@@ -1,4 +1,35 @@
 ---
-title: 'Get Plants'
-openapi: 'GET /plants'
+title: "Get Users"
+openapi: "GET /users"
 ---
+
+### Endpoint
+
+`GET /users`
+
+### Description
+
+Fetch a list of users from the system.
+
+---
+
+### Response
+
+#### Success (200 OK)
+
+```json
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john.doe@example.com"
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "email": "jane.smith@example.com"
+    }
+  ]
+}
+```
