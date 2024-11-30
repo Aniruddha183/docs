@@ -43,11 +43,11 @@
     },
     {
       "group": "Fitnearn Website",
-      "pages": ["fitnearn-backend","fitnearn-frontend"]
+      "pages": ["fitnearn-Backend", "fitnearn-Frontend"]
     },
     {
       "group": "Knwoledge Base",
-      "pages": ["Deployment-Docs","Cognito-Integration"]
+      "pages": ["Deployment-Docs", "Cognito-Integration"]
     },
     {
       "group": "Endpoints",
