@@ -42,12 +42,29 @@
       "pages": ["api-reference/introduction"]
     },
     {
-      "group": "Fitnearn Website",
-      "pages": ["fitnearn-Backend", "fitnearn-Frontend"]
+      "group": "Fitnearn Frontend",
+      "pages": ["adsense-integration"]
     },
     {
-      "group": "Knwoledge Base",
-      "pages": ["Deployment-Docs", "Cognito-Integration"]
+      "group": "Fitnearn Backend",
+      "pages": ["cloudflare-setup-guide", "google-calendar-integration"]
+    },
+    {
+      "group": "DevOps",
+      "pages": ["Deployment-Docs"]
+    },
+    {
+      "group": "Cloud",
+      "pages": ["Cognito-Integration"]
+    },
+    {
+      "group": "Others",
+      "pages": [
+        "git-flow-guide",
+
+        "meet-num-of-participants",
+        "api-inegration-security"
+      ]
     },
     {
       "group": "Endpoints",
