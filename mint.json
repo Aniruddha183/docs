@@ -1,24 +1,28 @@
 {
   "name": "API Documentation",
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/logo.png",
+    "dark": "/logo/logo.png"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/logo/logo.png",
   "colors": {
-    "primary": "#0D9373",
-    "light": "#07C983",
-    "dark": "#0D9373"
+    "primary": "#d46f22",
+    "light": "#d46f22",
+    "dark": "#d46f22"
+  },
+  "modeToggle": {
+    "default": "dark",
+    "isHidden": true
   },
   "topbarLinks": [
     {
       "name": "Support",
-      "url": "mailto:support@example.com"
+      "url": "mailto:admin@fitnearn.com"
     }
   ],
   "topbarCtaButton": {
     "name": "Dashboard",
-    "url": "https://dashboard.example.com"
+    "url": "/"
   },
   "anchors": [
     {
@@ -35,45 +39,104 @@
   "navigation": [
     {
       "group": "Getting Started",
-      "pages": ["introduction", "quickstart"]
-    },
-    {
-      "group": "API Documentation",
-      "pages": ["api-reference/introduction"]
-    },
-    {
-      "group": "Fitnearn Frontend",
-      "pages": ["adsense-integration"]
-    },
-    {
-      "group": "Fitnearn Backend",
-      "pages": ["cloudflare-setup-guide", "google-calendar-integration"]
-    },
-    {
-      "group": "DevOps",
-      "pages": ["Deployment-Docs"]
-    },
-    {
-      "group": "Cloud",
-      "pages": ["Cognito-Integration"]
-    },
-    {
-      "group": "Others",
       "pages": [
-        "git-flow-guide",
+        "introduction",
+        "purpose-of-documentation",
+        "how-to-use-documentation",
 
-        "meet-num-of-participants",
-        "api-inegration-security"
+        "quickstart"
       ]
     },
     {
-      "group": "Endpoints",
+      "group": "Frontend",
       "pages": [
-        "api-reference/endpoint/authentication",
-        "api-reference/endpoint/users",
-        "api-reference/endpoint/session",
-        "api-reference/endpoint/categories",
-        "api-reference/endpoint/newsletter"
+        {
+          "group": "Editor Tools",
+          "pages": ["editorjs-integration"]
+        },
+        {
+          "group": "Calendar & Social Media",
+          "pages": [
+            "google-calendar-integration",
+            "twitter-posts-integration",
+            "instagram-graph-api"
+          ]
+        },
+        {
+          "group": "Ads and Analytics",
+          "pages": ["adsense-integration", "google-analytics-nodejs"]
+        },
+        {
+          "group": "User Notifications",
+          "pages": ["notification-system"]
+        }
+      ]
+    },
+    {
+      "group": "Backend",
+      "pages": [
+        {
+          "group": "Payment and Communication",
+          "pages": ["razorpay-setup", "twilio-configuration"]
+        },
+        {
+          "group": "API and Security",
+          "pages": ["api-integration-security", "aws-iam-setup"]
+        },
+        {
+          "group": "Session Management",
+          "pages": ["multi-device-session-management"]
+        }
+      ]
+    },
+    {
+      "group": "DevOps",
+      "pages": [
+        {
+          "group": "Deployment",
+          "pages": ["digitalocean-app-deployment", "Deployment-Docs"]
+        },
+        {
+          "group": "Automation",
+          "pages": ["serverless-jenkins-setup"]
+        }
+      ]
+    },
+    {
+      "group": "Cloud",
+      "pages": [
+        {
+          "group": "Cloud Services",
+          "pages": ["cloudflare-setup-guide", "cloudflare-services-utilization"]
+        },
+        {
+          "group": "Authentication",
+          "pages": ["cognito-integration"]
+        }
+      ]
+    },
+    {
+      "group": "Troubleshooting",
+      "pages": ["errors-faced-and-resolved", "meet-num-of-participants"]
+    },
+    {
+      "group": "Best Practices",
+      "pages": ["git-commands", "git-flow-guide"]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction",
+        {
+          "group": "Endpoints",
+          "pages": [
+            "api-reference/endpoint/authentication",
+            "api-reference/endpoint/users",
+            "api-reference/endpoint/session",
+            "api-reference/endpoint/categories",
+            "api-reference/endpoint/newsletter"
+          ]
+        }
       ]
     }
   ]
