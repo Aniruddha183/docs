@@ -94,7 +94,7 @@
       "pages": [
         {
           "group": "Deployment",
-          "pages": ["digitalocean-app-deployment", "Deployment-Docs"]
+          "pages": ["Deployment-Docs", "digitalocean-app-deployment"]
         },
         {
           "group": "Automation",
@@ -117,11 +117,11 @@
     },
     {
       "group": "Troubleshooting",
-      "pages": ["errors-faced-and-resolved", "meet-num-of-participants"]
+      "pages": ["meet-num-of-participants", "errors-faced-and-resolved"]
     },
     {
       "group": "Best Practices",
-      "pages": ["git-commands", "git-flow-guide"]
+      "pages": ["git-flow-guide", "git-commands"]
     },
     {
       "group": "API Reference",
