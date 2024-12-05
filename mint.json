@@ -63,6 +63,11 @@
       "group": "Frontend",
 
       "pages": [
+
+        {
+          "group": "Template",
+          "pages": ["frontend-template"]
+        },
         {
           "group": "Code Guidelines",
           "pages": ["frontend-code-guidelines"]
