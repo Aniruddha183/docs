@@ -49,7 +49,12 @@
     },
     {
       "group": "Frontend",
+      
       "pages": [
+        {
+          "group": "Code Guidelines",
+          "pages": ["frontend-code-guidelines"]
+        },
         {
           "group": "Editor Tools",
           "pages": ["editorjs-integration"]
@@ -75,6 +80,11 @@
     {
       "group": "Backend",
       "pages": [
+
+        {
+          "group": "Code Guidelines",
+          "pages": ["backend-code-guidelines"]
+        },
         {
           "group": "Payment and Communication",
           "pages": ["razorpay-setup", "twilio-configuration"]
@@ -121,7 +131,7 @@
     },
     {
       "group": "Best Practices",
-      "pages": ["git-flow-guide", "git-commands"]
+      "pages": ["git-best-practices", "git-flow-guide"]
     },
     {
       "group": "API Reference",
