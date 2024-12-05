@@ -6,9 +6,21 @@
   },
   "favicon": "/logo/logo.png",
   "colors": {
-    "primary": "#d46f22",
-    "light": "#d46f22",
-    "dark": "#d46f22"
+    "primary": "#EB8916",
+    "light": "#EB8916",
+    "dark": "#EB8916"
+  },
+  "search": {
+    "prompt": "Search documentation...",
+    "placeholder": "Search docs...",
+    "indexing": {
+      "code": true,
+      "headers": true,
+      "text": true
+    }
+  },
+  "site": {
+    "search": true
   },
   "modeToggle": {
     "default": "dark",
@@ -49,7 +61,7 @@
     },
     {
       "group": "Frontend",
-      
+
       "pages": [
         {
           "group": "Code Guidelines",
@@ -80,7 +92,6 @@
     {
       "group": "Backend",
       "pages": [
-
         {
           "group": "Code Guidelines",
           "pages": ["backend-code-guidelines"]
