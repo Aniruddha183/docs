@@ -55,42 +55,35 @@
         "introduction",
         "purpose-of-documentation",
         "how-to-use-documentation",
-
         "quickstart"
       ]
     },
     {
       "group": "Frontend",
-
       "pages": [
-
         {
-          "group": "Template",
+          "group": "Code Guidelines and Best Practices",
+          "pages": ["frontend-code-guidelines"]
+        },
+      
+        {
+          "group": "Components and UI Libraries",
           "pages": ["frontend-template"]
         },
         {
-          "group": "Code Guidelines",
-          "pages": ["frontend-code-guidelines"]
-        },
-        {
-          "group": "Editor Tools",
-          "pages": ["editorjs-integration"]
-        },
-        {
-          "group": "Calendar & Social Media",
+          "group": "Integrations",
           "pages": [
             "google-calendar-integration",
             "twitter-posts-integration",
-            "instagram-graph-api"
+            "instagram-graph-api",
+            "adsense-integration",
+            "google-analytics-nodejs",
+            "notification-system"
           ]
         },
         {
-          "group": "Ads and Analytics",
-          "pages": ["adsense-integration", "google-analytics-nodejs"]
-        },
-        {
-          "group": "User Notifications",
-          "pages": ["notification-system"]
+          "group": "Developer Tools",
+          "pages": ["editorjs-integration"]
         }
       ]
     },
@@ -98,56 +91,70 @@
       "group": "Backend",
       "pages": [
         {
-          "group": "Code Guidelines",
+          "group": "Code Guidelines and Best Practices",
           "pages": ["backend-code-guidelines"]
         },
         {
-          "group": "Payment and Communication",
-          "pages": ["razorpay-setup", "twilio-configuration"]
-        },
-        {
-          "group": "API and Security",
-          "pages": ["api-integration-security", "aws-iam-setup"]
-        },
-        {
-          "group": "Session Management",
-          "pages": ["multi-device-session-management"]
-        }
-      ]
-    },
-    {
-      "group": "DevOps",
-      "pages": [
-        {
-          "group": "Deployment",
-          "pages": ["Deployment-Docs", "digitalocean-app-deployment"]
-        },
-        {
-          "group": "Automation",
+          "group": "Serverless",
           "pages": ["serverless-jenkins-setup"]
+        },
+        {
+          "group": "API",
+          "pages": ["api-integration-security"]
+        },
+        {
+          "group": "Databases and Datasets",
+          "pages": ["#"]
+        },
+        {
+          "group": "Integrations",
+          "pages": [
+            "razorpay-setup",
+            "twilio-configuration",
+            "aws-iam-setup",
+            "multi-device-session-management"
+          ]
+        },
+        {
+          "group": "Developer Tools",
+          "pages": ["git-flow-guide"]
         }
       ]
     },
     {
-      "group": "Cloud",
+      "group": "Cloud Documentation",
       "pages": [
+        {
+          "group": "AWS, GCP & Azure",
+          "pages": ["cognito-integration"]
+        },
+     
         {
           "group": "Cloud Services",
           "pages": ["cloudflare-setup-guide", "cloudflare-services-utilization"]
-        },
-        {
-          "group": "Authentication",
-          "pages": ["cognito-integration"]
         }
       ]
     },
     {
-      "group": "Troubleshooting",
-      "pages": ["meet-num-of-participants", "errors-faced-and-resolved"]
+      "group": "DevOps Documentation",
+      "pages": [
+        {
+          "group": "CI/CD",
+          "pages": ["Deployment-Docs", "digitalocean-app-deployment"]
+        },
+        {
+          "group": "Version Control and Repository Management",
+          "pages": ["git-best-practices", "git-flow-guide"]
+        },
+        {
+          "group": "Developer Tools",
+          "pages": ["git-flow-guide"]
+        }
+      ]
     },
     {
-      "group": "Best Practices",
-      "pages": ["git-best-practices", "git-flow-guide"]
+      "group": "Troubleshooting Erros",
+      "pages": ["meet-num-of-participants"]
     },
     {
       "group": "API Reference",
