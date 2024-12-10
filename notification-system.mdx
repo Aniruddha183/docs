@@ -31,7 +31,7 @@ Install the necessary dependencies for Firebase integration in your Next.js proj
 ````bash
 npm install firebase
 Integration Steps
-<Step title="Set Up Firebase Project"> 1. Go to [Firebase Console](https://console.firebase.google.com/) 2. Create a new project or use an existing one 3. Navigate to Project Settings > Cloud Messaging and note down the `Server Key` and `Sender ID` 4. Download the `google-services.json` or `firebase-config.js` file and store it securely </Step> <Step title="Configure Firebase in Next.js"> Add the Firebase configuration to your Next.js project by creating a `firebaseConfig.js` file:</step>
+<Step title="Set Up Firebase Project"> 1. Go to [Firebase Console](https://console.firebase.google.com/) 2. Create a new project or use an existing one 3. Navigate to Project Settings > Cloud Messaging and note down the `Server Key` and `Sender ID` 4. Download the `google-services.json` or `firebase-config.js` file and store it securely </Step> <Step title="Configure Firebase in Next.js"> Add the Firebase configuration to your Next.js project by creating a `firebaseConfig.js` file:</Step>
 
 ```javascript file="firebaseConfig.js"
 const firebaseConfig = {
@@ -72,7 +72,7 @@ export const onNotificationReceived = () => {
 };
 ```
 
- <Step title="Create a Service Worker"> Add a `firebase-messaging-sw.js` file in the public directory to handle background notifications:</Step
+ <Step title="Create a Service Worker"> Add a `firebase-messaging-sw.js` file in the public directory to handle background notifications:</Step>
 
 ```javascript file="public/firebase-messaging-sw.js"
 importScripts("https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js");
@@ -100,9 +100,9 @@ messaging.onBackgroundMessage((payload) => {
 });
 ```
 
-</Step> <Step title="Integrate Notification Request in App"> Add notification permissions and initialize listeners in your Next.js application:
+<Step> <Step title="Integrate Notification Request in App"> Add notification permissions and initialize listeners in your Next.js application:</Step></Step>
 
-```tsx file="NotificationComponent.tsx"
+```
 "use client";
 import { useEffect } from "react";
 import {
@@ -122,7 +122,7 @@ const NotificationComponent = () => {
 export default NotificationComponent;
 ```
 
-</Step> </Steps>
+
 Best Practices
 Ensure your Firebase API keys are secured
 Regularly update Firebase dependencies
