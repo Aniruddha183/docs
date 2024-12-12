@@ -42,7 +42,7 @@
       "icon": "book-open",
       "url": "api-reference"
     },
-  
+
     {
       "name": "Frontend",
       "icon": "code",
@@ -83,7 +83,7 @@
         },
         {
           "group": "Components and UI Libraries",
-          "pages": ["frontend/frontend-template"]
+          "pages": ["frontend/shadcn","frontend/frontend-template"]
         },
         {
           "group": "Integrations",
@@ -157,7 +157,10 @@
         },
         {
           "group": "Cloud Services",
-          "pages": ["cloud-devops/cloudflare-setup-guide", "cloud-devops/cloudflare-services-utilization"]
+          "pages": [
+            "cloud-devops/cloudflare-setup-guide",
+            "cloud-devops/cloudflare-services-utilization"
+          ]
         }
       ]
     },
@@ -166,11 +169,17 @@
       "pages": [
         {
           "group": "CI/CD",
-          "pages": ["cloud-devops/Deployment-Docs", "cloud-devops/digitalocean-app-deployment"]
+          "pages": [
+            "cloud-devops/Deployment-Docs",
+            "cloud-devops/digitalocean-app-deployment"
+          ]
         },
         {
           "group": "Version Control and Repository Management",
-          "pages": ["cloud-devops/git-best-practices", "cloud-devops/git-flow-guide"]
+          "pages": [
+            "cloud-devops/git-best-practices",
+            "cloud-devops/git-flow-guide"
+          ]
         }
       ]
     },
@@ -180,42 +189,41 @@
     }
   ],
   "tabs": [
-  {
-    "name": "Getting Started",
-    "url": "documentation",
-    "icon": "book-open-cover", 
-    "navigation": ["Getting Started"]
-  },
-  {
-    "name": "Frontend",
-    "url": "frontend",
-    "icon": "code", 
-    "navigation": ["Frontend"]
-  },
-  {
-    "name": "Backend",
-    "url": "backend",
-    "icon": "server", 
-    "navigation": ["Backend"]
-  },
-  {
-    "name": "Cloud & DevOps",
-    "url": "cloud-devops",
-    "icon": "cloud", 
-    "navigation": ["Cloud Documentation", "DevOps Documentation"]
-  },
-  {
-    "name": "Troubleshooting",
-    "url": "troubleshooting",
-    "icon": "exclamation-triangle", 
-    "navigation": ["Troubleshooting Errors"]
-  },
-  {
-    "name": "API Reference",
-    "url": "api-reference",
-    "icon": "cloud", 
-    "navigation": ["API Reference"]
-  }
-]
-  
+    {
+      "name": "Getting Started",
+      "url": "documentation",
+      "icon": "book-open-cover",
+      "navigation": ["Getting Started"]
+    },
+    {
+      "name": "Frontend",
+      "url": "frontend",
+      "icon": "code",
+      "navigation": ["Frontend"]
+    },
+    {
+      "name": "Backend",
+      "url": "backend",
+      "icon": "server",
+      "navigation": ["Backend"]
+    },
+    {
+      "name": "Cloud & DevOps",
+      "url": "cloud-devops",
+      "icon": "cloud",
+      "navigation": ["Cloud Documentation", "DevOps Documentation"]
+    },
+    {
+      "name": "Troubleshooting",
+      "url": "troubleshooting",
+      "icon": "exclamation-triangle",
+      "navigation": ["Troubleshooting Errors"]
+    },
+    {
+      "name": "API Reference",
+      "url": "api-reference",
+      "icon": "cloud",
+      "navigation": ["API Reference"]
+    }
+  ]
 }
