@@ -83,7 +83,7 @@
         },
         {
           "group": "Components and UI Libraries",
-          "pages": ["frontend/shadcn","frontend/frontend-template"]
+          "pages": ["frontend/shadcn", "frontend/frontend-template"]
         },
         {
           "group": "Integrations",
@@ -153,7 +153,7 @@
       "pages": [
         {
           "group": "AWS, GCP & Azure",
-          "pages": ["cloud-devops/cognito-integration"]
+          "pages": ["cloud-devops/Cognito-Integration"]
         },
         {
           "group": "Cloud Services",
