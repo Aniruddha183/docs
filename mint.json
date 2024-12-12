@@ -82,6 +82,10 @@
           "pages": ["frontend/frontend-code-guidelines"]
         },
         {
+          "group": "Fitnearn Components",
+          "pages": ["frontend/sidebar", "frontend/adminheader"]
+        },
+        {
           "group": "Components and UI Libraries",
           "pages": ["frontend/shadcn", "frontend/frontend-template"]
         },
