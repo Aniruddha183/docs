@@ -39,13 +39,29 @@
   "anchors": [
     {
       "name": "API Reference",
-      "icon": "book-open-cover",
+      "icon": "book-open",
       "url": "api-reference"
     },
+  
     {
-      "name": "SDKs",
+      "name": "Frontend",
       "icon": "code",
-      "url": "sdks"
+      "url": "frontend"
+    },
+    {
+      "name": "Troubleshooting",
+      "icon": "wrench",
+      "url": "troubleshooting"
+    },
+    {
+      "name": "Cloud & DevOps",
+      "icon": "wrench",
+      "url": "cloud-devops"
+    },
+    {
+      "name": "Backend",
+      "icon": "server",
+      "url": "backend"
     }
   ],
   "navigation": [
@@ -63,28 +79,26 @@
       "pages": [
         {
           "group": "Code Guidelines and Best Practices",
-          "pages": ["frontend-code-guidelines"]
+          "pages": ["frontend/frontend-code-guidelines"]
         },
-      
         {
           "group": "Components and UI Libraries",
-          "pages": ["frontend-template"]
+          "pages": ["frontend/frontend-template"]
         },
         {
           "group": "Integrations",
           "pages": [
-            "google-calendar-integration",
-             "notification-system",
-             "adsense-integration",
-            "twitter-posts-integration",
-            "instagram-graph-api",
-            "google-analytics-nodejs"
-           
+            "frontend/google-calendar-integration",
+            "frontend/notification-system",
+            "frontend/adsense-integration",
+            "frontend/twitter-posts-integration",
+            "frontend/instagram-graph-api",
+            "frontend/google-analytics-nodejs"
           ]
         },
         {
           "group": "Developer Tools",
-          "pages": ["editorjs-integration"]
+          "pages": ["frontend/editorjs-integration"]
         }
       ]
     },
@@ -93,67 +107,30 @@
       "pages": [
         {
           "group": "Code Guidelines and Best Practices",
-          "pages": ["backend-code-guidelines"]
-        },
-        {
-          "group": "Serverless",
-          "pages": ["serverless-jenkins-setup"]
+          "pages": ["backend/backend-code-guidelines"]
         },
         {
           "group": "API",
-          "pages": ["api-integration-security"]
+          "pages": ["backend/api-integration-security"]
         },
-     
+        {
+          "group": "Serverless",
+          "pages": ["backend/serverless-jenkins-setup"]
+        },
         {
           "group": "Integrations",
           "pages": [
-            "Twillow-integration",
-            "razorpay-setup",
-           
-            "aws-iam-setup",
-            "multi-device-session-management"
+            "backend/Twillow-integration",
+            "backend/razorpay-setup",
+            "backend/aws-iam-setup",
+            "backend/multi-device-session-management"
           ]
         },
         {
           "group": "Developer Tools",
-          "pages": ["git-flow-guide"]
+          "pages": ["backend/git-flow-guide"]
         }
       ]
-    },
-    {
-      "group": "Cloud Documentation",
-      "pages": [
-        {
-          "group": "AWS, GCP & Azure",
-          "pages": ["cognito-integration"]
-        },
-     
-        {
-          "group": "Cloud Services",
-          "pages": ["cloudflare-setup-guide", "cloudflare-services-utilization"]
-        }
-      ]
-    },
-    {
-      "group": "DevOps Documentation",
-      "pages": [
-        {
-          "group": "CI/CD",
-          "pages": ["Deployment-Docs", "digitalocean-app-deployment"]
-        },
-        {
-          "group": "Version Control and Repository Management",
-          "pages": ["git-best-practices", "git-flow-guide"]
-        },
-        {
-          "group": "Developer Tools",
-          "pages": ["git-flow-guide"]
-        }
-      ]
-    },
-    {
-      "group": "Troubleshooting Erros",
-      "pages": ["meet-num-of-participants"]
     },
     {
       "group": "API Reference",
@@ -170,6 +147,75 @@
           ]
         }
       ]
+    },
+    {
+      "group": "Cloud Documentation",
+      "pages": [
+        {
+          "group": "AWS, GCP & Azure",
+          "pages": ["cloud-devops/cognito-integration"]
+        },
+        {
+          "group": "Cloud Services",
+          "pages": ["cloud-devops/cloudflare-setup-guide", "cloud-devops/cloudflare-services-utilization"]
+        }
+      ]
+    },
+    {
+      "group": "DevOps Documentation",
+      "pages": [
+        {
+          "group": "CI/CD",
+          "pages": ["cloud-devops/Deployment-Docs", "cloud-devops/digitalocean-app-deployment"]
+        },
+        {
+          "group": "Version Control and Repository Management",
+          "pages": ["cloud-devops/git-best-practices", "cloud-devops/git-flow-guide"]
+        }
+      ]
+    },
+    {
+      "group": "Troubleshooting Errors",
+      "pages": ["troubleshooting/meet-num-of-participants"]
     }
-  ]
+  ],
+  "tabs": [
+  {
+    "name": "Getting Started",
+    "url": "documentation",
+    "icon": "book-open-cover", 
+    "navigation": ["Getting Started"]
+  },
+  {
+    "name": "Frontend",
+    "url": "frontend",
+    "icon": "code", 
+    "navigation": ["Frontend"]
+  },
+  {
+    "name": "Backend",
+    "url": "backend",
+    "icon": "server", 
+    "navigation": ["Backend"]
+  },
+  {
+    "name": "Cloud & DevOps",
+    "url": "cloud-devops",
+    "icon": "cloud", 
+    "navigation": ["Cloud Documentation", "DevOps Documentation"]
+  },
+  {
+    "name": "Troubleshooting",
+    "url": "troubleshooting",
+    "icon": "exclamation-triangle", 
+    "navigation": ["Troubleshooting Errors"]
+  },
+  {
+    "name": "API Reference",
+    "url": "api-reference",
+    "icon": "cloud", 
+    "navigation": ["API Reference"]
+  }
+]
+  
 }
