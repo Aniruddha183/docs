@@ -83,7 +83,7 @@
         },
         {
           "group": "Fitnearn Components",
-          "pages": ["frontend/sidebar", "frontend/adminheader"]
+          "pages": ["frontend/sidebar", "frontend/adminheader", "frontend/text-effect", "frontend/select-avatar"]
         },
         {
           "group": "Components and UI Libraries",
