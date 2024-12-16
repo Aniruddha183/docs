@@ -1,12 +1,12 @@
 ---
 title: 'Deployment Docs'
-description: 'Comprehensive guide for deploying Next.js applications on DigitalOcean Ubuntu Server'
+description: 'Comprehensive guide for deploying Next.js applications on digitalOcean/AWS Ubuntu Server'
 ---
 
 
-# Deployment Checklist for Next.js Applications on DigitalOcean Ubuntu Server
+# Deployment Checklist for Next.js Applications on digitalOcean/AWS Ubuntu Server
 
-This comprehensive guide ensures thorough preparation, deployment, and monitoring of Next.js applications on a DigitalOcean Ubuntu server.
+This comprehensive guide ensures thorough preparation, deployment, and monitoring of Next.js applications on a digitalOcean/AWS Ubuntu server.
 
 ## Preparation for Deployment
 
@@ -97,18 +97,18 @@ This comprehensive guide ensures thorough preparation, deployment, and monitorin
   </Accordion>
 </AccordionGroup>
 
-# Deployment Steps for Next.js Applications on DigitalOcean Ubuntu Server
+# Deployment Steps for Next.js Applications on digitalOcean/AWS Ubuntu Server
 
 ## Prerequisites
 
-- DigitalOcean account
+- digitalOcean/AWS account
 - Domain names managed through a service like Namecheap or GoDaddy
 - SSH key for secure access to the server
 
 ## Step-by-Step Deployment Guide
 
 <Steps>
-  <Step title="Provision the DigitalOcean Droplet">
+  <Step title="Provision the digitalOcean/AWS Droplet">
     <AccordionGroup>
       <Accordion title="Create a Droplet">
         - [ ] Choose Ubuntu as the operating system.
@@ -125,7 +125,7 @@ This comprehensive guide ensures thorough preparation, deployment, and monitorin
     <AccordionGroup>
       <Accordion title="Update DNS Records">
         - [ ] Log in to your domain provider (Namecheap, GoDaddy, etc.).
-        - [ ] Create A records for your main domain and any subdomains, pointing them to your DigitalOcean server's IP address.
+        - [ ] Create A records for your main domain and any subdomains, pointing them to your digitalOcean/AWS server's IP address.
       </Accordion>
     </AccordionGroup>
   </Step>
@@ -280,61 +280,7 @@ This comprehensive guide ensures thorough preparation, deployment, and monitorin
     </AccordionGroup>
   </Step>
 
-  <Step title="Set Up the Second Next.js Application">
-    <AccordionGroup>
-      <Accordion title="Create Another Next.js App">
-        Repeat steps 7 to 9 for the second Next.js app. Use a different port and directory.
-        ```bash
-        npx create-next-app@latest testomarl
-        cd testomarl
-        npm run build
-        pm2 start npm --name testomarl -- start
-        ```
-      </Accordion>
-      <Accordion title="Configure Nginx">
-        Create another Nginx configuration:
-        ```bash
-        sudo nano /etc/nginx/sites-available/testomarl
-        ```
-        Add the configuration:
-        ```nginx
-        server {
-          listen 80;
-          server_name test.omarl.com;
-
-          location / {
-            proxy_pass http://127.0.0.1:3001;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-          }
-
-          location ~ /.well-known/acme-challenge/ {
-            allow all;
-          }
-
-          gzip on;
-          gzip_types text/plain application/xml application/x-javascript text/css application/json;
-        }
-        ```
-      </Accordion>
-      <Accordion title="Enable the Site">
-        Enable the configuration:
-        ```bash
-        sudo ln -s /etc/nginx/sites-available/testomarl /etc/nginx/sites-enabled/
-        sudo systemctl restart nginx
-        ```
-      </Accordion>
-      <Accordion title="Obtain SSL Certificate">
-        Obtain an SSL certificate:
-        ```bash
-        sudo certbot --nginx -d test.omarl.com
-        ```
-      </Accordion>
-    </AccordionGroup>
-  </Step>
+ 
 </Steps>
 
 ## Additional Notes

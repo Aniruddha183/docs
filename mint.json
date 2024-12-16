@@ -79,11 +79,16 @@
       "pages": [
         {
           "group": "Code Guidelines and Best Practices",
-          "pages": ["frontend/frontend-code-guidelines"]
+          "pages": ["frontend/frontend-code-guidelines", "frontend/demo"]
         },
         {
           "group": "Fitnearn Components",
-          "pages": ["frontend/sidebar", "frontend/adminheader", "frontend/text-effect", "frontend/select-avatar"]
+          "pages": [
+            "frontend/sidebar",
+            "frontend/adminheader",
+            "frontend/text-effect",
+            "frontend/select-avatar"
+          ]
         },
         {
           "group": "Components and UI Libraries",
