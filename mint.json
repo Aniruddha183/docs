@@ -195,6 +195,20 @@
     {
       "group": "Troubleshooting Errors",
       "pages": ["troubleshooting/meet-num-of-participants"]
+    },
+    {
+      "group": "Swasthi",
+      "pages": [
+        "swasthi/swasthi-overview",
+        "swasthi/swasthi-dependencies",
+        "swasthi/swasthi-auth",
+        "swasthi/swasthi-firestore",
+        "swasthi/swasthi-firebase-storage",
+        "swasthi/swasthi-analytics",
+        "swasthi/swasthi-notification",
+        "swasthi/swasthi-purchases",
+        "swasthi/swasthi-admob"
+      ]
     }
   ],
   "tabs": [
@@ -233,6 +247,12 @@
       "url": "api-reference",
       "icon": "cloud",
       "navigation": ["API Reference"]
+    },
+    {
+      "name": "Swasthi",
+      "url": "swasthi",
+      "icon": "Mobile",
+      "navigation": ["Swasthi"]
     }
   ]
 }
