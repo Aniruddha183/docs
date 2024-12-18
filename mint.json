@@ -87,7 +87,8 @@
             "frontend/sidebar",
             "frontend/adminheader",
             "frontend/text-effect",
-            "frontend/select-avatar"
+            "frontend/select-avatar",
+            "frontend/shadcnButton"
           ]
         },
         {
