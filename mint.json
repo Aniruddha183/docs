@@ -62,6 +62,11 @@
       "name": "Backend",
       "icon": "server",
       "url": "backend"
+    },
+    {
+      "name":"Swasthi",
+      "icon":"mobile",
+      "url":"swasthi"
     }
   ],
   "navigation": [
@@ -201,13 +206,40 @@
       "pages": [
         "swasthi/swasthi-overview",
         "swasthi/swasthi-dependencies",
+        {
+          "group": "Code Guidelines",
+          "pages":[
+            "swasthi/swasthi-guidelines"
+          ]
+        },
         "swasthi/swasthi-auth",
         "swasthi/swasthi-firestore",
         "swasthi/swasthi-firebase-storage",
-        "swasthi/swasthi-analytics",
-        "swasthi/swasthi-notification",
-        "swasthi/swasthi-purchases",
-        "swasthi/swasthi-admob"
+        
+        
+        {
+          "group":"Integration",
+          "pages":[
+            "swasthi/swasthi-analytics",
+            "swasthi/swasthi-notification",
+            "swasthi/swasthi-purchases",
+            "swasthi/swasthi-admob"
+          ]
+        },
+        {
+          "group": "Developer Tools",
+          "pages":[
+            "swasthi/git-flow-guide"
+          ]
+        },
+        {
+          "group":"Build and Deployment",
+          "pages":[
+            "swasthi/swasthi-preparing",
+            "swasthi/swasthi-build",
+            "swasthi/swasthi-google-play"
+          ]
+        }
       ]
     }
   ],
@@ -251,7 +283,7 @@
     {
       "name": "Swasthi",
       "url": "swasthi",
-      "icon": "Mobile",
+      "icon": "mobile",
       "navigation": ["Swasthi"]
     }
   ]
