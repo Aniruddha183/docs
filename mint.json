@@ -109,7 +109,8 @@
             "frontend/adsense-integration",
             "frontend/twitter-posts-integration",
             "frontend/instagram-graph-api",
-            "frontend/google-analytics-nodejs"
+            "frontend/google-analytics-nodejs",
+            "frontend/chatwoot-integration"
           ]
         },
         {
