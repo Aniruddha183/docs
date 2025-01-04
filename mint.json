@@ -94,7 +94,7 @@
             "frontend/text-effect",
             "frontend/select-avatar",
             "frontend/shadcnButton",
-            "frontend/downloadButton", "frontend/toast-docs"
+            "frontend/downloadButton", "frontend/toast-docs", "frontend/combo-box", "frontend/table", "frontend/chat-bubble"
           ]
         },
         {
