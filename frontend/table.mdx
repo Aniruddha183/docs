@@ -6,23 +6,25 @@ description: "Integrate and customize a dynamic and paginated table in your Next
 ### Dynamic Table Component
 
 <Frame>
-  <img src="/images/dynamic-table.png" style={{ borderRadius: '0.5rem' }} />
+  <img src="/images/dynamic-table.png" style={{ borderRadius: "0.5rem" }} />
 </Frame>
 
 #### Overview
 
-The `DynamicTable` component is a versatile and customizable table that supports pagination, search, and row selection. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
+The `DynamicTable` component is a versatile and customizable table that supports pagination, search, row selection, and enhanced features such as dynamic page ranges and more user-friendly pagination controls. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
 
 #### Features
 
 - **Searchable Columns**: Each column includes a search field for filtering data.
-- **Pagination**: Easily navigate between multiple pages of data.
-- **Row Selection**: Supports selecting and deselecting rows for further actions.
+- **Pagination**: Enhanced pagination with ellipses for large datasets and better navigation.
+- **Row Selection**: Supports selecting and deselecting rows for further actions, including a "select all" feature.
 - **Details Column**: Optional column for additional actions like editing or viewing details.
+- **Customizable Keys**: Each row can be uniquely identified using the `uniqueKey` prop.
 
 #### Usage
 
 **Code Snippet:**
+
 ```tsx
 import DynamicTable from "./DynamicSessionTable";
 
@@ -37,8 +39,8 @@ const ExampleComponent = () => {
     // Simulate a data-fetching function
     return {
       data: [
-        { sessionId: "1", name: "John Doe", email: "john@example.com", role: "Admin" },
-        { sessionId: "2", name: "Jane Doe", email: "jane@example.com", role: "User" },
+        { id: "1", name: "John Doe", email: "john@example.com", role: "Admin" },
+        { id: "2", name: "Jane Doe", email: "jane@example.com", role: "User" },
       ],
       totalPages: 2,
     };
@@ -55,6 +57,7 @@ const ExampleComponent = () => {
       useData={useData}
       showBorder
       showDetailsColumn
+      uniqueKey="id"
       onDetailsClick={handleDetailsClick}
     />
   );
@@ -63,32 +66,36 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop                | Type                                              | Default       | Description                                                                  |
-|---------------------|---------------------------------------------------|---------------|------------------------------------------------------------------------------|
-| `columns`           | `Array<{ key: string; header: string }>`         | `[]`          | Defines the structure and headers of the table.                             |
-| `headerColor`       | `string`                                         | `"#000"`      | Background color for the table header.                                      |
-| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number }` | `undefined`   | Function to fetch table data dynamically based on page and search queries.  |
-| `showBorder`        | `boolean`                                        | `true`        | Whether to display a border around the table.                               |
-| `showDetailsColumn` | `boolean`                                        | `true`        | Whether to include a "Details" column for additional actions.               |
-| `onDetailsClick`    | `(item: any) => void`                             | `undefined`   | Callback for when the details button is clicked.                            |
+| Prop                | Type                                                                    | Default     | Description                                                                |
+| ------------------- | ----------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
+| `columns`           | `Array<{ key: string; header: string }>`                                | `[]`        | Defines the structure and headers of the table.                            |
+| `headerColor`       | `string`                                                                | `"#000"`    | Background color for the table header.                                     |
+| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number }` | `undefined` | Function to fetch table data dynamically based on page and search queries. |
+| `showBorder`        | `boolean`                                                               | `true`      | Whether to display a border around the table.                              |
+| `showDetailsColumn` | `boolean`                                                               | `true`      | Whether to include a "Details" column for additional actions.              |
+| `onDetailsClick`    | `(item: any) => void`                                                   | `undefined` | Callback for when the details button is clicked.                           |
+| `uniqueKey`         | `string`                                                                | `undefined` | The key used to uniquely identify rows.                                    |
 
 #### Anatomy
 
 1. **Table Header**:
+
    - Displays column names and search inputs.
    - Includes a checkbox for selecting all rows.
 
 2. **Table Body**:
+
    - Renders the rows based on the fetched data.
    - Includes individual checkboxes for row selection.
 
 3. **Pagination**:
    - Provides navigation buttons for moving between pages.
-   - Supports dynamic page ranges and ellipses for large datasets.
+   - Includes ellipses for large datasets and dynamic page ranges.
 
 #### Component Code
 
 **Code Snippet:**
+
 ```tsx
 export default function DynamicTable({
   columns,
@@ -97,6 +104,7 @@ export default function DynamicTable({
   showBorder = true,
   showDetailsColumn = true,
   onDetailsClick,
+  uniqueKey,
 }: DynamicTableProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -114,6 +122,15 @@ export default function DynamicTable({
     .join(" ");
 
   const { data, totalPages } = useData(page, searchQuery);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allRowIds = data.map((item) => item[uniqueKey]);
+      setSelectedRows(new Set(allRowIds));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
 
   const handleSearchChange = (field: string, value: string) => {
     setSearchQueries({ ...searchQueries, [field]: value });
@@ -136,7 +153,11 @@ export default function DynamicTable({
   };
 
   return (
-    <div className={`p-4 rounded-xl ${showBorder ? "border border-neutral-700" : ""}`}>
+    <div
+      className={`p-4 rounded-xl ${
+        showBorder ? "border border-neutral-700" : ""
+      }`}
+    >
       <Table>
         {/* Table Header */}
         {/* Table Body */}
