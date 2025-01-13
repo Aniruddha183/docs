@@ -150,7 +150,7 @@
         },
         {
           "group": "Developer Tools",
-          "pages": ["backend/git-flow-guide"]
+          "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
         }
       ]
     },
