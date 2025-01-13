@@ -1,0 +1,227 @@
+---
+title: Feature Branch to Development Workflow
+description: A step-by-step guide for deploying feature branches to the development environment, including setup, development, testing, and deployment strategies.
+---
+
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+
+## Table of Contents
+
+1. [Phase 1: Requirement Analysis and Initial Setup](#phase-1-requirement-analysis-and-initial-setup)
+2. [Phase 2: Development](#phase-2-development)
+3. [Phase 3: Testing and Deployment](#phase-3-testing-and-deployment)
+4. [Phase 4: Production Deployment](#phase-4-production-deployment)
+5. [Phase 5: Deployment Strategy](#phase-5-deployment-strategy)
+6. [Important Notes](#important-notes)
+
+## Phase 1: Requirement Analysis and Initial Setup
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="requirement-analysis">
+    <AccordionTrigger>Requirement Analysis Steps</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>
+          Navigate to the Project Board and identify tasks assigned to you.
+        </li>
+        <li>Review the requirements in detail.</li>
+        <li>
+          Collaborate with the Designer/Product Lead to clarify ambiguities.
+        </li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="document-requirements">
+    <AccordionTrigger>Documenting Requirements</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>
+          Create a detailed Requirements Document capturing discussed points.
+        </li>
+        <li>Draft an initial system design in Figma.</li>
+        <li>
+          Add comments in Figma and reconnect with the designer for
+          clarification if needed.
+        </li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="system-architecture">
+    <AccordionTrigger>System Architecture Design</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Start working on the User Flow alongside requirement gathering.</li>
+        <li>Create a System Architecture Design based on functionality.</li>
+        <li>Coordinate with Frontend Developer to discuss API requirements.</li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+---
+
+## Phase 2: Development
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="development-setup">
+    <AccordionTrigger>Setup Local Development Environment</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Pull the latest code from the development branch:</li>
+        <pre>
+          <code>git pull origin development</code>
+        </pre>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="rest-api-development">
+    <AccordionTrigger>REST API Development</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Create and test the required REST API locally.</li>
+        <li>Push your code to a new feature branch:</li>
+        <pre>
+          <code>
+            git checkout -b feature/branchName git add . git commit -m "Commit
+            Message" git push origin feature/branchName
+          </code>
+        </pre>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="code-merge-practices">
+    <AccordionTrigger>Code Merge Practices</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>
+          Pull updates from the development branch into the feature branch:
+        </li>
+        <pre>
+          <code>git pull origin development</code>
+        </pre>
+        <li>Ensure only the src directory is added before pushing.</li>
+        <li>
+          Clear cached files like <code>.env</code>:
+        </li>
+        <pre>
+          <code>git rm -r --cached .env</code>
+        </pre>
+        <li>
+          Create and raise a Pull Request (PR) on GitHub from the feature branch
+          to the development branch.
+        </li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+---
+
+## Phase 3: Testing and Deployment
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="api-deployment">
+    <AccordionTrigger>API Deployment Steps</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Deploy the API to the development server.</li>
+        <li>Test the API using the hosted API URL:</li>
+        <pre>
+          <code>
+            https://iwojpgsdff.execute-api.ap-south-1.amazonaws.com/dev/
+          </code>
+        </pre>
+        <li>Debug and monitor using AWS CloudWatch Logs.</li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="swagger-documentation">
+    <AccordionTrigger>Swagger Documentation</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Create an API design according to the Swagger document.</li>
+        <li>
+          Add API routes documentation under the <code>paths</code> tag in the
+          Swagger file.
+        </li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+---
+
+## Phase 4: Production Deployment
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="production-deployment">
+    <AccordionTrigger>Deploy Feature Branch to Production</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>Push code to a stable feature branch:</li>
+        <pre>
+          <code>
+            git checkout -b feature/branchName git add . git commit -m "Commit
+            Message" git push origin feature/branchName
+          </code>
+        </pre>
+        <li>Setup production resources such as S3 buckets and IAM roles.</li>
+        <li>Update and test the production environment file.</li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+---
+
+## Phase 5: Deployment Strategy
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="deployment-best-practices">
+    <AccordionTrigger>Best Practices</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>
+          Deploy from development to production only when the development branch
+          is stable.
+        </li>
+        <li>
+          Limit production releases to critical bug fixes or high-priority
+          features.
+        </li>
+        <li>Ensure a thorough review of changes before deployment.</li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+---
+
+## Important Notes
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="important-notes">
+    <AccordionTrigger>Key Considerations</AccordionTrigger>
+    <AccordionContent>
+      <ul>
+        <li>
+          Ensure <code>.env</code> files are included in <code>.gitignore</code>
+          .
+        </li>
+        <li>
+          When installing packages, check for compact options instead of entire
+          packages (e.g., <code>@aws-sdk/client-s3</code>).
+        </li>
+        <li>
+          Maximum Lambda deployment package size is 50 MB (direct upload) or 250
+          MB (via S3).
+        </li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
