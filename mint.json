@@ -192,7 +192,8 @@
           "group": "CI/CD",
           "pages": [
             "cloud-devops/Deployment-Docs",
-            "cloud-devops/digitalocean-app-deployment"
+            "cloud-devops/digitalocean-app-deployment",
+            "cloud-devops/backend_deployment"
           ]
         },
         {
