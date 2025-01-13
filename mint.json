@@ -42,7 +42,6 @@
       "icon": "book-open",
       "url": "api-reference"
     },
-
     {
       "name": "Frontend",
       "icon": "code",
@@ -221,7 +220,6 @@
         "swasthi/swasthi-auth",
         "swasthi/swasthi-firestore",
         "swasthi/swasthi-firebase-storage",
-
         {
           "group": "Integration",
           "pages": [
