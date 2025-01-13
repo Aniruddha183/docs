@@ -3,6 +3,8 @@ title: "Backend Deployment Process and Guidelines"
 description: "A comprehensive guide covering prerequisite knowledge, branching strategies, development workflow, and deployment procedures."
 ---
 
+import { Image } from "@/components/Image";
+
 ## Prerequisite Knowledge
 
 ### Required Skills
@@ -100,11 +102,18 @@ description: "A comprehensive guide covering prerequisite knowledge, branching s
 1. **Environment File Management**
    - Add `.env` to `.gitignore`
    - Clear cache after updates:
-     ```bash
-     git rm -r --cached .
-     git add .
-     git commit -m "Updated .gitignore to exclude .env"
-     ```
+     `bash
+git rm -r --cached .
+git add .
+git commit -m "Updated .gitignore to exclude .env"
+`
+     <img
+       src="/images/Backend_Deployment1.png"
+       alt="Backend Workflow Diagram"
+       width="230"
+       height="230"
+       className="mt-4 rounded-lg"
+     />
 
 ## Error Handling and Debugging
 
