@@ -42,7 +42,6 @@
       "icon": "book-open",
       "url": "api-reference"
     },
-
     {
       "name": "Frontend",
       "icon": "code",
@@ -64,9 +63,9 @@
       "url": "backend"
     },
     {
-      "name":"Swasthi",
-      "icon":"mobile",
-      "url":"swasthi"
+      "name": "Swasthi",
+      "icon": "mobile",
+      "url": "swasthi"
     }
   ],
   "navigation": [
@@ -94,7 +93,11 @@
             "frontend/text-effect",
             "frontend/select-avatar",
             "frontend/shadcnButton",
-            "frontend/downloadButton", "frontend/toast-docs"
+            "frontend/downloadButton",
+            "frontend/toast-docs",
+            "frontend/combo-box",
+            "frontend/table",
+            "frontend/chat-bubble"
           ]
         },
         {
@@ -154,12 +157,13 @@
             "backend/Twillow-integration",
             "backend/razorpay-setup",
             "backend/aws-iam-setup",
-            "backend/multi-device-session-management"
+            "backend/multi-device-session-management",
+            "backend/secure-s3-access-cognito"
           ]
         },
         {
           "group": "Developer Tools",
-          "pages": ["backend/git-flow-guide"]
+          "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
         }
       ]
     },
@@ -202,7 +206,8 @@
           "group": "CI/CD",
           "pages": [
             "cloud-devops/Deployment-Docs",
-            "cloud-devops/digitalocean-app-deployment"
+            "cloud-devops/digitalocean-app-deployment",
+            "cloud-devops/backend_deployment"
           ]
         },
         {
@@ -225,18 +230,14 @@
         "swasthi/swasthi-dependencies",
         {
           "group": "Code Guidelines",
-          "pages":[
-            "swasthi/swasthi-guidelines"
-          ]
+          "pages": ["swasthi/swasthi-guidelines"]
         },
         "swasthi/swasthi-auth",
         "swasthi/swasthi-firestore",
         "swasthi/swasthi-firebase-storage",
-        
-        
         {
-          "group":"Integration",
-          "pages":[
+          "group": "Integration",
+          "pages": [
             "swasthi/swasthi-analytics",
             "swasthi/swasthi-notification",
             "swasthi/swasthi-purchases",
@@ -245,13 +246,11 @@
         },
         {
           "group": "Developer Tools",
-          "pages":[
-            "swasthi/git-flow-guide"
-          ]
+          "pages": ["swasthi/git-flow-guide"]
         },
         {
-          "group":"Build and Deployment",
-          "pages":[
+          "group": "Build and Deployment",
+          "pages": [
             "swasthi/swasthi-preparing",
             "swasthi/swasthi-build",
             "swasthi/swasthi-google-play"
