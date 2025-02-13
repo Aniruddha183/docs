@@ -98,8 +98,22 @@
           ]
         },
         {
+          "group": "Fitnearn Store Components",
+          "pages": [
+            "frontend/StoreComponents/productCard",
+            "frontend/StoreComponents/rating",
+            "frontend/StoreComponents/reviewCard"
+          ]
+        },
+        {
           "group": "Components and UI Libraries",
           "pages": ["frontend/shadcn", "frontend/frontend-template"]
+        },
+        {
+          "group": "RTK-Slices",
+          "pages": [
+            "frontend/RTK-Slices/storeSlice"
+          ]
         },
         {
           "group": "Integrations",
