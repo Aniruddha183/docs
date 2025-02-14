@@ -108,15 +108,21 @@
             "frontend/StoreComponents/reviewCard"
           ]
         },
+
+        {
+          "group": "Fitnearn Authentication Pages",
+          "pages": [
+            "frontend/AuthenticationPages/login",
+            "frontend/AuthenticationPages/otpscreen"
+          ]
+        },
         {
           "group": "Components and UI Libraries",
           "pages": ["frontend/shadcn", "frontend/frontend-template"]
         },
         {
           "group": "RTK-Slices",
-          "pages": [
-            "frontend/RTK-Slices/storeSlice"
-          ]
+          "pages": ["frontend/RTK-Slices/storeSlice"]
         },
         {
           "group": "Integrations",
