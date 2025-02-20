@@ -167,6 +167,7 @@
             "backend/secure-s3-access-cognito"
           ]
         },
+        
         {
           "group": "Developer Tools",
           "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
@@ -248,6 +249,20 @@
             "swasthi/swasthi-notification",
             "swasthi/swasthi-purchases",
             "swasthi/swasthi-admob"
+          ]
+        },
+        {
+          "group": "Swasthi Components",
+          "pages": [
+            "swasthi/admin-login",
+            "swasthi/Change-Password",
+            "swasthi/Multi-factor Authentication",
+            "swasthi/Verify-identify",
+            "swasthi/mfa-device",
+            "swasthi/mfa-setup",
+            "swasthi/mfa-verify",
+            "swasthi/signin"
+           
           ]
         },
         {
