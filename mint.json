@@ -97,7 +97,9 @@
             "frontend/toast-docs",
             "frontend/combo-box",
             "frontend/table",
-            "frontend/chat-bubble"
+            "frontend/chat-bubble",
+            "frontend/Popup",
+            "frontend/ReasonBox"
           ]
         },
         {

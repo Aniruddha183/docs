@@ -1,0 +1,178 @@
+---
+title: "Reason Box Component"
+description: "A flexible and interactive Reason Box component for user input and visibility control."
+---
+
+### Reason Box Component
+
+<Frame>
+  <img src="/images/ReasonBox.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+#### Overview
+
+The `ReasonBox` component is a user-friendly interface for inputting and controlling the visibility of a comment. It is designed with flexibility in mind, allowing dynamic customization of its title, button label, and button icon. This component can be useful in scenarios where users need to provide justifications, feedback, or other types of input.
+
+#### Features
+
+- **Dynamic Title**: The title of the box can be set dynamically.
+- **Textarea Input**: Provides a user input field for comments.
+- **Visibility Control**: A checkbox allows toggling comment visibility.
+- **Customizable Button**: The button label and optional icon can be customized.
+- **State Management**: Supports both local and parent-managed state.
+
+#### Usage
+
+**Code Snippet:**
+
+```tsx
+import ReasonBox from "./ReasonBox";
+import { Save } from "lucide-react";
+import { useState } from "react";
+
+const ExampleComponent = () => {
+  const [comment, setComment] = useState("");
+  const [visibility, setVisibility] = useState(false);
+
+  const handleSave = (comment: string, visibility: boolean) => {
+    console.log("Comment:", comment);
+    console.log("Visible to user:", visibility);
+  };
+
+  return (
+    <ReasonBox
+      title="Reason for Decision"
+      buttonLabel="Save"
+      buttonIcon={<Save />}
+      onButtonClick={handleSave}
+      comment={comment}
+      setComment={setComment}
+      visibility={visibility}
+      setVisibility={setVisibility}
+    />
+  );
+};
+```
+
+#### Props
+
+| Prop              | Type                                             | Default            | Description                                             |
+| ----------------- | ------------------------------------------------ | ------------------ | ------------------------------------------------------- |
+| `title`           | `string`                                         | `""`               | The title displayed at the top of the component.        |
+| `buttonLabel`     | `string`                                         | `""`               | The label text for the button.                          |
+| `buttonIcon`      | `ReactNode`                                      | `undefined`        | An optional icon for the button.                        |
+| `onButtonClick`   | `(comment: string, visibility: boolean) => void` | `undefined`        | Callback function triggered when the button is clicked. |
+| `textareaBgColor` | `string`                                         | `"bg-neutral-800"` | Background color for the textarea.                      |
+| `comment`         | `string`                                         | `""`               | The value of the comment input field.                   |
+| `setComment`      | `React.Dispatch<React.SetStateAction<string>>`   | `undefined`        | Function to update the comment state.                   |
+| `visibility`      | `boolean`                                        | `false`            | Whether the comment is visible to the user.             |
+| `setVisibility`   | `React.Dispatch<React.SetStateAction<boolean>>`  | `undefined`        | Function to update the visibility state.                |
+
+#### Anatomy
+
+1. **Header Section**:
+
+   - Displays the title of the component.
+   - Includes a checkbox to toggle comment visibility.
+
+2. **Textarea Input**:
+
+   - A text field for user input.
+   - Allows customization of background color.
+
+3. **Action Button**:
+   - Customizable button with dynamic label and optional icon.
+   - Calls the `onButtonClick` callback when clicked.
+
+#### Component Code
+
+**Code Snippet:**
+
+```tsx
+export default function ReasonBox({
+  title,
+  buttonLabel,
+  buttonIcon,
+  onButtonClick,
+  textareaBgColor = "bg-neutral-800",
+  comment: propComment,
+  setComment: setPropComment,
+  visibility: propVisibility,
+  setVisibility: setPropVisibility,
+}: ReasonBoxProps) {
+  const [localComment, setLocalComment] = useState("");
+  const [localVisibility, setLocalVisibility] = useState(false);
+
+  const comment = propComment !== undefined ? propComment : localComment;
+  const setComment =
+    setPropComment !== undefined ? setPropComment : setLocalComment;
+
+  const visibility =
+    propVisibility !== undefined ? propVisibility : localVisibility;
+  const setVisibility =
+    setPropVisibility !== undefined ? setPropVisibility : setLocalVisibility;
+
+  const handleButtonClick = () => {
+    if (onButtonClick) {
+      onButtonClick(comment, visibility);
+    }
+  };
+
+  const handleVisibilityChange = (checked: boolean | "indeterminate") => {
+    setVisibility(checked === true);
+  };
+
+  return (
+    <Card className="w-full max-w-3xl border-0 p-0">
+      <CardHeader className="px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white -ml-[21px]">
+            {title}
+          </h2>
+          <div className="flex items-center -mr-[21px]">
+            <Checkbox
+              id="visible"
+              className="border-neutral-600"
+              checked={visibility}
+              onCheckedChange={handleVisibilityChange}
+            />
+            <label
+              htmlFor="visible"
+              className="text-sm font-medium text-white ml-2"
+            >
+              Comment visible to user
+            </label>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 border border-neutral-600 rounded-lg overflow-hidden">
+        <div className="space-y-4">
+          <Textarea
+            placeholder="Write text here ..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            className={`min-h-[200px] ${textareaBgColor} border-b border-neutral-600 text-white resize-none rounded-none`}
+          />
+          <div className="flex justify-end p-2 pt-0 pb-4">
+            <Button
+              className="bg-neutral-600 text-white gap-2"
+              size="lg"
+              onClick={handleButtonClick}
+            >
+              {buttonIcon}
+              {buttonLabel}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Customization
+
+- **Styling**: Modify background colors, text styles, and padding.
+- **Button Actions**: Customize button behavior with `onButtonClick`.
+- **Controlled Input**: Manage comment state externally or internally.
+- **Visibility Toggle**: Use the checkbox to toggle comment visibility dynamically.
