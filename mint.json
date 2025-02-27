@@ -98,7 +98,9 @@
             "frontend/combo-box",
             "frontend/table",
             "frontend/chat-bubble",
-            "frontend/Popup",
+            "frontend/calendar-popup",
+            "frontend/input-field",
+            "frontend/Live-session-form",
             "frontend/ReasonBox"
           ]
         },

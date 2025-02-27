@@ -1,0 +1,122 @@
+---
+title: "Input Component"
+description: "A versatile input component with various states for enhanced UI/UX."
+---
+
+### Input Component
+
+<Frame>
+  <img src="/images/Input.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+#### Overview
+
+The `Input` component is a highly customizable input field supporting multiple states, including success, error, and disabled. It adapts dynamically to provide an improved user experience based on interaction and validation results.
+
+#### Features
+
+- **State-Based Styling**: Dynamically applies styles based on different states.
+- **Customizable**: Accepts additional class names for styling.
+- **Forward Ref Support**: Allows integration with React's `ref` for accessibility and manipulation.
+- **Adaptive Placeholder & Text Colors**: Matches input styles according to its state.
+- **Focus & Disabled Handling**: Implements accessibility best practices.
+
+#### Usage
+
+**Code Snippet:**
+
+```tsx
+import { Input } from "./Input";
+import { useState } from "react";
+
+const ExampleComponent = () => {
+  const [value, setValue] = useState("");
+  
+  return (
+    <Input
+      type="text"
+      state={value ? "Typing" : "Normal"}
+      placeholder="Enter text..."
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+    />
+  );
+};
+```
+
+#### Props
+
+| Prop       | Type                              | Default      | Description                                      |
+|-----------|-----------------------------------|--------------|--------------------------------------------------|
+| `state`   | `'Normal' \| 'Active' \| 'Typing' \| 'Disabled' \| 'Success' \| 'Failure' \| 'Error' \| 'ReadOnly'` | `'Normal'`  | Defines the visual state of the input. |
+| `type`    | `string`                          | `"text"`     | Specifies the input type (e.g., `text`, `email`). |
+| `className` | `string`                        | `""`         | Additional classes for custom styling.          |
+| `ref`     | `React.Ref<HTMLInputElement>`    | `undefined`  | Forwarded ref for input reference.              |
+| `...props` | `React.ComponentProps<'input'>` | `undefined`  | Inherits all standard input attributes.         |
+
+#### Input States
+
+1. **Normal**:
+   - Default state with neutral styling.
+
+2. **Active / Typing**:
+   - Highlights the input when focused or receiving input.
+
+3. **Disabled**:
+   - Grayed-out style, preventing user input.
+
+4. **Success**:
+   - Green border/text indicating valid input.
+
+5. **Failure / Error**:
+   - Red border/text signaling an invalid input.
+
+6. **ReadOnly**:
+   - Slightly faded appearance for non-editable fields.
+
+#### Component Code
+
+**Code Snippet:**
+```tsx
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, state = "Normal", type, ...props }, ref) => {
+    const stateClasses = {
+      Normal: "border-neutral-600 bg-neutral-950 text-neutral-500 placeholder-neutral-500",
+      Active: "border-neutral-400 bg-neutral-950 text-white placeholder-white",
+      Typing: "border-neutral-400 bg-neutral-950 text-white placeholder-white",
+      Disabled: "border-neutral-600 bg-neutral-900 text-neutral-600 placeholder-neutral-600",
+      Success: "border-green-600 bg-neutral-900 text-green-600 placeholder-green-600",
+      Failure: "border-red-600 bg-neutral-900 text-red-600 placeholder-red-600",
+      Error: "border-red-600 bg-neutral-900 text-red-600 placeholder-red-600",
+      ReadOnly: "border-neutral-600 bg-neutral-800 text-neutral-300 placeholder-neutral-300",
+    };
+
+    return (
+      <input
+        type={type}
+        className={cn(
+          `flex h-9 w-full rounded-md border px-3 py-1 text-base shadow-sm transition-colors
+           bg-transparent file:border-0 file:bg-transparent file:text-sm file:font-medium
+           focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring
+           disabled:cursor-not-allowed disabled:opacity-50 md:text-sm`,
+          stateClasses[state],
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+
+Input.displayName = "Input";
+
+export { Input };
+```
+
+### Customization
+
+- **Styling**: Apply additional styles using `className`.
+- **Dynamic States**: Change states dynamically based on input validation.
+- **Accessibility**: Ensure compatibility with screen readers and keyboard interactions.
+- **Type Variability**: Use different input types like `email`, `password`, etc.

@@ -1,0 +1,138 @@
+---
+title: "Calendar Component"
+description: "A customizable calendar component built with react-day-picker for date selection."
+---
+
+### Calendar Component
+
+<Frame>
+  <img src="/images/calendar.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+#### Overview
+
+The `Calendar` component is a versatile date picker built using `react-day-picker`. It provides an intuitive UI for selecting dates and supports various styles and configurations, including range selection, custom navigation icons, and theming.
+
+#### Features
+
+- **Date Selection**: Allows users to pick single or range dates.
+- **Custom Navigation Icons**: Uses `ChevronLeft` and `ChevronRight` for navigation.
+- **Theming & Styling**: Supports Tailwind CSS and customizable styles.
+- **Range Selection**: Easily select a date range.
+- **Accessibility**: Fully keyboard navigable and screen-reader friendly.
+
+#### Usage
+
+**Code Snippet:**
+
+```tsx
+import { Calendar } from "./Calendar";
+
+const ExampleComponent = () => {
+  return (
+    <Calendar
+      mode="single"
+      selected={new Date()}
+      onSelect={(date) => console.log("Selected date:", date)}
+    />
+  );
+};
+```
+
+#### Props
+
+| Prop              | Type                                         | Default     | Description                                     |
+| ----------------- | -------------------------------------------- | ----------- | ----------------------------------------------- |
+| `className`       | `string`                                     | `""`        | Custom class name for the calendar container.   |
+| `classNames`      | `Record<string, string>`                     | `{}`        | Custom styles for individual calendar elements. |
+| `showOutsideDays` | `boolean`                                    | `true`      | Whether to show days from previous/next months. |
+| `mode`            | `'single' \| 'multiple' \| 'range'`          | `'single'`  | Date selection mode.                            |
+| `selected`        | `Date \| Date[] \| { from: Date, to: Date }` | `undefined` | Selected date(s) or range.                      |
+| `onSelect`        | `(date: Date) => void`                       | `undefined` | Callback triggered when a date is selected.     |
+
+#### Anatomy
+
+1. **Navigation Controls**:
+
+   - Uses `ChevronLeft` and `ChevronRight` for month navigation.
+   - Includes a label for the current month.
+
+2. **Date Grid**:
+
+   - Displays a matrix of days within a selected month.
+   - Supports single, multiple, and range selection modes.
+
+3. **Day Styling**:
+   - Highlights today’s date.
+   - Applies styles for selected, disabled, and outside days.
+
+#### Component Code
+
+**Code Snippet:**
+
+```tsx
+export function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  ...props
+}: CalendarProps) {
+  return (
+    <DayPicker
+      showOutsideDays={showOutsideDays}
+      className={cn("p-3", className)}
+      classNames={{
+        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+        month: "space-y-4",
+        caption: "flex justify-center pt-1 relative items-center",
+        caption_label: "text-sm font-medium",
+        nav: "space-x-1 flex items-center",
+        nav_button: cn(
+          buttonVariants({ variant: "outline" }),
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+        ),
+        nav_button_previous: "absolute left-1",
+        nav_button_next: "absolute right-1",
+        table: "w-full border-collapse space-y-1",
+        head_row: "flex",
+        head_cell:
+          "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
+        row: "flex w-full mt-2",
+        cell: cn(
+          "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+          props.mode === "range"
+            ? "[&:has(>.day-range-end)]:rounded-r-md [&:has(>.day-range-start)]:rounded-l-md"
+            : "[&:has([aria-selected])]:rounded-md"
+        ),
+        day: cn(
+          buttonVariants({ variant: "ghost" }),
+          "h-8 w-8 p-0 font-normal aria-selected:opacity-100"
+        ),
+        day_selected:
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+        day_today: "bg-accent text-accent-foreground",
+        day_outside:
+          "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
+        day_disabled: "text-muted-foreground opacity-50",
+        ...classNames,
+      }}
+      components={{
+        IconLeft: ({ className, ...props }) => (
+          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+        ),
+        IconRight: ({ className, ...props }) => (
+          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+        ),
+      }}
+      {...props}
+    />
+  );
+}
+```
+
+### Customization
+
+- **Styling**: Modify colors, sizes, and borders using `classNames`.
+- **Date Selection**: Choose between single, multiple, or range selection.
+- **Navigation**: Customize the month navigation icons.
+- **Event Handling**: Respond to user interactions with `onSelect` callbacks.
