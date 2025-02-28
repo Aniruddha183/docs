@@ -100,7 +100,7 @@
             "frontend/chat-bubble",
             "frontend/calendar-popup",
             "frontend/input-field",
-            "frontend/Live-session-form",
+            "frontend/dynamic-form",
             "frontend/ReasonBox"
           ]
         },
