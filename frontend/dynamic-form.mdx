@@ -21,6 +21,8 @@ The `Dynamic Form` component is a flexible and interactive form layout designed 
 - **Action Buttons**: Supports primary action, delete, and copy functionalities.
 - **Dropdown Menu**: Additional options for editing, copying, and deleting the session.
 - **Back Navigation**: Optional back arrow support for easy navigation.
+- **Header Button Toggle**: Control visibility of the header action button.
+- **Separate Edit and Save Buttons**: Allows toggling between edit mode and save mode distinctly.
 
 #### Usage
 
@@ -40,11 +42,12 @@ const ExampleComponent = () => {
       breadcrumbIcons={[null, null, null]}
       isEditable={isEditable}
       setIsEditable={setIsEditable}
-      actionButtonLabel="Start Session"
-      onActionButtonClick={() => console.log("Session started")}
+      actionButtonLabel="Edit"
+      onActionButtonClick={() => console.log("Editing session")}
       onDeleteClick={() => console.log("Session deleted")}
       onCopyClick={() => console.log("Session copied")}
       onSaveChanges={() => console.log("Changes saved")}
+      showHeaderButton={true}
     >
       <p>Session details go here...</p>
     </LiveSessionForm>
@@ -54,26 +57,27 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop                     | Type                                            | Default     | Description                                   |
-| ------------------------ | ----------------------------------------------- | ----------- | --------------------------------------------- |
-| `breadcrumb`             | `string[]`                                      | `[]`        | Array of breadcrumb labels.                   |
-| `breadcrumbLinks`        | `string[]`                                      | `undefined` | Optional links for breadcrumb navigation.     |
-| `breadcrumbIcons`        | `React.ReactNode[]`                             | `[]`        | Icons corresponding to breadcrumb items.      |
-| `statusBarSteps`         | `React.ReactNode[]`                             | `undefined` | Steps for the session progress status bar.    |
-| `statusBarColorOverride` | `{ [index: number]: string }`                   | `undefined` | Custom colors for status bar steps.           |
-| `children`               | `ReactNode`                                     | `undefined` | Content to be displayed inside the form.      |
-| `isEditable`             | `boolean`                                       | `false`     | Determines whether the form is in edit mode.  |
-| `setIsEditable`          | `React.Dispatch<React.SetStateAction<boolean>>` | `undefined` | Function to toggle edit mode.                 |
-| `actionButtonLabel`      | `string`                                        | `undefined` | Label for the primary action button.          |
-| `actionButtonIcon`       | `React.ReactNode`                               | `undefined` | Optional icon for the action button.          |
-| `onActionButtonClick`    | `() => void`                                    | `undefined` | Callback for the primary action button.       |
-| `onDeleteClick`          | `() => void`                                    | `undefined` | Callback for the delete action.               |
-| `onCopyClick`            | `() => void`                                    | `undefined` | Callback for the copy action.                 |
-| `onSaveChanges`          | `() => void`                                    | `undefined` | Callback for saving changes.                  |
-| `showButton`             | `boolean`                                       | `true`      | Determines if the edit/save button is shown.  |
-| `headerTitle`            | `string`                                        | `undefined` | Title displayed in the form header.           |
-| `showDropdown`           | `boolean`                                       | `true`      | Determines if the dropdown menu is displayed. |
-| `showBackArrow`          | `boolean`                                       | `false`     | Shows a back arrow for navigation.            |
+| Prop                     | Type                                            | Default     | Description                                      |
+| ------------------------ | ----------------------------------------------- | ----------- | ------------------------------------------------ |
+| `breadcrumb`             | `string[]`                                      | `[]`        | Array of breadcrumb labels.                      |
+| `breadcrumbLinks`        | `string[]`                                      | `undefined` | Optional links for breadcrumb navigation.        |
+| `breadcrumbIcons`        | `React.ReactNode[]`                             | `[]`        | Icons corresponding to breadcrumb items.         |
+| `statusBarSteps`         | `React.ReactNode[]`                             | `undefined` | Steps for the session progress status bar.       |
+| `statusBarColorOverride` | `{ [index: number]: string }`                   | `undefined` | Custom colors for status bar steps.              |
+| `children`               | `ReactNode`                                     | `undefined` | Content to be displayed inside the form.         |
+| `isEditable`             | `boolean`                                       | `false`     | Determines whether the form is in edit mode.     |
+| `setIsEditable`          | `React.Dispatch<React.SetStateAction<boolean>>` | `undefined` | Function to toggle edit mode.                    |
+| `actionButtonLabel`      | `string`                                        | `"Edit"`    | Label for the primary action button.             |
+| `actionButtonIcon`       | `React.ReactNode`                               | `undefined` | Optional icon for the action button.             |
+| `onActionButtonClick`    | `() => void`                                    | `undefined` | Callback for the primary action button.          |
+| `onDeleteClick`          | `() => void`                                    | `undefined` | Callback for the delete action.                  |
+| `onCopyClick`            | `() => void`                                    | `undefined` | Callback for the copy action.                    |
+| `onSaveChanges`          | `() => void`                                    | `undefined` | Callback for saving changes.                     |
+| `showButton`             | `boolean`                                       | `false`     | Determines if the edit/save button is shown.     |
+| `showHeaderButton`       | `boolean`                                       | `true`      | Determines if the header action button is shown. |
+| `headerTitle`            | `string`                                        | `undefined` | Title displayed in the form header.              |
+| `showDropdown`           | `boolean`                                       | `true`      | Determines if the dropdown menu is displayed.    |
+| `showBackArrow`          | `boolean`                                       | `false`     | Shows a back arrow for navigation.               |
 
 #### Anatomy
 
@@ -124,6 +128,7 @@ interface LiveSessionFormProps {
   onCopyClick?: () => void; // New optional prop for Create a Copy
   onSaveChanges?: () => void;
   showButton?: boolean;
+  showHeaderButton?: boolean;
   headerTitle?: string;
   showDropdown?: boolean;
   showBackArrow?: boolean;
@@ -151,14 +156,15 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
   children,
   isEditable,
   setIsEditable,
-  actionButtonLabel,
+  actionButtonLabel = "Edit",
   actionButtonIcon,
   onActionButtonClick,
   onDeleteClick, // New prop
   onCopyClick, // New prop
   onSaveChanges,
-  showButton = true,
+  showButton = false,
   headerTitle,
+  showHeaderButton = true,
   showDropdown = true,
   showBackArrow = false,
 }) => {
@@ -169,12 +175,17 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleEditClick = () => {
-    if (isEditable && onSaveChanges) {
-      onSaveChanges(); // Call the save handler when saving changes
-    } else {
-      setIsEditable((prev) => !prev); // Toggle edit mode
+    console.log("handleEditClick called, isEditable:", isEditable);
+
+    // Toggle between edit and non-edit mode without triggering save
+    setIsEditable((prev) => !prev);
+  };
+
+  const handleSaveClick = () => {
+    if (onSaveChanges) {
+      console.log("Saving changes...");
+      onSaveChanges(); // Calls the API when saving
     }
-    setDropdownOpen({ type: "SET", payload: false });
   };
 
   const handleClickOutside = (event: MouseEvent) => {
@@ -183,6 +194,16 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
       !dropdownRef.current.contains(event.target as Node)
     ) {
       setDropdownOpen({ type: "SET", payload: false });
+    }
+  };
+
+  const handleActionButtonClick = () => {
+    if (isEditable) {
+      console.log("Saving content...");
+      if (onSaveChanges) onSaveChanges(); // ✅ Call API when saving
+    } else {
+      console.log("Enabling edit mode...");
+      setIsEditable(true); // ✅ Toggle edit mode
     }
   };
 
@@ -242,12 +263,12 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
             </h1>
           </div>
           <div className="flex items-center space-x-4 relative">
-            {actionButtonLabel && (
+            {showHeaderButton && actionButtonLabel && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
-                onClick={onActionButtonClick}
+                onClick={handleActionButtonClick}
               >
                 {actionButtonIcon && (
                   <span className="flex items-center">{actionButtonIcon}</span>
@@ -364,5 +385,6 @@ export default LiveSessionForm;
 - **Action Buttons**: Customize label, icon, and functionality.
 - **Editable Mode**: Toggle between read-only and editable states.
 - **Status Bar**: Define steps and colors to match the workflow.
+- **Header Button Visibility**: Show or hide the main header action button.
 
 This component provides a structured yet customizable form experience for every form layout.
