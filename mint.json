@@ -95,6 +95,7 @@
             "frontend/shadcnButton",
             "frontend/downloadButton",
             "frontend/toast-docs",
+            "frontend/Popup",
             "frontend/combo-box",
             "frontend/table",
             "frontend/chat-bubble",
