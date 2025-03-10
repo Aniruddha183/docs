@@ -266,7 +266,8 @@
             "swasthi/mfa-device",
             "swasthi/mfa-setup",
             "swasthi/mfa-verify",
-            "swasthi/signin"
+            "swasthi/signin",
+            "swasthi/open-sidebar"
            
           ]
         },
