@@ -20,6 +20,7 @@ The `ReasonBox` component is a user-friendly interface for inputting and control
 - **Visibility Control**: A checkbox allows toggling comment visibility.
 - **Customizable Button**: The button label and optional icon can be customized.
 - **State Management**: Supports both local and parent-managed state.
+- **Read-Only Mode**: Allows rendering the component in a non-editable, view-only state.
 
 #### Usage
 
@@ -49,6 +50,7 @@ const ExampleComponent = () => {
       setComment={setComment}
       visibility={visibility}
       setVisibility={setVisibility}
+      readOnly={false} // Toggle to true to disable interaction
     />
   );
 };
@@ -56,17 +58,18 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop              | Type                                             | Default            | Description                                             |
-| ----------------- | ------------------------------------------------ | ------------------ | ------------------------------------------------------- |
-| `title`           | `string`                                         | `""`               | The title displayed at the top of the component.        |
-| `buttonLabel`     | `string`                                         | `""`               | The label text for the button.                          |
-| `buttonIcon`      | `ReactNode`                                      | `undefined`        | An optional icon for the button.                        |
-| `onButtonClick`   | `(comment: string, visibility: boolean) => void` | `undefined`        | Callback function triggered when the button is clicked. |
-| `textareaBgColor` | `string`                                         | `"bg-neutral-800"` | Background color for the textarea.                      |
-| `comment`         | `string`                                         | `""`               | The value of the comment input field.                   |
-| `setComment`      | `React.Dispatch<React.SetStateAction<string>>`   | `undefined`        | Function to update the comment state.                   |
-| `visibility`      | `boolean`                                        | `false`            | Whether the comment is visible to the user.             |
-| `setVisibility`   | `React.Dispatch<React.SetStateAction<boolean>>`  | `undefined`        | Function to update the visibility state.                |
+| Prop              | Type                                             | Default            | Description                                                 |
+| ----------------- | ------------------------------------------------ | ------------------ | ----------------------------------------------------------- |
+| `title`           | `string`                                         | `""`               | The title displayed at the top of the component.            |
+| `buttonLabel`     | `string`                                         | `""`               | The label text for the button.                              |
+| `buttonIcon`      | `ReactNode`                                      | `undefined`        | An optional icon for the button.                            |
+| `onButtonClick`   | `(comment: string, visibility: boolean) => void` | `undefined`        | Callback function triggered when the button is clicked.     |
+| `textareaBgColor` | `string`                                         | `"bg-neutral-800"` | Background color for the textarea.                          |
+| `comment`         | `string`                                         | `""`               | The value of the comment input field.                       |
+| `setComment`      | `React.Dispatch<React.SetStateAction<string>>`   | `undefined`        | Function to update the comment state.                       |
+| `visibility`      | `boolean`                                        | `false`            | Whether the comment is visible to the user.                 |
+| `setVisibility`   | `React.Dispatch<React.SetStateAction<boolean>>`  | `undefined`        | Function to update the visibility state.                    |
+| `readOnly`        | `boolean`                                        | `false`            | If `true`, disables interaction with textarea and checkbox. |
 
 #### Anatomy
 
@@ -79,6 +82,7 @@ const ExampleComponent = () => {
 
    - A text field for user input.
    - Allows customization of background color.
+   - Can be set to read-only.
 
 3. **Action Button**:
    - Customizable button with dynamic label and optional icon.
@@ -89,17 +93,41 @@ const ExampleComponent = () => {
 **Code Snippet:**
 
 ```tsx
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { ReactNode } from "react";
+import { useState } from "react";
+
+interface ReasonBoxProps {
+  title: string; // Dynamic title for the header
+  buttonLabel: string; // Dynamic label for the button
+  buttonIcon?: ReactNode; // Optional dynamic icon for the button
+  onButtonClick?: (comment: string, visibility: boolean) => void;
+  textareaBgColor?: string; // Background color for the Textarea
+  comment?: string; // Add this line
+  setComment?: React.Dispatch<React.SetStateAction<string>>; // Add this line
+  visibility?: boolean; // Add this line
+  setVisibility?: React.Dispatch<React.SetStateAction<boolean>>; // Add this line
+  readOnly?: boolean; // ✅ NEW
+}
+
 export default function ReasonBox({
   title,
   buttonLabel,
   buttonIcon,
   onButtonClick,
   textareaBgColor = "bg-neutral-800",
-  comment: propComment,
+  comment: propComment, // Props from parent
   setComment: setPropComment,
   visibility: propVisibility,
   setVisibility: setPropVisibility,
+  readOnly = false,
 }: ReasonBoxProps) {
+  // Use prop state if provided, otherwise use local state
   const [localComment, setLocalComment] = useState("");
   const [localVisibility, setLocalVisibility] = useState(false);
 
@@ -114,7 +142,7 @@ export default function ReasonBox({
 
   const handleButtonClick = () => {
     if (onButtonClick) {
-      onButtonClick(comment, visibility);
+      onButtonClick(comment, visibility); // Send the correct state
     }
   };
 
@@ -134,7 +162,10 @@ export default function ReasonBox({
               id="visible"
               className="border-neutral-600"
               checked={visibility}
-              onCheckedChange={handleVisibilityChange}
+              onCheckedChange={(checked) =>
+                !readOnly && handleVisibilityChange(checked)
+              }
+              disabled={readOnly}
             />
             <label
               htmlFor="visible"
@@ -150,7 +181,7 @@ export default function ReasonBox({
           <Textarea
             placeholder="Write text here ..."
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e) => !readOnly && setComment(e.target.value)} // Controlled input
             className={`min-h-[200px] ${textareaBgColor} border-b border-neutral-600 text-white resize-none rounded-none`}
           />
           <div className="flex justify-end p-2 pt-0 pb-4">
@@ -176,3 +207,4 @@ export default function ReasonBox({
 - **Button Actions**: Customize button behavior with `onButtonClick`.
 - **Controlled Input**: Manage comment state externally or internally.
 - **Visibility Toggle**: Use the checkbox to toggle comment visibility dynamically.
+- **Read-Only Mode**: Prevent user interaction for review-only scenarios.
