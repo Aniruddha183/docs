@@ -1,0 +1,182 @@
+# Custom Video Player Widget
+
+The `CustomVideoPlayer` is a Flutter widget that provides a custom video player implementation with enhanced controls and features. It uses the `video_player` and `chewie` packages to deliver a rich video playback experience.
+
+## Features
+
+- Custom video controls with play/pause, forward/backward (10 seconds)
+- Fullscreen support
+- Progress bar with seek functionality
+- Remaining time display
+- Auto-hiding controls
+- Loading indicator
+- Aspect ratio preservation
+- Gesture-based control visibility
+
+## Dependencies
+
+```yaml
+dependencies:
+  chewie: ^latest_version
+  video_player: ^latest_version
+  flutter_spinkit: ^latest_version
+  sizer: ^latest_version
+```
+
+## Implementation
+
+### Basic Usage
+
+```dart
+CustomVideoPlayer(
+  videoKey: 'your_video_key',
+)
+```
+
+### Component Structure
+
+The `CustomVideoPlayer` consists of several key parts:
+
+1. **State Management**
+   - Uses `ValueNotifier` for control visibility
+   - Manages video player state with `VideoPlayerController`
+   - Handles video URL fetching through `FileService`
+
+2. **Control System**
+   - Custom controls overlay
+   - Auto-hiding mechanism
+   - Gesture detection for control visibility
+
+3. **Progress Tracking**
+   - Custom progress bar with gradient
+   - Time remaining display
+   - Seek functionality
+
+### Key Methods
+
+#### Initialization
+```dart
+void initVideo(String videoUrl) {
+  videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+  chewieController = ChewieController(
+    videoPlayerController: videoPlayerController!,
+    autoPlay: false,
+    allowFullScreen: true,
+    allowMuting: true,
+    allowPlaybackSpeedChanging: false,
+    autoInitialize: true,
+    looping: false,
+    hideControlsTimer: const Duration(seconds: 3),
+    customControls: // Custom controls implementation
+  );
+}
+```
+
+#### Control Visibility
+```dart
+void _handleControlsVisibility() {
+  controleBuilder.value = true;
+  _hideTimer?.cancel();
+  _hideTimer = Timer(const Duration(seconds: 3), () {
+    if (mounted && videoPlayerController?.value.isPlaying == true) {
+      controleBuilder.value = false;
+    }
+  });
+}
+```
+
+#### Seeking
+```dart
+void _seekToPosition(double dx) {
+  final box = context.findRenderObject() as RenderBox;
+  final width = box.size.width;
+  double position = dx.clamp(0, width);
+  final progress = position / width;
+  final duration = videoPlayerController!.value.duration;
+  videoPlayerController!.seekTo(
+    Duration(milliseconds: (progress * duration.inMilliseconds).toInt())
+  );
+}
+```
+
+## Customization
+
+### Control Styling
+The video player controls can be customized by modifying the `customControls` property in the `ChewieController`. The current implementation includes:
+
+- Play/Pause button
+- Forward/Backward buttons (10 seconds)
+- Fullscreen button
+- Progress bar with gradient
+- Time remaining display
+
+### Loading State
+The loading state can be customized by modifying the `SpinKitRing` widget in the build method:
+
+```dart
+SpinKitRing(
+  color: Theme.of(context).primaryColor,
+  size: 20.sp,
+  lineWidth: 2,
+)
+```
+
+## Best Practices
+
+1. **Memory Management**
+   - Always dispose of controllers in the `dispose` method
+   - Cancel timers to prevent memory leaks
+   - Check mounted state before setState calls
+
+2. **Error Handling**
+   - Implement proper error handling for video loading
+   - Handle network connectivity issues
+   - Provide fallback UI for loading failures
+
+3. **Performance**
+   - Use `ValueListenableBuilder` for efficient rebuilds
+   - Implement proper aspect ratio handling
+   - Optimize control visibility logic
+
+## Example Usage
+
+```dart
+class VideoScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Video Player')),
+      body: Center(
+        child: CustomVideoPlayer(
+          videoKey: 'example_video_key',
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Video Not Loading**
+   - Check if the video key is valid
+   - Verify network connectivity
+   - Ensure proper permissions are set
+
+2. **Controls Not Responding**
+   - Check gesture detector implementation
+   - Verify control visibility logic
+   - Ensure proper state management
+
+3. **Aspect Ratio Issues**
+   - Verify video dimensions
+   - Check container constraints
+   - Ensure proper aspect ratio calculation
+
+## Additional Resources
+
+- [Video Player Package Documentation](https://pub.dev/packages/video_player)
+- [Chewie Package Documentation](https://pub.dev/packages/chewie)
+- [Flutter Video Player Best Practices](https://flutter.dev/docs/cookbook/plugins/play-video)

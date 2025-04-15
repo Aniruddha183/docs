@@ -1,0 +1,277 @@
+---
+title: CustomButton Widget
+description: A highly customizable button widget with gradient support and loading state
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# CustomButton
+
+The `CustomButton` widget is a versatile button component that supports gradients, loading states, and various styling options. It provides both filled and outlined variants with extensive customization capabilities.
+
+## Features
+
+- Gradient background support
+- Loading state with spinner
+- Outline and filled variants
+- Customizable dimensions and padding
+- Gradient text support
+- Custom border styling
+- Full-width option
+
+## Usage
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:your_app/widgets/buttons/CustomButton.dart';
+
+// Basic filled button
+CustomButton(
+  text: 'Click Me',
+  onTab: () {
+    // Handle button press
+  },
+)
+
+// Outline button
+CustomButton.outline(
+  text: 'Outline Button',
+  onTab: () {
+    // Handle button press
+  },
+)
+
+// Button with loading state
+CustomButton(
+  text: 'Loading...',
+  isLoading: true,
+  onTab: () {
+    // Handle button press
+  },
+)
+
+// Custom styled button
+CustomButton(
+  text: 'Custom Style',
+  height: 50,
+  width: 200,
+  padding: EdgeInsets.all(16),
+  textStyle: TextStyle(fontSize: 20),
+  gradient: LinearGradient(colors: [Colors.blue, Colors.green]),
+  borderRadius: BorderRadius.circular(25),
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `text` | `String` | Button text | Required |
+| `onTab` | `Function()?` | Callback function when button is pressed | `null` |
+| `fullWidth` | `bool` | Whether button should take full width | `false` |
+| `height` | `double?` | Custom height | `null` |
+| `width` | `double?` | Custom width | `null` |
+| `padding` | `EdgeInsets?` | Custom padding | `EdgeInsets.all(16)` |
+| `textStyle` | `TextStyle?` | Custom text style | `Theme.of(context).textTheme.labelMedium` |
+| `gradient` | `Gradient?` | Custom gradient | `UiGradient.instance.buttonGradientBg` |
+| `isLoading` | `bool` | Loading state | `false` |
+| `bgColor` | `Color?` | Background color | `null` |
+| `borderRadius` | `BorderRadius?` | Custom border radius | `BorderRadius.circular(16)` |
+| `gradientText` | `Widget?` | Custom gradient text widget | `null` |
+
+## Outline Variant Properties
+
+Additional properties available for outline variant:
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `borderColor` | `Color?` | Border color | `Theme.of(context).primaryColor` |
+| `borderWidth` | `double?` | Border width | `1` |
+
+## Implementation Details
+
+The `CustomButton` widget is implemented as a `StatelessWidget` with two constructors:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:gradient_borders/box_borders/gradient_box_border.dart';
+
+import '../../ui/gradient.dart';
+
+class CustomButton extends StatelessWidget {
+  Function()? onTab;
+  bool fullWidth;
+  double? height;
+  double? width;
+  String text;
+  TextStyle? textStyle;
+  EdgeInsets? padding;
+  Gradient? gradient;
+  bool isLoading;
+  Color? bgColor;
+  final bool outline;
+  Color? borderColor;
+  double? borderWidth;
+  BorderRadius? borderRadius;
+  Widget? gradientText;
+
+  // Regular constructor
+  CustomButton({
+    super.key,
+    required this.text,
+    this.onTab,
+    this.fullWidth = false,
+    this.height,
+    this.width,
+    this.padding,
+    this.textStyle,
+    this.gradient,
+    this.isLoading = false,
+    this.bgColor,
+    this.borderRadius,
+  }): borderColor = null, borderWidth = null,
+  gradientText = null;
+
+  // Outline constructor
+  CustomButton.outline({
+    super.key,
+    required this.text,
+    this.onTab,
+    this.fullWidth = false,
+    this.height,
+    this.width,
+    this.padding,
+    this.textStyle,
+    this.gradient,
+    this.isLoading = false,
+    this.bgColor,
+    this.borderColor,
+    this.borderWidth,
+    this.borderRadius,
+    this.gradientText,
+  }) : outline = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (outline) {
+      return Container(
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: borderRadius ?? BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: borderRadius ?? BorderRadius.circular(16),
+            onTap: onTab,
+            child: Container(
+              height: height,
+              width: width ?? (fullWidth ? double.infinity : null),
+              decoration: BoxDecoration(
+                border: gradient != null 
+                  ? GradientBoxBorder(
+                      gradient: gradient!,
+                      width: 1
+                    ) 
+                  : Border.all(
+                      color: borderColor ?? Theme.of(context).primaryColor, 
+                      width: borderWidth ?? 1
+                    ),
+                borderRadius: borderRadius ?? BorderRadius.circular(16),
+              ),
+              child: isLoading
+                  ? Padding(
+                      padding: EdgeInsets.all(11),
+                      child: SpinKitRing(
+                        color: Theme.of(context).primaryColor,
+                        size: 35,
+                        duration: Duration(milliseconds: 1000),
+                        lineWidth: 3,
+                      ),
+                    )
+                  : Padding(
+                      padding: padding ??
+                          EdgeInsets.only(
+                              left: 16, right: 16, bottom: 16, top: 16),
+                      child: Center(
+                        child: gradientText ?? Text(
+                          text,
+                          textAlign: TextAlign.center,
+                          style: textStyle ??
+                              Theme.of(context)
+                                  .textTheme
+                                  .labelMedium!
+                                  .copyWith(fontSize: 18),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        gradient: bgColor != null 
+          ? null 
+          : gradient ?? (onTab == null 
+            ? UiGradient.instance.buttonDisableGradientBg 
+            : UiGradient.instance.buttonGradientBg),
+        borderRadius: borderRadius ?? BorderRadius.circular(16),
+      ),
+      child: Material(
+        color: bgColor ?? Colors.transparent,
+        borderRadius: borderRadius ?? BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: borderRadius ?? BorderRadius.circular(16),
+          onTap: onTab,
+          child: SizedBox(
+            height: height,
+            width: width ?? (fullWidth ? double.infinity : null),
+            child: isLoading 
+              ? Padding(
+                  padding: EdgeInsets.all(11),
+                  child: SpinKitRing(
+                    color: Theme.of(context).primaryColor,
+                    size: 35, 
+                    duration: Duration(milliseconds: 1000), 
+                    lineWidth: 3,
+                  ),
+                ) 
+              : Padding(
+                  padding: padding ?? 
+                    EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 16),
+                  child: Center(
+                    child: Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      style: textStyle ?? 
+                        Theme.of(context).textTheme.labelMedium!.copyWith(
+                          fontSize: 18
+                        ),
+                    ),
+                  ),
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+## Styling
+
+The widget supports various styling options:
+- Gradient backgrounds
+- Custom colors
+- Custom border radius
+- Custom padding
+- Custom text styles
+- Loading spinner customization
+
+## Best Practices
+
+1. Use appropriate button variants based on the context (filled vs outline)
+2. Implement loading states for async operations
+3. Maintain consistent button sizes across your application
+4. Use gradients sparingly to maintain visual hierarchy
+5. Ensure sufficient contrast for accessibility
+6. Consider using the fullWidth property for primary actions 

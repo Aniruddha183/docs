@@ -1,0 +1,356 @@
+---
+title: Drawer Widget
+description: A customizable drawer component for navigation and user settings
+---
+
+import { CodeBlock } from 'components/CodeBlock';
+import { Callout } from 'components/Callout';
+
+# CustomDrawer
+
+The `CustomDrawer` is a comprehensive drawer component that provides navigation and user settings functionality in the Swasthi application. It features a user profile section, various settings options, and premium features access.
+
+## Features
+
+- User profile display with image and details
+- Connection settings
+- Language selection
+- Goal settings
+- Moodboard access
+- Calculator functionality
+- Premium features access
+- Reminder settings
+- Support and help options
+- Rate and feedback options
+- Logout functionality
+
+## Implementation Details
+
+### Basic Structure
+
+The CustomDrawer is implemented as a StatelessWidget with the following structure:
+
+```dart
+class CustomDrawer extends StatelessWidget {
+  const CustomDrawer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).drawerTheme.backgroundColor
+      ),
+      width: MediaQuery.of(context).size.width * 0.75,
+      child: Consumer<PaymentProvider>(
+        builder: (context, payment, _) {
+          return ListView(
+            padding: EdgeInsets.only(left: 15.sp, right: 15.sp),
+            children: [
+              // Drawer content sections
+            ],
+          );
+        }
+      ),
+    );
+  }
+}
+```
+
+### User Profile Section
+
+The profile section displays user information and is implemented as follows:
+
+```dart
+Selector<AccountProvider, Account?>(
+  builder: (context, value, child) {
+    return GestureDetector(
+      onTap: () {
+        context.push("/profile/edit");
+      },
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(50),
+            child: CachedNetworkImage(
+              imageUrl: value?.image ?? "default_image_url",
+              height: 40.sp,
+              width: 40.sp,
+              fit: BoxFit.cover,
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value?.name ?? "",
+                  style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                    fontWeight: FontWeight.w700
+                  ),
+                ),
+                Text(
+                  value?.email ?? "",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                    fontSize: 12
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  },
+  selector: (p0, p1) => p1.account,
+),
+```
+
+### Settings Section
+
+The settings section includes connection and language settings:
+
+```dart
+Container(
+  decoration: BoxDecoration(
+    color: Theme.of(context).cardColor,
+    borderRadius: BorderRadius.circular(15.sp)
+  ),
+  child: Column(
+    children: [
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(15.sp),
+            topRight: Radius.circular(15.sp)
+          ),
+          onTap: () {
+            context.push("/connection");
+          },
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: 6.sp,
+              left: 8.sp,
+              right: 8.sp,
+              top: 12.sp
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SvgPicture.asset("assets/drawer/connection.svg"),
+                SizedBox(width: 8.sp),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context)!.connection,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      fontSize: 14
+                    ),
+                  ),
+                ),
+                CustomSwitch(
+                  active: true,
+                  onTab: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+```
+
+### Features Section
+
+The features section includes various app functionalities:
+
+```dart
+Container(
+  decoration: BoxDecoration(
+    color: Theme.of(context).cardColor,
+    borderRadius: BorderRadius.circular(15.sp)
+  ),
+  child: Column(
+    children: [
+      _buildMenuItem(
+        context,
+        icon: Icons.flag,
+        title: "Goal Settings",
+        onTap: () {},
+      ),
+      _buildMenuItem(
+        context,
+        icon: Icons.mood,
+        title: "Moodboard",
+        onTap: () {},
+      ),
+      _buildMenuItem(
+        context,
+        icon: Icons.calculate,
+        title: "Calculator",
+        onTap: () {},
+      ),
+      // Premium features section
+      if(payment.isSubscribed() == false)
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(15.sp),
+              bottomRight: Radius.circular(15.sp)
+            ),
+            onTap: () {
+              Provider.of<PaymentProvider>(context, listen: false)
+                .updateHasSetup(true);
+              context.push("/subscription");
+            },
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: 12.sp,
+                left: 8.sp,
+                right: 8.sp,
+                top: 8.sp
+              ),
+              child: Row(
+                children: [
+                  SvgPicture.asset("assets/drawer/statistics.svg"),
+                  SizedBox(width: 8.sp),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context)!.statistics,
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontSize: 14
+                      ),
+                    ),
+                  ),
+                  GradientText(
+                    AppLocalizations.of(context)!.be_premium_user,
+                    gradient: UiGradient.instance.defaultGradient,
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      letterSpacing: 0,
+                      fontStyle: FontStyle.italic
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ],
+  ),
+),
+```
+
+### Helper Methods
+
+The drawer uses helper methods for consistent menu item creation:
+
+```dart
+Widget _buildMenuItem(
+  BuildContext context, {
+  required IconData icon,
+  required String title,
+  required VoidCallback onTap,
+}) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: 6.sp,
+          left: 8.sp,
+          right: 8.sp,
+          top: 8.sp
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 24.sp),
+            SizedBox(width: 8.sp),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  fontSize: 14
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+```
+
+## Required Dependencies
+
+Add these to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  go_router: ^latest_version
+  provider: ^latest_version
+  sizer: ^latest_version
+  flutter_svg: ^latest_version
+  cached_network_image: ^latest_version
+  url_launcher: ^latest_version
+```
+
+## Styling Guidelines
+
+The drawer follows these styling conventions:
+
+1. **Spacing**
+   - Uses `sizer` package for responsive sizing
+   - Consistent padding: 15.sp for container, 8.sp for items
+   - 12.sp spacing between sections
+
+2. **Colors**
+   - Uses theme colors for consistency
+   - Card background: `Theme.of(context).cardColor`
+   - Drawer background: `Theme.of(context).drawerTheme.backgroundColor`
+
+3. **Typography**
+   - Title text: `labelMedium` with `FontWeight.w700`
+   - Subtitle text: `titleSmall` with `fontSize: 12`
+   - Menu items: `bodyMedium` with `fontSize: 14`
+
+4. **Shapes**
+   - Rounded corners: `BorderRadius.circular(15.sp)`
+   - Profile image: `BorderRadius.circular(50)`
+
+## Best Practices
+
+1. **State Management**
+   - Use `Provider` for state management
+   - Implement proper error handling
+   - Cache user data appropriately
+
+2. **Performance**
+   - Use `CachedNetworkImage` for profile pictures
+   - Implement proper image sizing
+   - Optimize SVG assets
+
+3. **Accessibility**
+   - Provide proper contrast ratios
+   - Include semantic labels
+   - Support screen readers
+
+## Related Components
+
+- `CustomSwitch` - Used for connection toggle
+- `LogoutDialog` - For logout confirmation
+- `RateUsDialog` - For app rating
+- `ReportIssueDialog` - For issue reporting
+
+## Notes
+
+- The drawer width is set to 75% of screen width
+- All icons are SVG format for better scaling
+- Premium features are clearly marked with gradient text
+- The component is fully responsive using `sizer`

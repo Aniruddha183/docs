@@ -1,0 +1,125 @@
+---
+title: PaymentTile
+description: A reusable payment method tile component with icon and selection support
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# PaymentTile
+
+The `PaymentTile` widget is a reusable component designed for displaying payment methods with icons and selection states. It's used as a building block for various payment method selectors.
+
+## Features
+
+- Icon support (SVG or Material Icon)
+- Selection state with radio button
+- Consistent styling
+- Material ripple effect
+- Flexible layout
+- Customizable text color
+
+## Usage
+
+```dart
+PaymentTile(
+  title: "Paytm",
+  asset: "assets/payments/paytm.svg",
+  selected: true,
+  onTab: () {
+    // Handle selection
+  },
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `title` | `String` | Display text | Required |
+| `asset` | `String?` | SVG asset path | Optional |
+| `icon` | `Icon?` | Material icon | Optional |
+| `selected` | `bool` | Selection state | `false` |
+| `onTab` | `Function()` | Selection callback | Required |
+
+## Implementation Details
+
+The `PaymentTile` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:sizer/sizer.dart';
+import '../widget.dart';
+
+class PaymentTile extends StatelessWidget {
+  String title;
+  String? asset;
+  bool selected;
+  Icon? icon;
+  Function() onTab;
+  
+  PaymentTile({
+    super.key,
+    this.asset,
+    required this.title,
+    this.selected = false,
+    this.icon,
+    required this.onTab
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+              borderRadius: BorderRadius.circular(7.sp)
+            ),
+            height: 28.sp,
+            width: 28.sp,
+            padding: EdgeInsets.all(3.sp),
+            child: icon ?? SvgPicture.asset(asset!,
+              height: 20.sp, width: 20.sp,
+            ),
+          ),
+          SizedBox(width: 10.sp),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                color: Color(0xffFAFAFA)
+              ),
+            ),
+          ),
+          CustomRadio(
+            onTab: onTab,
+            selected: selected,
+          )
+        ],
+      ),
+    );
+  }
+}
+```
+
+## Styling
+
+The widget uses:
+- Consistent icon container sizing
+- Standard spacing
+- Custom border radius
+- Theme-based colors
+- Material ripple effect
+- Custom text color
+
+## Best Practices
+
+1. Use appropriate icon sizes
+2. Maintain consistent spacing
+3. Use meaningful titles
+4. Consider accessibility
+5. Handle selection state properly
+6. Use either asset or icon, not both
+7. Keep payment method names clear and concise 

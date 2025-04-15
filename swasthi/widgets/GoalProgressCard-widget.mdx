@@ -1,0 +1,289 @@
+---
+title: GoalProgressCard
+description: A comprehensive goal tracking card with nested circular progress indicators and goal metrics
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# GoalProgressCard
+
+The `GoalProgressCard` widget is a sophisticated goal tracking interface that displays multiple health and fitness metrics using nested circular progress indicators. It integrates with the `GoalProvider` to show real-time progress for workout, sleep, steps, and water intake goals.
+
+## Features
+
+- Nested circular progress indicators
+- Multiple goal tracking (workout, sleep, steps, water)
+- Real-time progress updates
+- Gradient styling
+- Responsive design
+- Localization support
+- Interactive goal logging
+- Visual progress representation
+- Device-specific sizing
+
+## Usage
+
+```dart
+GoalProgressCard()
+```
+
+## Implementation Details
+
+The `GoalProgressCard` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
+import 'package:gradient_borders/gradient_borders.dart';
+import 'package:percent_indicator/percent_indicator.dart';
+import 'package:provider/provider.dart';
+import 'package:sizer/sizer.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../provider/goal.provider.dart';
+import '../../ui/colors.dart';
+import '../../ui/gradient.dart';
+import '../buttons/GradientSvgIcon.dart';
+import '../widget.dart';
+
+class GoalProgressCard extends StatelessWidget {
+  const GoalProgressCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GoalProvider>(
+      builder: (context, goal, _) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: UiGradient.instance.cardBgGradient,
+            borderRadius: BorderRadius.circular(15.sp)
+          ),
+          padding: EdgeInsets.only(left: 15.sp, right: 15.sp, bottom: 10.sp, top: 10.sp),
+          child: Row(children: [
+            // Progress Indicators
+            SizedBox(
+              child: Column(
+                children: [
+                  CircularPercentIndicator(
+                    circularStrokeCap: CircularStrokeCap.round,
+                    linearGradient: UiGradient.instance.progressGradient_1,
+                    radius: SizerUtil.deviceType == DeviceType.tablet ? 30.sp : 73.0,
+                    lineWidth: 12.0,
+                    percent: goal.getWorkoutGoalPercentage() ?? 0.0,
+                    center: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: CircularPercentIndicator(
+                        radius: SizerUtil.deviceType == DeviceType.tablet ? 23.sp : 55.0,
+                        lineWidth: 10.0,
+                        percent: goal.getSleepGoalPercentage(),
+                        circularStrokeCap: CircularStrokeCap.round,
+                        linearGradient: UiGradient.instance.progressGradient_2,
+                        center: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: CircularPercentIndicator(
+                            circularStrokeCap: CircularStrokeCap.round,
+                            radius: SizerUtil.deviceType == DeviceType.tablet ? 17.sp : 40.0,
+                            lineWidth: 8.0,
+                            percent: goal.getStepsGoalPercentage(),
+                            linearGradient: UiGradient.instance.progressGradient_3,
+                            center: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: CircularPercentIndicator(
+                                radius: SizerUtil.deviceType == DeviceType.tablet ? 12.sp : 27.0,
+                                lineWidth: 5.0,
+                                percent: goal.getWaterGoalPercentage(),
+                                circularStrokeCap: CircularStrokeCap.round,
+                                linearGradient: UiGradient.instance.progressGradient_4,
+                                center: Text(
+                                  "${goal.getOverallGoalPercentage() == null ? '0' : goal.getOverallGoalPercentage().toStringAsFixed(0)}%",
+                                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                                    fontSize: 10.sp
+                                  ),
+                                ),
+                                backgroundColor: UIColor.instance.barBgColor4,
+                              ),
+                            ),
+                            backgroundColor: UIColor.instance.barBgColor3,
+                          ),
+                        ),
+                        backgroundColor: UIColor.instance.barBgColor2,
+                      ),
+                    ),
+                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: SizerUtil.deviceType == DeviceType.tablet ? 18.sp : 22.sp),
+            // Goal Metrics
+            Expanded(
+              child: Column(children: [
+                Row(children: [
+                  Expanded(child: Row(children: [
+                    SvgPicture.asset("assets/icons_svg/workout.svg", height: 12.sp, width: 12.sp),
+                    SizedBox(width: 4.sp),
+                    Text(AppLocalizations.of(context)!.workout,
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: Color(0xffE5E5E5),
+                        fontSize: 8.5.sp
+                      ),
+                    )
+                  ])),
+                  SizedBox(width: 12),
+                  Expanded(child: Row(children: [
+                    SvgPicture.asset("assets/icons_svg/sleep.svg", height: 12.sp, width: 12.sp),
+                    SizedBox(width: 4.sp),
+                    Text(AppLocalizations.of(context)!.sleep,
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: Color(0xffE5E5E5),
+                        fontSize: 8.5.sp
+                      ),
+                    )
+                  ]))
+                ]),
+                SizedBox(height: 4.sp),
+                Row(children: [
+                  Expanded(child: Row(children: [
+                    SvgPicture.asset("assets/icons_svg/steps.svg", height: 12.sp, width: 12.sp),
+                    SizedBox(width: 4.sp),
+                    Text(AppLocalizations.of(context)!.steps,
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: Color(0xffE5E5E5),
+                        fontSize: 8.5.sp
+                      ),
+                    )
+                  ])),
+                  SizedBox(width: 12),
+                  Expanded(child: Row(children: [
+                    SvgPicture.asset("assets/icons_svg/water.svg", height: 12.sp, width: 12.sp),
+                    SizedBox(width: 4.sp),
+                    Text(AppLocalizations.of(context)!.water,
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: Color(0xffE5E5E5),
+                        fontSize: 8.5.sp
+                      ),
+                    )
+                  ]))
+                ]),
+                SizedBox(height: 14.sp),
+                // Log Button
+                Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(15.sp),
+                          border: GradientBoxBorder(
+                            gradient: UiGradient.instance.borderGradient,
+                            width: 2,
+                          )
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(15.sp),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(15.sp),
+                            onTap: () {
+                              context.push("/goal");
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 6.sp, bottom: 6.sp, left: 10.sp, right: 10.sp),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GradientText(
+                                    AppLocalizations.of(context)!.log_for_today,
+                                    gradient: UiGradient.instance.textGradientBg,
+                                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                      fontSize: SizerUtil.deviceType == DeviceType.tablet ? 11.sp : null
+                                    ),
+                                  ),
+                                  SizedBox(width: 3.sp),
+                                  GradientSvgIcon(
+                                    assetName: "assets/icons_svg/next_icon.svg",
+                                    gradient: UiGradient.instance.textGradientBg,
+                                    size: 10
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              ]),
+            ),
+          ]),
+        );
+      }
+    );
+  }
+}
+```
+
+## Components
+
+### Progress Indicators
+- Nested circular progress indicators for:
+  - Workout progress (outermost)
+  - Sleep progress
+  - Steps progress
+  - Water intake progress (innermost)
+- Overall progress percentage display
+- Gradient styling for each indicator
+- Device-specific sizing
+
+### Goal Metrics
+- Icon and label pairs for:
+  - Workout
+  - Sleep
+  - Steps
+  - Water intake
+- Responsive layout
+- Localized text
+
+### Log Button
+- Gradient border
+- Material ripple effect
+- Navigation to goal screen
+- Localized text
+- Responsive sizing
+
+## Styling
+
+The widget uses:
+- Card-based layout with gradient background
+- Nested circular progress indicators
+- Gradient borders
+- Consistent spacing
+- Material ripple effect
+- Theme-based colors
+- Responsive sizing
+- Device-specific dimensions
+- Gradient text
+- Custom progress gradients
+- Semi-transparent backgrounds
+
+## Best Practices
+
+1. Maintain consistent progress indicator sizes
+2. Use appropriate gradient intensities
+3. Consider accessibility
+4. Ensure proper touch targets
+5. Maintain consistent spacing
+6. Use appropriate border radius
+7. Handle text overflow properly
+8. Use appropriate color contrast
+9. Consider localization needs
+10. Handle navigation properly
+11. Maintain consistent visual hierarchy
+12. Use appropriate icon sizes
+13. Consider device-specific layouts
+14. Ensure proper state management 
