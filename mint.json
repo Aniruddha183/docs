@@ -66,6 +66,11 @@
       "name": "Swasthi",
       "icon": "mobile",
       "url": "swasthi"
+    },
+    {
+      "name": "FitnEarnPal",
+      "icon": "mobile",
+      "url": "fitnearnpal"
     }
   ],
   "navigation": [
@@ -284,7 +289,20 @@
           ]
         }
       ]
+    },
+    {
+      "group" : "FitnEarnPal",
+      "pages": [
+        "fitnearnpal/fitnearnpal-overview",
+        {
+          "group" : "UI COMPONENTS",
+          "pages" : [
+            "fitnearnpal/fitnearnpal-ui-components"
+          ]
+        }
+      ]
     }
+
   ],
   "tabs": [
     {
