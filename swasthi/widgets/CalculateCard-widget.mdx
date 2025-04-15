@@ -1,0 +1,142 @@
+---
+title: CalculateCard
+description: A customizable card component with icon, title, and selection state support
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# CalculateCard
+
+The `CalculateCard` widget is a versatile card component that displays an icon and title with optional selection state. It features gradient styling and interactive feedback.
+
+## Features
+
+- Icon and title display
+- Optional selection state
+- Gradient styling
+- Interactive feedback
+- Customizable border radius
+- Responsive sizing
+- Material ripple effect
+
+## Usage
+
+```dart
+CalculateCard(
+  asset: "assets/icons/calculator.svg",
+  title: "Calculate BMI",
+  onTab: () {
+    // Handle card tap
+  },
+  selectable: true,
+  selected: false,
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `asset` | `String` | SVG asset path | Required |
+| `title` | `String` | Card title text | Required |
+| `onTab` | `Function()` | Tap callback | Required |
+| `selectable` | `bool` | Enable selection state | `false` |
+| `selected` | `bool?` | Selection state | `false` |
+
+## Implementation Details
+
+The `CalculateCard` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:gradient_borders/gradient_borders.dart';
+import 'package:sizer/sizer.dart';
+import '../../ui/gradient.dart';
+
+class CalculateCard extends StatelessWidget {
+  final String asset;
+  final String title;
+  final Function() onTab;
+  final bool selectable;
+  bool? selected;
+
+  CalculateCard({
+    super.key,
+    required this.asset,
+    required this.onTab,
+    required this.title,
+    this.selectable = false,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: selectable && selected!
+            ? UiGradient.instance.defaultGradient.scale(0.12)
+            : null,
+        border: selectable && selected!
+            ? GradientBoxBorder(gradient: UiGradient.instance.borderGradient)
+            : null,
+        borderRadius: BorderRadius.circular(15.sp),
+      ),
+      child: Material(
+        color: selectable && selected!
+            ? Colors.transparent
+            : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14.sp),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14.sp),
+          onTap: onTab,
+          child: Padding(
+            padding: EdgeInsets.all(14.0.sp),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SvgPicture.asset(asset),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Color(0xffA3A3A3),
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Styling
+
+The widget uses:
+- Card-based layout with rounded corners
+- Gradient backgrounds for selected state
+- Gradient borders for selected state
+- Consistent padding
+- Material ripple effect
+- Theme-based colors
+- Responsive sizing
+- Text overflow handling
+- Custom gradient scaling
+
+## Best Practices
+
+1. Use appropriate icon sizes
+2. Keep titles concise (max 2 lines)
+3. Consider accessibility
+4. Use meaningful icons
+5. Ensure proper touch targets
+6. Maintain consistent spacing
+7. Use appropriate border radius
+8. Consider gradient intensity
+9. Handle text overflow properly
+10. Use appropriate color contrast 

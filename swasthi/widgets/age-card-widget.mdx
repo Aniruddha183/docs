@@ -1,0 +1,111 @@
+
+# AgeCard Widget
+
+## Overview
+The `AgeCard` widget is a reusable Flutter component that provides an interactive age input interface. It features a numeric input field with increment/decrement buttons, allowing users to easily adjust their age within a specified range.
+
+## Features
+- Interactive age input with increment/decrement buttons
+- Numeric keyboard input support
+- Input validation and range checking
+- Customizable styling
+- Localization support
+- Responsive design using Sizer package
+
+## Implementation Details
+
+### Constructor Parameters
+```dart
+AgeCard({
+  required this.age,
+  required this.onChange,
+  required this.controller
+})
+```
+
+- `age` (int): The current age value
+- `onChange` (Function(int)): Callback function triggered when age changes
+- `controller` (TextEditingController): Controller for the text input field
+
+### Widget Structure
+The widget consists of:
+1. A container with rounded corners and theme-based background color
+2. A label showing "Age" (localized)
+3. An interactive input area containing:
+   - Decrement button (-)
+   - Numeric input field
+   - Increment button (+)
+
+### Styling
+- Uses theme-based colors for consistency
+- Implements a dark background (Color(0xff262626)) for the input container
+- Uses circular buttons with a secondary background color (Color(0xff404040))
+- Responsive sizing using the Sizer package
+
+## Usage Example
+
+```dart
+class AgeInputScreen extends StatefulWidget {
+  @override
+  _AgeInputScreenState createState() => _AgeInputScreenState();
+}
+
+class _AgeInputScreenState extends State<AgeInputScreen> {
+  int age = 13;
+  final TextEditingController ageController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: AgeCard(
+          age: age,
+          onChange: (newAge) {
+            setState(() {
+              age = newAge;
+            });
+          },
+          controller: ageController,
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Implementation Notes
+
+### Input Validation
+- The widget automatically validates input to ensure it's a valid number
+- If input is empty, defaults to age 13
+- Age range is limited between 1 and 100 years
+
+### Localization
+The widget uses Flutter's localization system:
+```dart
+Text(AppLocalizations.of(context)!.age)
+```
+
+### Responsive Design
+- Uses the Sizer package for responsive sizing
+- All dimensions are scaled using `sp` (scale-independent pixels)
+- Container padding and border radius are responsive
+
+## Best Practices
+1. Always provide a valid initial age value
+2. Implement proper state management for the age value
+3. Handle the onChange callback appropriately
+4. Dispose of the TextEditingController when no longer needed
+5. Consider implementing additional validation if needed
+
+## Limitations
+- Currently hardcoded to support ages between 1 and 100
+- Input formatters are commented out in the current implementation
+- Limited customization options for colors and styling
+
+## Future Improvements
+1. Add support for custom age ranges
+2. Implement additional input validation
+3. Add support for custom styling
+4. Add support for different input modes (slider, dropdown)
+5. Implement accessibility features

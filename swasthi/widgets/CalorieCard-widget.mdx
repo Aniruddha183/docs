@@ -1,0 +1,771 @@
+---
+title: CalorieCard
+description: A comprehensive nutrition tracking card with multiple views for calories, macros, and micronutrients
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# CalorieCard
+
+The `CalorieCard` widget is a sophisticated nutrition tracking component that displays calorie consumption, remaining calories, and micronutrient information through a swipeable interface. It includes a pie chart for macro distribution and progress indicators for various nutrients.
+
+## Features
+
+- Swipeable nutrition views
+- Calorie consumption tracking
+- Macro nutrient distribution (pie chart)
+- Micro nutrient tracking
+- Progress indicators
+- Interactive page navigation
+- Optional meal plan creation button
+- Responsive design
+- Gradient styling
+
+## Usage
+
+```dart
+CalorieCard(
+  totalCalories: 2000,
+  protein: 50,
+  carbs: 200,
+  fat: 65,
+  fiber: 25,
+  showCreate: true,
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `totalCalories` | `int` | Total calories consumed | Required |
+| `protein` | `double` | Protein amount in grams | Required |
+| `carbs` | `double` | Carbohydrates amount in grams | Required |
+| `fat` | `double` | Fat amount in grams | Required |
+| `fiber` | `double` | Fiber amount in grams | Required |
+| `showCreate` | `bool` | Show meal plan creation button | `false` |
+
+## Implementation Details
+
+The `CalorieCard` widget is implemented as a `StatefulWidget` with the following structure:
+
+```dart
+
+class CalorieCard extends StatefulWidget {
+  final int totalCalories;
+  final double protein;
+  final double carbs;
+  final double fat;
+  final double fiber;
+  bool showCreate;
+
+   CalorieCard({
+    Key? key,
+    required this.totalCalories,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+    required this.fiber,
+    this.showCreate = false,
+  }) : super(key: key);
+
+  @override
+  State<CalorieCard> createState() => _CalorieCardState();
+}
+
+class _CalorieCardState extends State<CalorieCard> {
+  final pageLength = 3;
+    int currentPage = 0;
+    PageController pageController = PageController();
+
+
+  @override
+  Widget build(BuildContext context) {
+    
+
+    
+
+    return SizedBox(
+      height: widget.showCreate ? 245.sp : 210.sp,
+      child: Card(
+color: Theme.of(context).canvasColor,
+shape: RoundedRectangleBorder(
+  borderRadius: UiSize.instance.borderRadius_m,
+),
+        child: Column(
+          children: [
+            Expanded(
+              child: PageView(
+                controller: pageController,
+                onPageChanged: (value) {
+                  setState(() {
+                    currentPage = value;
+                  });
+                },
+                
+                // physics: const NeverScrollableScrollPhysics(),
+                
+                children: [
+                 
+                  CalorieConsumedCard(totalCalories: widget.totalCalories, protein: widget.protein, carbs: widget.carbs, fat: widget.fat, fiber: widget.fiber),
+                  CalorieRemainingCard(),
+                  MicroNutrientCard(),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  DotIndicator(
+                    size: 7,
+                    
+                    color: Color(0xffD9D9D9),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: currentPage == 0 ? 
+                      
+                      BoxDecoration(
+                        gradient: UiGradient.instance.defaultGradient,
+                        borderRadius: BorderRadius.circular(100),
+                      ) : BoxDecoration(
+                        color: Color(0xffD9D9D9),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(width: 8,),
+
+                  DotIndicator(
+                    size: 7,
+                    
+                    color: Color(0xffD9D9D9),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: currentPage == 1 ? 
+                      
+                      BoxDecoration(
+                        gradient: UiGradient.instance.defaultGradient,
+                        borderRadius: BorderRadius.circular(100),
+                      ) : BoxDecoration(
+                        color: Color(0xffD9D9D9),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                  ),
+                   SizedBox(width: 8,),
+
+                  DotIndicator(
+                    size: 7,
+                    
+                    color: Color(0xffD9D9D9),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: currentPage == 2  ? 
+                      
+                      BoxDecoration(
+                        gradient: UiGradient.instance.defaultGradient,
+                        borderRadius: BorderRadius.circular(100),
+                      ) : BoxDecoration(
+                        color: Color(0xffD9D9D9),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if(widget.showCreate)
+            Container(
+              decoration: BoxDecoration(
+                gradient: UiGradient.instance.defaultGradient,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                )
+              ),
+              
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+                                ),
+                  onTap: (){
+                     Navigator.push(context, MaterialPageRoute(builder: (context)=>PersonalInformationScreen()));
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(children: [
+                      Expanded(child: Text("Create your Meal Plan",
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        fontSize: 16,
+                        color: Color(0xffE5E5E5)
+                      ),)),
+                      Icon(Icons.arrow_forward_ios,
+                      size: 16,)
+                    ],),
+                  ),
+                ),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+
+    
+  }
+
+  
+}
+
+class MicroNutrientCard extends StatelessWidget {
+  const MicroNutrientCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: 16, right: 16, top: 16
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Micro Nutrient",
+            style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),),
+            SizedBox(height: 16,),
+            _buildGradientProgress(percent: 0.6,
+                       
+                       text: "Vitamin A", 
+                       value: 3,
+                       width: 100,
+                       totalValue: 100,
+                       ),
+                       Spacer(),
+                       
+
+                       _buildGradientProgress(percent: 0.6,
+                       
+                       text: "Vitamin A", 
+                       value: 3,
+                       width: 100,
+                       totalValue: 100,
+                       ),
+                       Spacer(),
+
+                       _buildGradientProgress(percent: 0.6,
+                       
+                       text: "Vitamin A", 
+                       value: 3,
+                       width: 100,
+                       totalValue: 100,
+                       ),
+                       Spacer(),
+
+                       _buildGradientProgress(percent: 0.6,
+                       
+                       text: "Vitamin A", 
+                       value: 3,
+                       width: 100,
+                       totalValue: 100,
+                       ),
+                       Spacer(),
+        
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+class CalorieConsumedCard extends StatelessWidget {
+  final int totalCalories;
+  final double protein;
+  final double carbs;
+  final double fat;
+  final double fiber;
+  const CalorieConsumedCard({super.key, required this.totalCalories, required this.protein, required this.carbs, required this.fat, required this.fiber});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorList = <Color>[
+      const Color(0xFF7ECD50), // Protein - Green
+      const Color(0xFFFF9838), // Carbs - Orange
+      const Color(0xFFAA5EFF), // Fat - Purple
+      const Color(0xFFFF5757), // Fiber - Red
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      // mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title and Total Calories
+        Padding(
+          padding:  EdgeInsets.only(left: 16, right: 16, top: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Calorie Consumed',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Row(
+                children: [
+                   Material(
+                  color: Color(0xffFFC107),
+                  borderRadius: BorderRadius.circular(50),
+                  child: Padding(
+                    padding: const EdgeInsets.all(5.0),
+                    child: Image.asset(
+                      "assets/recipe/fire.png",
+                      height: 10,
+                      width: 10,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                  const SizedBox(width: 7),
+                  Text(
+                    '${totalCalories}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // const SizedBox(height: 24),
+        
+        // Pie Chart and Legend
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding:  EdgeInsets.only(left: 16, right: 16, ),
+                child: CustomPieChart(
+                  borderColor: Colors.black,
+                  borderWidth: 1,
+                  animate: false,
+                  data: [
+                    PieChartData(value: 25, color: const Color(0xFFFF9829), label: 'Carbohydrate'),
+                    PieChartData(value: 38, color: const Color(0xFFF96173), label: 'Fiber'),
+                    PieChartData(value: 34, color: const Color(0xFFA647FF), label: 'Fat'),
+                    PieChartData(value: 52, color: const Color(0xFFA5FD1D), label: 'Protein'),
+                  ],
+                  labelStyle: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w600
+                    
+                  ),
+                  showValue: false,
+                ),
+              ),),
+            
+            
+            // Macro Details
+            Expanded(
+              flex: 3,
+              child: Column(
+        
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMacroDetail('P', protein, 'of protein', colorList[0]),
+                  const SizedBox(height: 12),
+                  _buildMacroDetail('C', carbs, 'of carbohydrates', colorList[1]),
+                  const SizedBox(height: 12),
+                  _buildMacroDetail('F', fat, 'of fats', colorList[2]),
+                  const SizedBox(height: 12),
+                  _buildMacroDetail('F', fiber, 'of fibers', colorList[3]),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        // Pagination Dots
+        // const SizedBox(height: 16),
+        // Padding(
+        //   padding:  EdgeInsets.only(bottom: 18),
+        //   child: Row(
+        //     mainAxisAlignment: MainAxisAlignment.center,
+        //     children: [
+        //       Container(
+        //         width: 8,
+        //         height: 8,
+        //         decoration:  BoxDecoration(
+        //           shape: BoxShape.circle,
+        //           gradient: UiGradient.instance.defaultGradient
+        //         ),
+        //       ),
+        //       const SizedBox(width: 6),
+        //       Container(
+        //         width: 8,
+        //         height: 8,
+        //         decoration: const BoxDecoration(
+        //           shape: BoxShape.circle,
+        //           color: Colors.grey,
+        //         ),
+        //       ),
+        //     ],
+        //   ),
+        // ),
+      ],
+    );
+  }
+}
+
+
+class CalorieRemainingCard extends StatelessWidget {
+  const CalorieRemainingCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Padding(
+          padding:  EdgeInsets.only(left: 16, right: 16, top: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Calorie Remaining',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Row(
+                children: [
+                
+                  const SizedBox(width: 7),
+                  
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        Row(children: [
+          Expanded(
+            flex: 3,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, top: 16),
+                child: CircularPercentIndicator(
+                      radius: 80.0,
+                      lineWidth: 10.0,
+                      animation: true,
+                      animationDuration: 1000,
+                      animateFromLastPercent: true,
+                      animateToInitialPercent: true,
+                      percent: 0.6,
+                      center: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                           Material(
+                            color: Color(0xffFFC107),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6.0),
+                              child: Image.asset(
+                                "assets/recipe/fire.png",
+                                height: 10,
+                                width: 10,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            height: UiSize.instance.verticalGap_s * 0.3,
+                          ),
+                      
+                          Text("3000/\n3500",
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),)
+                      ],),
+                      linearGradient: UiGradient.instance.defaultGradient,
+                      reverse: true,
+                      backgroundColor: Color(0xff262626),
+                    ),
+              ),
+            )),
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding:  EdgeInsets.only(right: 16, left: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Column(children: [
+
+                    _progressBuilder(percent: 0.6,
+                     color: Color(0xFFA5FD1D), 
+                     bgColor: Color(0xFFA5FD1D).withValues(alpha: 0.2), 
+                     text: "Protein", 
+                     value: "3",
+                     width: constraints.maxWidth,
+                     ),
+                     SizedBox(height: 10,),
+                    _progressBuilder(percent: 0.6,
+                     color: Color(0xffFFC107), 
+                     bgColor: Color(0xffFFC107).withValues(alpha: 0.2), 
+                     text: "Carbohydrate", 
+                     value: "3",
+                     width: constraints.maxWidth,
+                     ),
+                      SizedBox(height: 10,),
+                      _progressBuilder(percent: 0.6,
+                     color: Color(0xffA647FF), 
+                     bgColor: Color(0xffA647FF).withValues(alpha: 0.2), 
+                     text: "Fat", 
+                     value: "3",
+                     width: constraints.maxWidth ,
+                     ),
+                      SizedBox(height: 10,),
+                      _progressBuilder(percent: 0.6,
+                     color: Color(0xffF96173), 
+                     bgColor: Color(0xffF96173).withValues(alpha: 0.2), 
+                     text: "Fibers", 
+                     value: "3",
+                     width: constraints.maxWidth ,
+                     ),
+                  ],);
+                }
+              ),
+            )),
+
+        ],)
+
+    ],);
+  }
+}
+
+
+Widget _buildGradientProgress({
+  required double percent,
+ 
+  required String text,
+  required int value,
+  required int totalValue,
+  required double width
+}){
+  return Column(children: [
+   Padding(
+        padding:  EdgeInsets.only(left: 10, bottom: 6,right: 10),
+        child: Row(children: [
+          Expanded(child: Text(text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Color(0xffffffff)
+          ),)),
+        SizedBox(width: 5,),
+          Text("$value/${totalValue}g",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Color(0xffffffff)
+          )),
+        ],),
+      ),
+      SizedBox(height: 6,),
+      LinearPercentIndicator(
+                // width: width,
+                lineHeight: 4.0,
+                percent: percent,
+                backgroundColor: Color(0xffD84315).withValues(alpha: 0.12),
+                linearGradient: LinearGradient(colors: [
+                  Color(0xffFFC107),
+                  Color(0xffD84315),
+                  // Color(0xffFFC107),
+                ]),
+                barRadius: Radius.circular(10),
+                
+                padding: EdgeInsets.zero,
+                // trailing: Container(
+                //   height: 4,
+                //   width: 4,
+                //   decoration: BoxDecoration(
+                //     gradient: UiGradient.instance.defaultGradient,
+                //     borderRadius: BorderRadius.circular(100),
+                //   ),
+                // ),
+              ),
+
+  ],);
+}
+
+Widget _progressBuilder({
+  required double percent,
+  required Color color,
+  required Color bgColor,
+  required String text,
+  required String value,
+  required double width
+}){
+  return Column(
+    children: [
+      Padding(
+        padding:  EdgeInsets.only(left: 10, bottom: 6,right: 10),
+        child: Row(children: [
+          Expanded(child: Text(text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Color(0xffffffff)
+          ),)),
+        SizedBox(width: 5,),
+          Text("$value%",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Color(0xffffffff)
+          )),
+        ],),
+      ),
+      LinearPercentIndicator(
+                width: width,
+                lineHeight: 4.0,
+                percent: percent,
+                backgroundColor: bgColor,
+                progressColor: color,
+                barRadius: Radius.circular(10),
+              ),
+    ],
+  );
+}
+
+
+Widget _buildMacroDetail(String letter, double value, String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              letter,
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w500,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '${value.toStringAsFixed(0)}g',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w300,
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+```
+
+## Sub-Components
+
+### CalorieConsumedCard
+Displays:
+- Total calories consumed
+- Macro distribution pie chart
+- Detailed macro breakdown (protein, carbs, fat, fiber)
+
+### CalorieRemainingCard
+Shows:
+- Circular progress indicator for remaining calories
+- Linear progress bars for each macro
+- Current vs target values
+
+### MicroNutrientCard
+Presents:
+- Vitamin and mineral progress
+- Gradient progress bars
+- Current vs recommended values
+
+## Styling
+
+The widget uses:
+- Card-based layout with rounded corners
+- Gradient backgrounds
+- Consistent spacing
+- Responsive sizing
+- Custom progress indicators
+- Material design principles
+- Theme-based colors
+- Custom gradients for progress bars
+
+## Best Practices
+
+1. Ensure accurate nutrition data
+2. Maintain consistent spacing
+3. Use appropriate colors for different nutrients
+4. Consider accessibility
+5. Keep text concise and readable
+6. Use appropriate progress indicator types
+7. Handle navigation properly
+8. Consider responsive design
+9. Use meaningful gradients
+10. Maintain consistent iconography 

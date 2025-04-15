@@ -1,0 +1,149 @@
+---
+title: ActivityTile Widget
+description: A tile component for displaying activity information with gradient selection state
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# ActivityTile
+
+The `ActivityTile` widget is a specialized tile component designed for displaying activity information with a gradient selection state. It's particularly useful for activity lists and selection interfaces.
+
+## Features
+
+- Gradient selection state
+- Title and subtitle support
+- Optional icon with color state
+- ID-based selection handling
+- Material Design ripple effect
+- Customizable border radius
+
+## Usage
+
+```dart
+ActivityTile(
+  id: 1,
+  title: 'Morning Walk',
+  subTitle: '30 minutes',
+  asset: 'assets/icons/walk.svg',
+  isSelected: true,
+  onTab: (id) {
+    // Handle selection
+  },
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `id` | `int` | Unique identifier for the activity | Required |
+| `title` | `String` | Main title text | Required |
+| `subTitle` | `String` | Subtitle text | Required |
+| `asset` | `String?` | Optional icon asset path | `null` |
+| `isSelected` | `bool` | Selection state | `false` |
+| `onTab` | `Function(int)` | Callback when tile is tapped | Required |
+
+## Implementation Details
+
+The `ActivityTile` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:Swasthi/ui/size.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:gradient_borders/gradient_borders.dart';
+import 'package:sizer/sizer.dart';
+
+import '../../ui/gradient.dart';
+
+class ActivityTile extends StatelessWidget {
+  Function(int) onTab;
+  bool isSelected;
+  int id;
+  String? asset;
+  String title;
+  String subTitle;
+  
+  ActivityTile({
+    super.key, 
+    required this.onTab, 
+    this.isSelected = false, 
+    required this.id, 
+    this.asset, 
+    required this.subTitle, 
+    required this.title 
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isSelected ? UiGradient.instance.buttonGradientBg.scale(0.4) : null,
+        borderRadius: UiSize.instance.borderRadius_m,
+        border: isSelected ? GradientBoxBorder(
+          gradient: UiGradient.instance.borderGradient,
+          width: 2,
+        ) : null,
+      ),
+      child: Material(
+        borderRadius: UiSize.instance.borderRadius_m,
+        color: !isSelected ? Theme.of(context).cardColor : Colors.transparent,
+        child: InkWell(
+          borderRadius: UiSize.instance.borderRadius_m,
+          onTap: () => onTab(id),
+          child: Padding(
+            padding: EdgeInsets.only(left: 16.sp, right: 16.sp, bottom: 7.sp, top: 7.sp),
+            child: Row(children: [
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: !isSelected ? Color(0xffA3A3A3) : Theme.of(context).textTheme.bodyMedium!.color
+                    ),
+                  ),
+                  Text(subTitle,
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: Color(0xffA3A3A3)
+                    ),
+                  ),
+                ],
+              )),
+              if(asset != null)
+                SvgPicture.asset(
+                  asset!,
+                  height: 24, 
+                  width: 24,
+                  colorFilter: ColorFilter.mode(
+                    isSelected ? Color(0xffFAFAFA) : Color(0xffA3A3A3),
+                    BlendMode.srcIn
+                  )
+                )
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Styling
+
+The widget uses:
+- Gradient background for selected state
+- Custom border radius from theme
+- Dynamic text colors based on selection state
+- Consistent icon sizing
+- Material ripple effect for interaction
+
+## Best Practices
+
+1. Use consistent IDs for tracking selections
+2. Provide meaningful titles and subtitles
+3. Use appropriate icon assets
+4. Consider accessibility when choosing colors
+5. Maintain consistent spacing
+6. Use the selection state to indicate active items 
