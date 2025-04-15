@@ -332,10 +332,17 @@
       "group" : "FitnEarnPal",
       "pages": [
         "fitnearnpal/fitnearnpal-overview",
+        "fitnearnpal/fitnearnpal-ui-components",
         {
           "group" : "UI COMPONENTS",
           "pages" : [
-            "fitnearnpal/fitnearnpal-ui-components"
+            "fitnearnpal/widgets/custom-textfield",
+            "fitnearnpal/widgets/custom-buttons",
+            "fitnearnpal/widgets/live-session-card",
+            "fitnearnpal/widgets/delete-dialog-box",
+            "fitnearnpal/widgets/level-dropdown",
+            "fitnearnpal/widgets/send-for-review-popup",
+            "fitnearnpal/widgets/custom-time-picker"
           ]
         }
       ]
@@ -384,6 +391,12 @@
       "url": "swasthi",
       "icon": "mobile",
       "navigation": ["Swasthi"]
+    },
+    {
+      "name": "FitnEarnPal",
+      "url": "fitnearnpal",
+      "icon": "mobile",
+      "navigation": ["FitnEarnPal"]
     }
   ]
 }

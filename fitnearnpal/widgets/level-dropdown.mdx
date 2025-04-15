@@ -1,0 +1,126 @@
+import { Meta } from "@storybook/addon-docs";
+
+<Meta title="Components/LevelDropdown" />
+
+# LevelDropdown
+
+A customizable dropdown selector component with focus state management, designed for selecting levels or categories in your application.
+
+## Features
+
+- Custom focus state visualization with border color change
+- Clean, modern design with full-width container
+- Customizable dropdown items
+- Hint text when no selection is made
+- Proper focus management for accessibility
+- Responsive touch handling
+
+## Props
+
+| Prop Name       | Type              | Required | Description                                                    |
+| --------------- | ----------------- | -------- | -------------------------------------------------------------- |
+| `selectedLevel` | String?           | No       | Currently selected level value                                 |
+| `levels`        | List(String)      | Yes      | List of available options to display in the dropdown           |
+| `onChanged`     | Function(String?) | Yes      | Callback function that returns the selected value when changed |
+
+## Usage Example
+
+```dart
+import 'package:coach_app/constants/colors.dart';
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class LevelDropdown extends StatefulWidget {
+  final String? selectedLevel;
+  final List<String> levels;
+  final Function(String?) onChanged;
+
+  const LevelDropdown({
+    super.key,
+    this.selectedLevel,
+    required this.levels,
+    required this.onChanged,
+  });
+
+  @override
+  State<LevelDropdown> createState() => _LevelDropdownState();
+}
+
+class _LevelDropdownState extends State<LevelDropdown> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {
+        _isFocused = _focusNode.hasFocus;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _focusNode,
+      child: GestureDetector(
+        onTap: () {
+          _focusNode.requestFocus(); // Trigger focus when tapped
+        },
+        child: Container(
+          height: 58,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: buttonColor2,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _isFocused ? buttonColor1 : Colors.transparent,
+            ),
+          ),
+          child: DropdownButton<String>(
+            value: widget
+                .selectedLevel, // Set the default value to the selected level
+            onChanged: (value) {
+              widget.onChanged(value);
+              _focusNode.unfocus(); // Remove focus after selection
+            },
+            items: widget.levels
+                .map((level) => DropdownMenuItem<String>(
+                      value: level,
+                      child: Text(level),
+                    ))
+                .toList(),
+            hint: Text(
+              'Select Level',
+              style: GoogleFonts.lato(color: fontColor5),
+            ), // Optional hint when no level is selected
+            style: GoogleFonts.lato(
+                fontSize: 16, color: fontColor1), // Adjust the text style
+            dropdownColor:
+                Colors.grey[800], // Optional dropdown background color
+            isExpanded:
+                true, // Ensures the dropdown expands to the container's width
+            underline: const SizedBox(), // Removes the underline
+            icon: const Icon(
+              Icons.arrow_drop_down, // The dropdown arrow icon
+              color: fontColor5, // Color for the arrow
+            ),
+            iconSize: 30, // Size of the arrow icon
+            iconEnabledColor:
+                Colors.white, // Color when the dropdown is enabled
+          ),
+        ),
+      ),
+    );
+  }
+}
+```

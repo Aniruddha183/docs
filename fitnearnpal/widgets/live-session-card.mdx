@@ -1,0 +1,335 @@
+---
+title: Live Session Card
+description: Documentation for various cards used in Coach App
+---
+
+import { Callout } from "nextra-theme-docs"; // Example import if using Nextra
+
+# Coach App Reusable Components
+
+This document outlines the specifications and code for various reusable UI components developed for the Coach App.
+
+# Cards Documentation
+
+Cards are used throughout the application to display concise information about various entities like live sessions, bookings, posts, etc. They are designed to be customizable and informative.
+
+---
+
+**Purpose:** This card specifically displays information about a scheduled or ongoing live session. It includes details like the session type, level, capacity, date, and duration. It also incorporates swipe-to-delete functionality with confirmation dialogs and a reason input.
+
+**Code Snippet:**
+
+```dart
+import 'package:coach_app/constants/colors.dart';
+import 'package:coach_app/screens/helpandsupport/cancelation_policy.dart';
+import 'package:coach_app/theme/text_theme.dart';
+import 'package:coach_app/widgets/delete_dialog.dart';
+import 'package:coach_app/widgets/dot_text.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class SessionCard extends StatelessWidget {
+  final String sessionId; // Unique identifier for the card
+  final Function(String) onDismissed; // Callback when the card is dismissed
+  final String sessionState;
+  final Color sessionColor;
+  final VoidCallback onTap;
+
+  const SessionCard({
+    super.key,
+    required this.sessionId,
+    required this.onDismissed,
+    required this.sessionState,
+    required this.sessionColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(sessionId), // Unique key for the Dismissible widget
+      direction: DismissDirection.endToStart, // Swipe from right to left
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red, // Background color for the dismiss action
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+          size: 30,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        // Show the first confirmation dialog
+        bool? shouldDelete = await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return DeleteDialog(
+              text: 'Cancel Session',
+              subText: 'Are you sure you want to cancel your live session ?',
+              smallText: 'Read Cancellation Policy ',
+              image: 'assets/images/mdi_alert.png',
+              buttonText1: 'No',
+              buttonText2: 'Yes',
+              onPressed1: () {
+                Navigator.pop(context, false);
+              },
+              onPressed2: () {
+                Navigator.pop(context, true);
+              },
+              onPressedcancellationpolicy: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CancelationPolicy(),
+                  ),
+                );
+              },
+            );
+          },
+        );
+
+        // If user tapped "Yes", show Cancel Reason dialog
+        if (shouldDelete ?? false) {
+          String? rejectReason = await showDialog<String>(
+            context: context,
+            builder: (BuildContext context) {
+              TextEditingController reasonController = TextEditingController();
+              FocusNode focusNode = FocusNode();
+              return StatefulBuilder(
+                builder: (context, setState) {
+                  return AlertDialog(
+                    backgroundColor: buttonColor2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    title: Column(
+                      children: [
+                        ShaderMask(
+                          blendMode: BlendMode.srcIn,
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [
+                              linearGradientFontColor2,
+                              linearGradientFontColor1
+                            ],
+                          ).createShader(
+                              Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+                          child: Text(
+                            "Cancel Reason",
+                            style: GoogleFonts.lato(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: fontColor1,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Please share your cancel reason?",
+                          style: GoogleFonts.lato(
+                            fontSize: 16,
+                            color: fontColor6,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: reasonController,
+                          focusNode: focusNode,
+                          minLines: 3,
+                          maxLines: 5,
+                          decoration: InputDecoration(
+                            hintText: "Enter your text here",
+                            hintStyle: GoogleFonts.lato(
+                              color: fontColor5,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            filled: true,
+                            fillColor: backgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: focusNode.hasFocus
+                                    ? buttonColor1
+                                    : Colors.grey,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: buttonColor1),
+                            ),
+                          ),
+                          style: const TextStyle(color: Colors.white),
+                          onTap: () => setState(() {}),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                if (reasonController.text.trim().isNotEmpty) {
+                                  Navigator.pop(context, reasonController.text);
+                                }
+                              },
+                              style: TextButton.styleFrom(
+                                backgroundColor: buttonColor1,
+                                minimumSize: const Size(120, 40),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                "Submit",
+                                style: GoogleFonts.lato(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context, null);
+                              },
+                              style: TextButton.styleFrom(
+                                backgroundColor: backgroundColor,
+                                minimumSize: const Size(120, 40),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: const BorderSide(color: fontColor1),
+                                ),
+                              ),
+                              child: Text(
+                                "Cancel",
+                                style: GoogleFonts.lato(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          );
+
+          if (rejectReason != null && rejectReason.trim().isNotEmpty) {
+            onDismissed(sessionId); // Remove the card after valid input
+            return true;
+          }
+        }
+
+        // Don't dismiss card otherwise
+        return false;
+      },
+
+      onDismissed: (direction) {
+        onDismissed(sessionId); // Proceed with deletion only if confirmed
+      },
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: buttonColor2,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image Section
+              ClipRRect(
+                child: Image.asset(
+                  'assets/images/Rectangle 111.png', // Replace with your image URL or asset
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Text Section
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 5),
+                    // "Under Review" Label
+                    Text(
+                      sessionState,
+                      style: GoogleFonts.lato(
+                        color: sessionColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Session Title
+                    Text(
+                      'Yoga Session',
+                      style: AppTextTheme.darkTextTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    // Session Details
+                    Row(
+                      children: [
+                        Text(
+                          'Cardio',
+                          style: AppTextTheme.darkTextTheme.bodySmall,
+                        ),
+                        const DotText(text: "Beginner"),
+                        const DotText(text: "20 Seat"),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Date and Time
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Image.asset(
+                                  'assets/images/calendar-month-outline.png'),
+                              const SizedBox(width: 4),
+                              Text(
+                                '05 May 2024',
+                                style: AppTextTheme.darkTextTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 30),
+                          Row(
+                            children: [
+                              Image.asset('assets/images/clock-outline.png'),
+                              const SizedBox(width: 4),
+                              Text(
+                                '10 Min',
+                                style: AppTextTheme.darkTextTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+```
