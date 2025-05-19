@@ -102,6 +102,8 @@
             "frontend/calendar-popup",
             "frontend/input-field",
             "frontend/dynamic-form",
+            "frontend/single-select-searchbox",
+            "frontend/map-card",
             "frontend/ReasonBox"
           ]
         },

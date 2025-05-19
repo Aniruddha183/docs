@@ -1,0 +1,80 @@
+---
+title: "Map Card Component"
+description: "Display an interactive Google Map with dark mode styling and marker support."
+---
+
+### Map Card Component
+
+<Frame>
+  <img src="/images/map-card.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+#### Overview
+
+The `MapCard` component renders an interactive **Google Map** centered on a specified latitude and longitude. It includes dark mode styling, a zoomable interface, and a custom marker icon. A loading skeleton and error handling provide graceful fallbacks during map load.
+
+#### Features
+
+- **Google Maps Integration**: Uses `@react-google-maps/api` to embed an interactive map.
+- **Dark Mode Styling**: Custom map theme with dark UI elements.
+- **Custom Marker**: Displays a red marker at the provided coordinates.
+- **Loading State**: Skeleton loader shown while the map is initializing.
+- **Error Handling**: Displays an error message if the Google Maps API fails to load.
+- **Lightweight UI**: Minimal controls enabled for better user focus.
+
+#### Usage
+
+```tsx
+import MapCard from "@/components/ui/MapCard";
+
+const Example = () => {
+  const studioLocation = {
+    lat: 28.6139,
+    lng: 77.209,
+  };
+
+  return <MapCard position={studioLocation} />;
+};
+```
+
+#### Props
+
+| Prop       | Type                                        | Default     | Description                                                              |
+| ---------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
+| `position` | `{ lat: number; lng: number } \| undefined` | `undefined` | Center coordinates for the map and marker. If undefined, shows a loader. |
+
+#### Anatomy
+
+1. **SkeletonLoader**
+
+   - A pulsing gray block shown while the map is loading or coordinates are unavailable.
+
+2. **GoogleMap Wrapper**
+
+   - Renders a `<GoogleMap>` from `@react-google-maps/api` with dark theme and minimal UI.
+
+3. **Marker**
+
+   - A red marker placed at the given `position`. Uses a custom icon.
+
+4. **Error Message**
+   - Shows a red warning box if the map fails to load.
+
+#### Environment Setup
+
+Make sure to add your Google Maps API key in `.env.local`:
+
+```env
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE
+```
+
+Also ensure **Billing is enabled** in your Google Cloud Console and the **Maps JavaScript API** is active.
+
+#### Customization
+
+- **Styling**: Controlled using the `darkModeStyles` object and Tailwind utility classes.
+- **Zoom Level**: Default zoom is `13`, changeable in the `GoogleMap` `zoom` prop.
+- **Marker Icon**: Replace the URL inside `icon.url` for different marker visuals.
+- **Map Controls**: UI options such as zoom, street view, and fullscreen are customizable in `mapOptions`.
+
+---
