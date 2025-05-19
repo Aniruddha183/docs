@@ -1,0 +1,139 @@
+---
+title: CustomRadio Widget
+description: A customizable radio button widget with gradient support
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# CustomRadio
+
+The `CustomRadio` widget is a customizable radio button component that supports gradient borders and custom styling. It's built using Flutter's Material Design principles and provides a modern, animated radio button experience.
+
+## Features
+
+- Gradient border support
+- Customizable size and padding
+- Animated selection state
+- Custom color support
+- Material Design ripple effect
+
+## Usage
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:your_app/widgets/inputs/CustomRadio.dart';
+
+// Basic usage
+CustomRadio(
+  selected: true,
+  onTab: () {
+    // Handle selection
+  },
+)
+
+// With custom styling
+CustomRadio(
+  selected: false,
+  height: 32,
+  width: 32,
+  padding: 6,
+  color: Colors.blue,
+  onTab: () {
+    // Handle selection
+  },
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `onTab` | `Function()?` | Callback function when radio is tapped | `null` |
+| `selected` | `bool` | Whether the radio is selected | `false` |
+| `color` | `Color?` | Custom color for unselected state | `Theme.of(context).dividerColor` |
+| `height` | `double?` | Custom height of the radio | `24` |
+| `width` | `double?` | Custom width of the radio | `24` |
+| `padding` | `double?` | Inner padding of the radio | `4` |
+
+## Implementation Details
+
+The `CustomRadio` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:gradient_borders/gradient_borders.dart';
+
+import '../../ui/gradient.dart';
+
+class CustomRadio extends StatelessWidget {
+  Function()? onTab;
+  bool selected;
+  Color? color;
+  double? height;
+  double? width;
+  double? padding;
+  
+  CustomRadio({
+    super.key, 
+    this.onTab, 
+    this.selected = false,
+    this.color, 
+    this.height, 
+    this.width, 
+    this.padding
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(50),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(50),
+        onTap: onTab,
+        child: Container(
+          height: height ?? 24,
+          width: width ?? 24,
+          decoration: BoxDecoration(
+            border: selected 
+              ? GradientBoxBorder(
+                  gradient: UiGradient.instance.defaultGradient,
+                  width: 2
+                ) 
+              : Border.all(
+                  color: color ?? Theme.of(context).dividerColor, 
+                  width: 2
+                ),
+            borderRadius: BorderRadius.circular(50)
+          ),
+          child: Center(
+            child: Container(
+              margin: EdgeInsets.all(padding ?? 4),
+              decoration: BoxDecoration(
+                color: selected ? null : color ?? Theme.of(context).dividerColor,
+                borderRadius: BorderRadius.circular(50),
+                gradient: selected ? UiGradient.instance.defaultGradient : null
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Styling
+
+The widget uses a combination of:
+- Gradient borders for selected state
+- Custom colors for unselected state
+- Circular border radius for a modern look
+- Material ripple effect for better user interaction
+
+## Best Practices
+
+1. Use consistent sizing across your application
+2. Consider accessibility by ensuring sufficient contrast
+3. Use the gradient feature sparingly to maintain visual hierarchy
+4. Always provide an `onTab` callback for user interaction 

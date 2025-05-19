@@ -1,0 +1,216 @@
+---
+title: CustomScrollBar Widget
+description: A highly customizable scroll bar widget with centered item selection and smooth scrolling behavior
+---
+# Custom Scroll Bar Widget
+
+The `CustomScrollBar` is a Flutter widget that provides a horizontal scrollable list with centered item selection and smooth scrolling behavior. It's particularly useful for creating custom pickers, selectors, or any UI that requires a horizontally scrollable list with centered item selection.
+
+![](./images/customscrollbar.png)
+
+## Features
+
+- Horizontal scrolling with centered item selection
+- Smooth scrolling animation
+- Customizable item width and height
+- Initial index selection
+- Item selection callback
+- Dynamic item styling based on selection
+- Automatic centering of selected items
+
+## Dependencies
+
+```yaml
+dependencies:
+  scrollable_positioned_list: ^latest_version
+```
+
+## Implementation
+
+### Basic Usage
+
+```dart
+CustomScrollBar(
+  children: [
+    Text('Item 1'),
+    Text('Item 2'),
+    Text('Item 3'),
+  ],
+  onItemSelected: (index) {
+    print('Selected index: $index');
+  },
+  itemWidth: 80,
+  height: 50,
+  initialIndex: 1,
+)
+```
+
+### Component Structure
+
+The `CustomScrollBar` consists of several key parts:
+
+1. **State Management**
+   - Uses `ItemScrollController` for scroll control
+   - Uses `ItemPositionsListener` for position tracking
+   - Manages selected index state
+
+2. **Scroll Behavior**
+   - Centered item selection
+   - Smooth scrolling animation
+   - Position-based item selection
+
+3. **Layout**
+   - Customizable item width and height
+   - Dynamic padding calculation
+   - Responsive to container constraints
+
+### Key Methods
+
+#### Initialization
+```dart
+@override
+void initState() {
+  super.initState();
+  _positionsListener.itemPositions.addListener(_onPositionChange);
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if(!isBuild){
+      isBuild = true;
+      setState(() {});
+    }
+  });
+}
+```
+
+#### Scrolling to Middle
+```dart
+void _scrollToMiddle(int index) {
+  _scrollController.scrollTo(
+    index: index,
+    duration: Duration(milliseconds: 300),
+    alignment: 0.5,
+  );
+}
+```
+
+#### Position Change Handler
+```dart
+void _onPositionChange() {
+  final positions = _positionsListener.itemPositions.value;
+  if (positions.isNotEmpty) {
+    final middlePosition = positions.firstWhere(
+      (ItemPosition position) => position.itemTrailingEdge > 0.5 && position.itemLeadingEdge < 0.5,
+      orElse: () => positions.first,
+    );
+    final middleIndex = middlePosition.index;
+    if (middleIndex != _selectedIndex) {
+      setState(() {
+        _selectedIndex = middleIndex;
+      });
+      widget.onItemSelected(_selectedIndex);
+    }
+  }
+}
+```
+
+## Customization
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| children | List\<Widget\> | List of widgets to display in the scroll bar |
+| onItemSelected | Function(int) | Callback when an item is selected |
+| itemWidth | double | Width of each item (default: 80) |
+| height | double | Height of the scroll bar (default: 50) |
+| initialIndex | int? | Initial selected index |
+| hasValue | bool | Whether the scroll bar has a value (default: false) |
+
+### Item Styling
+The component automatically styles items based on their selection state:
+
+```dart
+Widget _buildItem(int index) {
+  final isSelected = index == _selectedIndex;
+  return Container(
+    width: widget.itemWidth,
+    alignment: Alignment.center,
+    child: AnimatedDefaultTextStyle(
+      child: widget.children[index],
+      style: TextStyle(
+        fontSize: isSelected ? 18 : 14,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.blue : Colors.black,
+      ),
+      duration: Duration(milliseconds: 200),
+    ),
+  );
+}
+```
+
+## Best Practices
+
+1. **Performance**
+   - Use appropriate item width to prevent too many items
+   - Implement proper disposal of listeners
+   - Use `LayoutBuilder` for responsive layout
+
+2. **State Management**
+   - Handle initial index properly
+   - Ensure proper cleanup in dispose method
+   - Use post-frame callbacks for initial setup
+
+3. **User Experience**
+   - Provide appropriate item spacing
+   - Use smooth animations for transitions
+   - Implement proper error handling
+
+## Example Usage
+
+```dart
+class CustomPicker extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CustomScrollBar(
+          children: List.generate(
+            10,
+            (index) => Text('Item ${index + 1}'),
+          ),
+          onItemSelected: (index) {
+            print('Selected item: ${index + 1}');
+          },
+          itemWidth: 100,
+          height: 60,
+          initialIndex: 2,
+        ),
+      ],
+    );
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Items Not Centering**
+   - Check if `itemWidth` is appropriate
+   - Verify container constraints
+   - Ensure proper padding calculation
+
+2. **Selection Not Working**
+   - Verify `onItemSelected` callback
+   - Check position listener implementation
+   - Ensure proper state management
+
+3. **Performance Issues**
+   - Reduce number of items if needed
+   - Optimize item building
+   - Check for unnecessary rebuilds
+
+## Additional Resources
+
+- [ScrollablePositionedList Documentation](https://pub.dev/packages/scrollable_positioned_list)
+- [Flutter LayoutBuilder Documentation](https://api.flutter.dev/flutter/widgets/LayoutBuilder-class.html)
+- [Flutter Animation Documentation](https://flutter.dev/docs/development/ui/animations)

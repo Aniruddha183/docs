@@ -1,0 +1,244 @@
+---
+title: Coach App Custom Buttons
+description: Documentation for various buttons used in Coach App
+---
+
+import { Callout } from "nextra-theme-docs"; // Example import if using Nextra
+
+# Coach App Reusable Components
+
+This document outlines the specifications and code for various reusable UI components developed for the Coach App.
+
+# Button Components Documentation
+
+This outlines the various button components used in the application, their purpose, and their corresponding Flutter code snippets as provided.
+
+---
+
+## a. Active Pink Button
+
+**Purpose:** This button is actively used to navigate between screens and also performs functions like validation checks.
+
+**Code Snippet:**
+
+```dart
+// File: pink_button.dart (Example path)
+import 'package:coach_app/constants/colors.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class PinkButton extends StatelessWidget {
+  final String buttontext;
+  final VoidCallback onPressed;
+
+  const PinkButton({
+    super.key,
+    required this.buttontext,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height:48,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromRGBO(210, 55, 85, 1),
+                buttonColor1, // Assumed color from constants
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: ElevatedButton(
+            onPressed: onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              // Note: The shape might be implicitly handled by ClipRRect + Container
+              // but explicitly setting can prevent theme overrides.
+            ),
+            child: Text(
+              buttontext,
+              style: GoogleFonts.lato(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## b. Active Grey Button
+
+**Purpose:** This button is actively used along with pink button to perform navigation functions as well as some other functions as needed by user.
+
+**Code Snippet:**
+
+```dart
+// File: grey_button.dart (Example path)
+import 'package:coach_app/constants/colors.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class GreyButton extends StatelessWidget {
+  final String buttontext;
+  final VoidCallback navigateTo;
+  const GreyButton(
+      {super.key, required this.buttontext, required this.navigateTo});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height:48,
+      child: ElevatedButton(
+        onPressed: navigateTo,
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          backgroundColor: buttonColor2, // Assumed color from constants
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        child: Text(
+          buttontext,
+          style: GoogleFonts.lato(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## c. Disabled Button
+
+**Purpose:** This button represents that it is in inactive state and no function can be carried out by pressing on it.
+
+**Code Snippet:**
+
+```dart
+// File: disabled_button.dart (Example path)
+import 'package:coach_app/constants/colors.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class DisabledButton extends StatelessWidget {
+  final String buttontext;
+  final VoidCallback onPressed;
+  const DisabledButton(
+      {super.key, required this.buttontext, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height:48
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient( // Uses gradient for solid color look
+              colors: [
+                fontColor19, // Assumed disabled color from constants
+                fontColor19,
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: ElevatedButton(
+            onPressed: onPressed, // Button is still technically pressable
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            child: Text(
+              buttontext,
+              style: GoogleFonts.lato(
+                color: fontColor4, // Assumed disabled text color from constants
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## d. Create Button
+
+**Purpose:** This button is used for creating live sessions, blogs, posts, workout videos, plans, etc.
+
+**Code Snippet:**
+
+```dart
+// File: create_live_session_button.dart (Example path)
+import 'package:coach_app/constants/colors.dart';
+import 'package:coach_app/routes/routes.dart';
+import 'package:coach_app/theme/text_theme.dart'; // Assuming theme definition
+import 'package:flutter/material.dart';
+
+class CreateLiveSessionButton extends StatelessWidget {
+  final String buttonText;
+  const CreateLiveSessionButton({super.key, required this.buttonText});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            tabColor3, // Assumed start color from constants
+            tabColor4, // Assumed end color from constants
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          // Navigation is hardcoded inside the widget
+          Navigator.pushNamed(context, AppRoutes.namedescsessioncreate);
+        },
+        icon: const Icon(
+          Icons.add_circle_outline,
+          color: fontColor1, // Assumed icon color from constants
+        ),
+        label: Text(
+          buttonText, //Change content according to need
+          style: AppTextTheme.darkTextTheme.bodyMedium, // Uses specific theme
+        ),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```

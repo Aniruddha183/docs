@@ -1,0 +1,159 @@
+---
+title: StepBar
+description: A widget for displaying a step-based progress bar with customizable navigation controls
+---
+
+
+# StepBar Widget
+
+The `StepBar` is a Flutter widget that provides a visual representation of progress through multiple steps, typically used in multi-step forms or wizards. It includes a progress bar, step counter, and navigation buttons.
+
+![](./images/stepbar.png)
+
+## Features
+
+- Visual progress indicator
+- Step counter display
+- Navigation buttons (back/next)
+- Animated progress bar
+- Customizable navigation controls
+- Responsive design using sizer
+- Gradient styling support
+
+## Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `currentStep` | int | Yes | Current step number (1-based) |
+| `totalStep` | int | Yes | Total number of steps |
+| `onNext` | Function() | Yes | Callback for next button |
+| `onBack` | Function() | Yes | Callback for back button |
+| `allowNext` | bool | Yes | Whether next button is enabled |
+| `allowBack` | bool | Yes | Whether back button is enabled |
+
+## Usage Example
+
+```dart
+StepBar(
+  currentStep: 2,
+  totalStep: 5,
+  onNext: () {
+    // Handle next step
+  },
+  onBack: () {
+    // Handle previous step
+  },
+  allowNext: true,
+  allowBack: true,
+)
+```
+
+## Implementation Details
+
+### Components
+1. **Step Counter**: Shows "Step X of Y" format
+2. **Progress Bar**: Linear progress indicator with gradient
+3. **Navigation Buttons**: Back and Next buttons with gradient icons
+
+### Default Values
+- Progress bar height: 10.0
+- Progress bar radius: 8
+- Animation duration: 600ms
+- Icon size: 14x14
+- Spacing: 8.sp
+
+## Styling
+
+### Default Styles
+- Progress bar background: `UIColor.instance.progressBarBgColor`
+- Progress bar gradient: `UiGradient.instance.progressBarGradient`
+- Button gradient: `UiGradient.instance.buttonGradientBg`
+- Text style: Theme's bodySmall
+
+### Customization Options
+1. Progress bar appearance through `LinearPercentIndicator`
+2. Button styling through `GradientIconButton`
+3. Text styling through Theme
+4. Spacing through sizer package
+
+## Best Practices
+
+1. Use appropriate step numbers (1-based)
+2. Ensure total steps is greater than current step
+3. Handle edge cases in navigation callbacks
+4. Consider accessibility when choosing colors
+5. Test with different step counts
+6. Ensure proper state management for allowNext/allowBack
+7. Consider mobile responsiveness
+
+## Performance Considerations
+
+- Uses `LinearPercentIndicator` for smooth animations
+- Efficient rendering with `StatelessWidget`
+- Minimal widget tree depth
+- Responsive sizing with sizer package
+
+## Common Use Cases
+
+1. Multi-step forms
+2. Setup wizards
+3. Tutorial flows
+4. Survey questionnaires
+5. Registration processes
+6. Configuration flows
+7. Onboarding experiences
+
+## Example with Different States
+
+```dart
+// First step
+StepBar(
+  currentStep: 1,
+  totalStep: 5,
+  onNext: () => goToNextStep(),
+  onBack: () => goToPreviousStep(),
+  allowNext: true,
+  allowBack: false, // Disable back on first step
+)
+
+// Middle step
+StepBar(
+  currentStep: 3,
+  totalStep: 5,
+  onNext: () => goToNextStep(),
+  onBack: () => goToPreviousStep(),
+  allowNext: true,
+  allowBack: true,
+)
+
+// Last step
+StepBar(
+  currentStep: 5,
+  totalStep: 5,
+  onNext: () => completeProcess(),
+  onBack: () => goToPreviousStep(),
+  allowNext: false, // Disable next on last step
+  allowBack: true,
+)
+```
+
+## Integration Tips
+
+1. Place at bottom of screens for consistency
+2. Use with form validation
+3. Consider adding step titles
+4. Implement proper state management
+5. Add loading states for async operations
+6. Consider adding step completion indicators
+7. Test with different screen sizes
+
+## Accessibility Considerations
+
+1. Ensure sufficient color contrast
+2. Provide clear step indicators
+3. Make navigation buttons easily tappable
+4. Consider adding ARIA labels
+5. Support keyboard navigation
+6. Provide clear feedback on actions
+7. Test with screen readers
+

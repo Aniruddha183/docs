@@ -1,0 +1,213 @@
+---
+title: DropPickerInput Widget
+description: A customizable dropdown-like input field with support for icons, gradients, and various styling options
+---
+
+# Drop Picker Input Component
+
+The `DropPickerInput` is a Flutter widget that provides a customizable dropdown-like input field with support for icons, gradients, and various styling options. It's designed to be used as a trigger for opening dropdown menus or pickers.
+
+![](./images/droppickerinput.png)
+
+## Features
+
+- Customizable title and value display
+- Optional leading and trailing icons
+- Gradient border support
+- Custom background color
+- Flexible text styling
+- Ellipsis text overflow handling
+- Rounded corners with consistent border radius
+- Material design ink effect
+- Responsive sizing with sizer package
+
+## Dependencies
+
+```yaml
+dependencies:
+  sizer: ^latest_version
+  gradient_borders: ^latest_version
+```
+
+## Implementation
+
+### Basic Usage
+
+```dart
+DropPickerInput(
+  title: 'Select Option',
+  value: 'Selected Value',
+  hint: 'Choose an option',
+  onTab: () {
+    // Handle tap event
+  },
+)
+```
+
+### Component Structure
+
+The `DropPickerInput` consists of several key parts:
+
+1. **Title Section**
+   - Optional title text
+   - Customizable title style
+   - Configurable gap between title and input
+
+2. **Input Container**
+   - Material design container
+   - Custom background color
+   - Optional gradient border
+   - Rounded corners
+
+3. **Content Layout**
+   - Leading icon (optional)
+   - Value/hint text
+   - Trailing icon (optional)
+
+### Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| title | String | Title text displayed above the input | Required |
+| value | String? | Current selected value | null |
+| hint | String? | Placeholder text when no value is selected | null |
+| showIcon | bool | Whether to show the trailing icon | true |
+| gap | double? | Space between title and input | 6.sp |
+| bgColor | Color? | Background color of the input | Theme's cardColor |
+| leadingIcon | Icon? | Icon displayed at the start of the input | null |
+| titleStyle | TextStyle? | Custom style for the title text | Theme's labelSmall |
+| onTab | Function() | Callback when the input is tapped | Required |
+| trailingIcon | Icon? | Custom trailing icon | Icons.keyboard_arrow_down |
+| isGradientBorder | bool | Whether to use gradient border | false |
+
+## Customization
+
+### Styling
+
+The component can be styled in various ways:
+
+```dart
+DropPickerInput(
+  title: 'Custom Styled Input',
+  value: 'Value',
+  hint: 'Select',
+  titleStyle: TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.bold,
+  ),
+  bgColor: Colors.white,
+  isGradientBorder: true,
+  leadingIcon: Icon(Icons.person),
+  trailingIcon: Icon(Icons.arrow_drop_down),
+  gap: 10,
+)
+```
+
+### Border Radius
+
+The component uses a consistent border radius from the `UiSize` class:
+
+```dart
+borderRadius: UiSize.instance.borderRadius_m
+```
+
+### Text Styling
+
+The value text uses a specific style:
+
+```dart
+style: Theme.of(context).textTheme.labelMedium!.copyWith(
+  fontWeight: FontWeight.w400,
+  color: Color(0xffA3A3A3)
+)
+```
+
+## Best Practices
+
+1. **Layout**
+   - Use appropriate gap values for spacing
+   - Consider text length when setting maxLines
+   - Ensure proper padding for touch targets
+
+2. **Styling**
+   - Use consistent colors from theme
+   - Maintain proper contrast for text
+   - Consider accessibility when choosing colors
+
+3. **Functionality**
+   - Always provide a meaningful hint text
+   - Use appropriate icons for context
+   - Handle long text with ellipsis
+
+## Example Usage
+
+### Basic Implementation
+
+```dart
+class CustomForm extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        DropPickerInput(
+          title: 'Select Category',
+          value: selectedCategory,
+          hint: 'Choose a category',
+          onTab: () {
+            // Show category picker
+          },
+        ),
+        SizedBox(height: 16),
+        DropPickerInput(
+          title: 'Select Date',
+          value: selectedDate,
+          hint: 'Choose a date',
+          leadingIcon: Icon(Icons.calendar_today),
+          onTab: () {
+            // Show date picker
+          },
+        ),
+      ],
+    );
+  }
+}
+```
+
+### With Gradient Border
+
+```dart
+DropPickerInput(
+  title: 'Premium Selection',
+  value: selectedOption,
+  hint: 'Select premium option',
+  isGradientBorder: true,
+  onTab: () {
+    // Show premium options
+  },
+)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Text Overflow**
+   - Ensure proper width constraints
+   - Use appropriate maxLines
+   - Consider text scaling
+
+2. **Touch Target Size**
+   - Verify padding values
+   - Check container height
+   - Ensure proper spacing
+
+3. **Styling Inconsistencies**
+   - Check theme inheritance
+   - Verify color values
+   - Ensure proper border radius
+
+## Additional Resources
+
+- [Flutter Material Design](https://flutter.dev/docs/development/ui/widgets/material)
+- [Sizer Package Documentation](https://pub.dev/packages/sizer)
+- [Gradient Borders Package](https://pub.dev/packages/gradient_borders)

@@ -1,0 +1,172 @@
+import { Meta } from "@storybook/addon-docs";
+
+<Meta title="Components/DeleteDialog" />
+
+# DeleteDialog
+
+A customizable dialog component for displaying confirmation messages, typically used for delete actions or other important decisions.
+
+## Props
+
+| Prop Name                     | Type         | Required | Description                                                  |
+| ----------------------------- | ------------ | -------- | ------------------------------------------------------------ |
+| `text`                        | string       | Yes      | Main heading text of the dialog                              |
+| `subText`                     | string       | Yes      | Subtitle text displayed below the main heading               |
+| `smallText`                   | string       | Yes      | Additional small text, typically for policies or disclaimers |
+| `image`                       | string       | Yes      | Path to the image asset displayed at the top of the dialog   |
+| `buttonText1`                 | string       | Yes      | Text for the first (primary) button                          |
+| `buttonText2`                 | string       | Yes      | Text for the second (secondary) button                       |
+| `onPressed1`                  | VoidCallback | Yes      | Callback function for the first button                       |
+| `onPressed2`                  | VoidCallback | Yes      | Callback function for the second button                      |
+| `onPressedcancellationpolicy` | VoidCallback | No       | Optional callback for when the small text is tapped          |
+
+## Usage Example
+
+```dart
+import 'package:coach_app/constants/colors.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class DeleteDialog extends StatelessWidget {
+  final String text;
+  final String subText;
+  final String smallText;
+  final String image;
+  final String buttonText1;
+  final String buttonText2;
+  final VoidCallback onPressed1;
+  final VoidCallback onPressed2;
+  final VoidCallback? onPressedcancellationpolicy;
+
+  const DeleteDialog({
+    super.key,
+    required this.text,
+    required this.subText,
+    required this.smallText,
+    required this.image,
+    required this.buttonText1,
+    required this.buttonText2,
+    required this.onPressed1,
+    required this.onPressed2,
+    this.onPressedcancellationpolicy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: backgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      title: Column(
+        children: [
+          Image.asset(image),
+          const SizedBox(height: 8),
+          ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [
+                linearGradientFontColor2,
+                linearGradientFontColor1
+              ], // Gradient colors
+            ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+            child: Text(
+              text,
+              style: GoogleFonts.lato(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: fontColor1,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subText,
+            style: GoogleFonts.lato(
+              fontSize: 16,
+              color: fontColor3,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          if (smallText.isNotEmpty)
+            GestureDetector(
+              onTap: onPressedcancellationpolicy,
+              child: Column(
+                children: [
+                  Text(
+                    smallText,
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      color: fontColor1,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 2),
+                  Visibility(
+                    visible: smallText.trim().toLowerCase() ==
+                        'read cancellation policy'.toLowerCase(),
+                    child: Container(
+                      height: 1,
+                      width: MediaQuery.sizeOf(context).width * 0.4,
+                      decoration: const BoxDecoration(
+                        color: fontColor1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: onPressed1,
+                style: TextButton.styleFrom(
+                  backgroundColor: buttonColor1,
+                  minimumSize: const Size(80, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  buttonText1,
+                  style: GoogleFonts.lato(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: onPressed2,
+                style: TextButton.styleFrom(
+                  backgroundColor: backgroundColor,
+                  minimumSize: const Size(80, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(
+                      color: fontColor1,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  buttonText2,
+                  style: GoogleFonts.lato(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+```

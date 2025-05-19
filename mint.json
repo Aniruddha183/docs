@@ -66,6 +66,11 @@
       "name": "Swasthi",
       "icon": "mobile",
       "url": "swasthi"
+    },
+    {
+      "name": "FitnEarnPal",
+      "icon": "mobile",
+      "url": "fitnearnpal"
     }
   ],
   "navigation": [
@@ -257,6 +262,44 @@
             "swasthi/swasthi-purchases",
             "swasthi/swasthi-admob"
           ]
+        },{
+          "group":"Swasthi Widgets",
+          "pages":[
+            "swasthi/widgets/navbar-widget",
+            "swasthi/widgets/drawer-widget",
+            "swasthi/widgets/search-bar-widget",
+            "swasthi/widgets/filter-chip-widget",
+            "swasthi/widgets/appbar-widget",
+            "swasthi/widgets/group-button-widget",
+            "swasthi/widgets/gradient-tile-widget",
+            "swasthi/widgets/gradient-text-widget",
+            "swasthi/widgets/custombuttom-widget",
+            "swasthi/widgets/stepbar-widget",
+            "swasthi/widgets/custom-scrollbar-widget",
+            "swasthi/widgets/videoplayer-widget",
+            "swasthi/widgets/DropPickerInput-widget",
+            "swasthi/widgets/tips-card-widget",
+            "swasthi/widgets/streak-widget",
+            "swasthi/widgets/age-card-widget",
+            "swasthi/widgets/gender-card-widget",
+            "swasthi/widgets/height-card-widget",
+            "swasthi/widgets/custom-radio-widget",
+            "swasthi/widgets/activity-tile-widget",
+            "swasthi/widgets/custom-list-tile-widget",
+            "swasthi/widgets/dropdown-tile-widget",
+            "swasthi/widgets/service-tile-widget",
+            "swasthi/widgets/CalculateCard-widget",
+            "swasthi/widgets/CalculateHomeCard-widget",
+            "swasthi/widgets/CalorieCard-widget",
+            "swasthi/widgets/CardPayment-widget",
+            "swasthi/widgets/GoalProgressCard-widget",
+            "swasthi/widgets/IconMenuItem-widget",
+            "swasthi/widgets/OtherPayment-widget",
+            "swasthi/widgets/PaymentTile-widget",
+            "swasthi/widgets/UPIPayment-widget",
+            "swasthi/widgets/WalletPayment-widget"
+            
+          ]
         },
         {
           "group": "Swasthi Components",
@@ -286,7 +329,27 @@
           ]
         }
       ]
+    },
+    {
+      "group" : "FitnEarnPal",
+      "pages": [
+        "fitnearnpal/fitnearnpal-overview",
+        "fitnearnpal/fitnearnpal-ui-components",
+        {
+          "group" : "UI COMPONENTS",
+          "pages" : [
+            "fitnearnpal/widgets/custom-textfield",
+            "fitnearnpal/widgets/custom-buttons",
+            "fitnearnpal/widgets/live-session-card",
+            "fitnearnpal/widgets/delete-dialog-box",
+            "fitnearnpal/widgets/level-dropdown",
+            "fitnearnpal/widgets/send-for-review-popup",
+            "fitnearnpal/widgets/custom-time-picker"
+          ]
+        }
+      ]
     }
+
   ],
   "tabs": [
     {
@@ -330,6 +393,12 @@
       "url": "swasthi",
       "icon": "mobile",
       "navigation": ["Swasthi"]
+    },
+    {
+      "name": "FitnEarnPal",
+      "url": "fitnearnpal",
+      "icon": "mobile",
+      "navigation": ["FitnEarnPal"]
     }
   ]
 }

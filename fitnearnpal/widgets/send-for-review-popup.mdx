@@ -1,0 +1,131 @@
+import { Meta } from "@storybook/addon-docs";
+
+<Meta title="Components/PopupWidgetwithOneOption" />
+
+# PopupWidgetwithOneOption
+
+A visually appealing single-action popup dialog component designed for displaying important messages, confirmations, or informational content with one primary action button.
+
+## Component Overview
+
+This widget creates a centered dialog with:
+
+- A header image
+- Gradient-styled main text
+- Supporting subtitle text
+- A single bordered action button
+- Dark-themed background for modern UI aesthetics
+
+## Use Cases
+
+- Success/error notifications
+- Informational alerts
+- Single-action confirmations
+- Completion messages
+- System status updates
+
+## Props
+
+| Prop Name    | Type         | Required | Description                                           |
+| ------------ | ------------ | -------- | ----------------------------------------------------- |
+| `text`       | String       | Yes      | Main headline text (displays with gradient effect)    |
+| `subText`    | String       | Yes      | Supporting descriptive text below the main headline   |
+| `image`      | String       | Yes      | Asset path for the header image                       |
+| `buttonText` | String       | Yes      | Text displayed on the action button                   |
+| `onPressed`  | VoidCallback | Yes      | Callback function executed when the button is pressed |
+
+## Usage Example
+
+```dart
+import 'package:coach_app/constants/colors.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class PopupWidgetwithOneOption extends StatelessWidget {
+  final String text;
+  final String subText;
+  final String image;
+  final String buttonText;
+  final VoidCallback onPressed;
+
+  const PopupWidgetwithOneOption(
+      {super.key,
+      required this.text,
+      required this.subText,
+      required this.onPressed,
+      required this.image,
+      required this.buttonText});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.grey[850],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      title: Column(
+        children: [
+          Image.asset(image),
+          const SizedBox(height: 8),
+          ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [
+                linearGradientFontColor2,
+                linearGradientFontColor1
+              ], // Gradient colors
+            ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+            child: Text(
+              text,
+              style: GoogleFonts.lato(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: fontColor1,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subText,
+            style: GoogleFonts.lato(
+              fontSize: 16,
+              color: fontColor3,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 40,
+            width: 160,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: fontColor1,
+              ),
+            ),
+            child: TextButton(
+              onPressed: onPressed,
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                minimumSize: const Size(80, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                buttonText,
+                style: GoogleFonts.lato(
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```

@@ -1,0 +1,246 @@
+---
+title: CalculateHomeCard
+description: A home screen calculator card with horizontal scrolling calculator options and selection state
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# CalculateHomeCard
+
+The `CalculateHomeCard` widget is a comprehensive calculator selection interface that displays a list of calculator options in a horizontal scrollable list. It features selection states, gradient styling, and navigation capabilities.
+
+![](./images/calculate_card.png)
+
+## Features
+
+- Horizontal scrolling calculator list
+- Selection state with visual feedback
+- Gradient styling for selected items
+- Localization support
+- Navigation integration
+- Responsive design
+- Visual indicators
+- Smooth transitions
+
+## Usage
+
+```dart
+CalculateHomeCard()
+```
+
+## Implementation Details
+
+The `CalculateHomeCard` widget is implemented as a `StatefulWidget` with the following structure:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:gradient_borders/gradient_borders.dart';
+import 'package:sizer/sizer.dart';
+import '../../model/Calculator.model.dart';
+import '../../ui/gradient.dart';
+import '../../utils/CalculateData.dart';
+
+class CalculateHomeCard extends StatefulWidget {
+  const CalculateHomeCard({super.key});
+
+  @override
+  State<CalculateHomeCard> createState() => _CalculateHomeCardState();
+}
+
+class _CalculateHomeCardState extends State<CalculateHomeCard> {
+  CalculatorType selectedType = CalculatorType.Unknown;
+
+  @override
+  Widget build(BuildContext context) {
+    var list = getListData(AppLocalizations.of(context)!);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).canvasColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // Header Section
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.sp, vertical: 16.sp),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Calculate",
+                        style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                              fontSize: 22,
+                            ),
+                      ),
+                      Text(
+                        "Reach your goals faster",
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              color: Color(0xfffafafa),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                SvgPicture.asset("assets/icons_svg/calculate.svg"),
+              ],
+            ),
+          ),
+          // Calculator List
+          SizedBox(
+            height: 85,
+            child: ListView.separated(
+              shrinkWrap: true,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.only(left: 15.sp, right: 15.sp),
+              itemBuilder: (context, index) {
+                var item = list[index];
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: selectedType == item.type
+                              ? UiGradient.instance.defaultGradient.scale(0.20)
+                              : null,
+                          borderRadius: BorderRadius.circular(15.sp),
+                          border: selectedType != item.type
+                              ? null
+                              : GradientBoxBorder(
+                                  gradient: UiGradient.instance.defaultGradient),
+                        ),
+                        child: Material(
+                          color: selectedType == item.type
+                              ? Colors.transparent
+                              : Color(0xff262626),
+                          borderRadius: BorderRadius.circular(15.sp),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(15.sp),
+                            onTap: () async {
+                              setState(() {
+                                selectedType = item.type;
+                              });
+                              await Future.delayed(Duration(milliseconds: 1500));
+                              context.go(getListData(AppLocalizations.of(context)!)[index].route);
+                              setState(() {
+                                selectedType = CalculatorType.Unknown;
+                              });
+                            },
+                            child: SizedBox(
+                              width: 70,
+                              child: Padding(
+                                padding: const EdgeInsets.all(15.0),
+                                child: SvgPicture.asset(
+                                  item.asset,
+                                  colorFilter: ColorFilter.mode(
+                                    selectedType == item.type
+                                        ? Color(0xffFAFAFA)
+                                        : Color(0xffA3A3A3),
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    SizedBox(
+                      width: 70,
+                      child: Text(
+                        calculatorName(item.type, AppLocalizations.of(context)!),
+                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                              color: selectedType == item.type
+                                  ? Color(0xffFAFAFA)
+                                  : Color(0xffA3A3A3),
+                            ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                );
+              },
+              separatorBuilder: (context, index) {
+                return SizedBox(width: 12.sp);
+              },
+              itemCount: list.length,
+            ),
+          ),
+          // Bottom Indicator
+          SizedBox(height: 8.sp),
+          Container(
+            decoration: BoxDecoration(
+              color: Color(0xff737373),
+              borderRadius: BorderRadius.circular(100),
+            ),
+            width: 40,
+            height: 3.5,
+          ),
+          SizedBox(height: 10.sp),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## Components
+
+### Header Section
+- Title "Calculate"
+- Subtitle "Reach your goals faster"
+- Calculator icon
+
+### Calculator List
+- Horizontal scrollable list
+- Individual calculator items with:
+  - Icon
+  - Title
+  - Selection state
+  - Gradient styling
+  - Navigation
+
+### Bottom Indicator
+- Visual separator
+- Rounded rectangle design
+
+## Styling
+
+The widget uses:
+- Card-based layout with rounded corners
+- Gradient backgrounds for selected items
+- Gradient borders for selected items
+- Consistent spacing
+- Material ripple effect
+- Theme-based colors
+- Responsive sizing
+- Text overflow handling
+- Custom gradient scaling
+- Fixed height for list items
+- Visual indicators
+
+## Best Practices
+
+1. Use appropriate icon sizes
+2. Keep calculator names concise
+3. Consider accessibility
+4. Use meaningful icons
+5. Ensure proper touch targets
+6. Maintain consistent spacing
+7. Use appropriate border radius
+8. Consider gradient intensity
+9. Handle text overflow properly
+10. Use appropriate color contrast
+11. Implement smooth transitions
+12. Consider localization needs
+13. Handle navigation properly
+14. Maintain consistent visual hierarchy 

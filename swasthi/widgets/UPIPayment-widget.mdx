@@ -1,0 +1,173 @@
+---
+title: UPIPayment
+description: A payment method selector for UPI payments with supported UPI apps
+---
+
+import { CodeBlock } from '@mintlify/components';
+
+# UPIPayment
+
+The `UPIPayment` widget is a specialized payment method selector for UPI-based payments, supporting various UPI apps like Google Pay, PhonePe, and Paytm.
+
+![](./images/paymentupi.png)
+
+## Features
+
+- UPI payment selection
+- Multiple UPI app support
+- Visual UPI app indicators
+- Material ripple effect
+- Consistent styling
+- Selection state management
+
+## Usage
+
+```dart
+UPIPayment(
+  selected: PaymentType.UPI,
+  onChange: (type) {
+    // Handle payment type change
+  },
+)
+```
+
+## Properties
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `selected` | `PaymentType` | Currently selected payment type | Required |
+| `onChange` | `Function(PaymentType)` | Payment type change callback | Required |
+
+## Implementation Details
+
+The `UPIPayment` widget is implemented as a `StatelessWidget` with the following structure:
+
+```dart
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/material.dart';
+import 'package:sizer/sizer.dart';
+import '../../utils/types.dart';
+import '../widget.dart';
+
+class UPIPayment extends StatelessWidget {
+  PaymentType selected;
+  Function(PaymentType) onChange;
+  
+  UPIPayment({
+    super.key, 
+    required this.onChange, 
+    required this.selected 
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(15.sp)
+      ),
+      child: Column(
+        children: [
+          // UPI payment option
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(15.sp), 
+                topRight: Radius.circular(15.sp)
+              ),
+              onTap: () => onChange(PaymentType.UPI),
+              child: Container(
+                padding: EdgeInsets.only(
+                  top: 13.sp, 
+                  left: 13.sp, 
+                  right: 13.sp, 
+                  bottom: 6.5.sp
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor, 
+                          width: 1
+                        ),
+                        borderRadius: BorderRadius.circular(7.sp)
+                      ),
+                      height: 28.sp,
+                      width: 28.sp,
+                      padding: EdgeInsets.all(3.5.sp),
+                      child: SvgPicture.asset(
+                        "assets/payments/upi.svg",
+                        height: 20.sp, 
+                        width: 20.sp
+                      ),
+                    ),
+                    SizedBox(width: 10.sp),
+                    Expanded(
+                      child: Text(
+                        "UPI",
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          color: Color(0xffFAFAFA)
+                        ),
+                      ),
+                    ),
+                    CustomRadio(
+                      selected: selected == PaymentType.UPI,
+                      onTab: () => onChange(PaymentType.UPI),
+                    )
+                  ],
+                )
+              )
+            )
+          ),
+          Divider(
+            color: Theme.of(context).dividerColor, 
+            height: 0
+          ),
+          // UPI app indicators
+          Container(
+            padding: EdgeInsets.only(
+              top: 6.5.sp, 
+              left: 13.sp, 
+              right: 13.sp, 
+              bottom: 13.sp
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildUPIAppIcon("assets/payments/gpay.svg"),
+                SizedBox(width: 6.5.sp),
+                _buildUPIAppIcon("assets/payments/phonepe.svg"),
+                SizedBox(width: 6.5.sp),
+                _buildUPIAppIcon("assets/payments/paytm.svg"),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
+```
+
+## Styling
+
+The widget uses:
+- Card-like container with rounded corners
+- Consistent padding and spacing
+- Theme-based colors
+- Material ripple effect
+- Custom border radius
+- Standard icon sizes
+
+## Best Practices
+
+1. Use appropriate UPI app icons
+2. Maintain consistent spacing
+3. Handle selection state properly
+4. Consider accessibility
+5. Keep UPI app indicators visible
+6. Use proper divider placement
+7. Ensure proper touch targets 

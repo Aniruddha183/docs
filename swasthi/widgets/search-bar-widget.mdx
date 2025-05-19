@@ -1,0 +1,283 @@
+---
+title: SearchBar Widget
+description: A customizable search bar component with voice input and barcode scanning capabilities
+---
+
+import { CodeBlock } from 'components/CodeBlock';
+import { Callout } from 'components/Callout';
+
+# CustomSearchBar
+
+The `CustomSearchBar` is a versatile search component that provides text input, voice input, and barcode scanning functionality. It's designed to be highly customizable and can be used across different parts of the application.
+
+![](./images/searchbar.png)
+
+## Features
+
+- Text input with customizable styling
+- Voice input capability
+- Barcode scanner integration
+- Customizable appearance
+- Responsive design using sizer
+- Theme-aware styling
+
+## Implementation Details
+
+### Basic Structure
+
+The CustomSearchBar is implemented as a StatelessWidget with the following structure:
+
+```dart
+class CustomSearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool showScanner;
+  final BorderRadiusGeometry? borderRadius;
+  final Function(String) onChanged;
+  final Function()? onTap;
+  final bool readOnly;
+  final Color? backgroundColor;
+  final TextStyle? hintStyle;
+  final Color? iconColor;
+
+  const CustomSearchBar({
+    super.key, 
+    required this.controller, 
+    required this.hint, 
+    this.showScanner = true, 
+    this.borderRadius, 
+    required this.onChanged,
+    this.onTap,
+    this.readOnly = false,
+    this.backgroundColor,
+    this.hintStyle,
+    this.iconColor
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      // Implementation details
+    );
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `controller` | `TextEditingController` | Required. Controls the text input field |
+| `hint` | `String` | Required. The hint text to display in the search field |
+| `showScanner` | `bool` | Optional. Whether to show the barcode scanner button (default: true) |
+| `borderRadius` | `BorderRadiusGeometry?` | Optional. Custom border radius for the search bar |
+| `onChanged` | `Function(String)` | Required. Callback when the text changes |
+| `onTap` | `Function()?` | Optional. Callback when the text field is tapped |
+| `readOnly` | `bool` | Optional. Whether the text field is read-only (default: false) |
+| `backgroundColor` | `Color?` | Optional. Custom background color |
+| `hintStyle` | `TextStyle?` | Optional. Custom style for the hint text |
+| `iconColor` | `Color?` | Optional. Custom color for icons |
+
+### Text Input Implementation
+
+The text input field is implemented with the following features:
+
+```dart
+TextField(
+  readOnly: readOnly,
+  onTap: onTap,
+  onChanged: (value) {
+    onChanged(value);
+  },
+  controller: controller,
+  keyboardType: TextInputType.text,
+  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+    color: Color(0xffFAFAFA)
+  ),
+  decoration: InputDecoration(
+    border: InputBorder.none,
+    hintText: hint,
+    hintStyle: hintStyle ?? Theme.of(context).textTheme.bodyMedium!.copyWith(
+      color: UIColor.instance.hintTextColor
+    ),
+    prefixIcon: Icon(
+      Icons.search, 
+      color: iconColor ?? UIColor.instance.hintTextColor,
+      size: 15.sp,
+    ),
+    contentPadding: EdgeInsets.only(
+      top: 8.sp,
+      bottom: 8.sp,
+    )
+  ),
+)
+```
+
+### Barcode Scanner Implementation
+
+The barcode scanner button is implemented as follows:
+
+```dart
+if(showScanner)
+  Material(
+    borderRadius: BorderRadius.circular(50),
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(50),
+      onTap: () {
+        Navigator.push(
+          context, 
+          MaterialPageRoute(
+            builder: (context) => BarCodeScannerScreen()
+          )
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: SvgPicture.asset(
+          "assets/icons_svg/scaner_icon.svg",
+          height: 14.sp, 
+          width: 14.sp,
+          colorFilter: ColorFilter.mode(
+            iconColor ?? Color(0xffCAC4D0), 
+            BlendMode.srcIn
+          )
+        ),
+      ),
+    ),
+  )
+```
+
+### Voice Input Implementation
+
+The voice input button is implemented as follows:
+
+```dart
+Material(
+  borderRadius: BorderRadius.circular(50),
+  color: Colors.transparent,
+  child: InkWell(
+    borderRadius: BorderRadius.circular(50),
+    onTap: () {
+      showSearchSheet(context, 
+        onData: (data) {
+          if(data.isNotEmpty) {
+            controller.text = data;
+          }
+        }, 
+        onDismiss: () {
+          Navigator.pop(context);
+        }
+      );
+    },
+    child: Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Icon(
+        Icons.mic_none_rounded, 
+        color: iconColor ?? UIColor.instance.hintTextColor,
+        size: 16.sp,
+      ),
+    ),
+  ),
+)
+```
+
+## Usage Example
+
+Here's how to use the CustomSearchBar in your application:
+
+```dart
+class SearchScreen extends StatefulWidget {
+  @override
+  _SearchScreenState createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: CustomSearchBar(
+          controller: _searchController,
+          hint: 'Search recipes...',
+          onChanged: (value) {
+            // Handle search text changes
+          },
+          showScanner: true,
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Styling Guidelines
+
+The search bar follows these styling conventions:
+
+1. **Container Styling**
+   - Background color: `Theme.of(context).cardColor` (default)
+   - Border radius: 50 (default)
+   - Customizable through `backgroundColor` and `borderRadius` properties
+
+2. **Text Styling**
+   - Input text color: `Color(0xffFAFAFA)`
+   - Hint text color: `UIColor.instance.hintTextColor`
+   - Customizable through `hintStyle` property
+
+3. **Icon Styling**
+   - Search icon size: 15.sp
+   - Microphone icon size: 16.sp
+   - Scanner icon size: 14.sp
+   - Icon color: `UIColor.instance.hintTextColor` (default)
+   - Customizable through `iconColor` property
+
+4. **Spacing**
+   - Uses `sizer` package for responsive sizing
+   - Content padding: 8.sp top and bottom
+   - Right padding: 2.w
+
+## Required Dependencies
+
+Add these to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flutter_svg: ^latest_version
+  sizer: ^latest_version
+  provider: ^latest_version
+```
+
+## Best Practices
+
+1. **State Management**
+   - Use a `TextEditingController` to manage the search text
+   - Implement proper cleanup in `dispose()` method
+   - Use `onChanged` callback for real-time search updates
+
+2. **Performance**
+   - Use `const` constructors where possible
+   - Implement proper error handling for voice input
+   - Cache SVG assets for better performance
+
+3. **Accessibility**
+   - Provide proper contrast ratios
+   - Include semantic labels
+   - Support screen readers
+
+## Related Components
+
+- `BarCodeScannerScreen` - For barcode scanning functionality
+- `showSearchSheet` - For voice input functionality
+- `UIColor` - For theme colors
+
+## Notes
+
+- The component is fully responsive using `sizer`
+- All icons are properly sized using `sp` units
+- The search bar supports both light and dark themes
+- Voice input requires proper permissions
+- Barcode scanning requires camera permissions

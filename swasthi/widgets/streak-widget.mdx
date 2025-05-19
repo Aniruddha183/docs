@@ -1,0 +1,207 @@
+---
+title: Streak Widget
+description: A widget for displaying a streak of login activity with a timeline visualization
+---
+
+## Overview
+
+The streak components in Swasthi app provide a visual representation of user login streaks and activity tracking. This documentation covers two main components:
+
+![](./images/streak.png)
+
+1. `StreakCard` - A container widget that displays the current streak count and timeline
+2. `StreakTimelineBar` - A horizontal timeline visualization of login activity
+
+## StreakCard
+
+The `StreakCard` widget is a container that displays the user's current streak and a timeline of their login activity.
+
+### Implementation
+
+```dart
+class StreakCard extends StatefulWidget {
+  const StreakCard({super.key});
+
+  @override
+  State<StreakCard> createState() => _StreakCardState();
+}
+```
+
+### Features
+
+- Displays current streak count
+- Shows a timeline of login activity
+- Uses gradient text for visual appeal
+- Responsive design that adapts to different screen sizes
+
+### Usage
+
+```dart
+StreakCard()
+```
+
+### Dependencies
+
+- `StreakProvider` - Manages streak data
+- `AccountProvider` - Handles user account information
+- `StreakTimelineBar` - Displays the timeline visualization
+
+## StreakTimelineBar
+
+The `StreakTimelineBar` widget provides a horizontal timeline visualization of user login activity.
+
+### Implementation
+
+```dart
+class StreakTimelineBar extends StatefulWidget {
+  const StreakTimelineBar({
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<StreakTimelineBar> createState() => _StreakTimelineBarState();
+}
+```
+
+### Features
+
+- Horizontal scrollable timeline
+- Visual indicators for login status
+- Auto-scrolls to current date
+- Displays weekdays and dates
+- Custom gradient styling
+- Streak line visualization
+
+### Key Components
+
+1. **Timeline Indicators**
+   - Green checkmark for successful logins
+   - Red X for failed logins
+   - Gray circle for future dates
+   - Gradient highlight for current date
+
+2. **Streak Line**
+   - Custom painted line connecting consecutive login days
+   - Uses gradient colors
+   - Rounded caps for smooth appearance
+
+3. **Date Display**
+   - Shows abbreviated weekdays (Mo, Tu, We, etc.)
+   - Displays full date for current day
+   - Gradient text for current date
+
+### Usage
+
+```dart
+StreakTimelineBar()
+```
+
+### Dependencies
+
+- `timelines_plus` - For timeline visualization
+- `jiffy` - For date formatting
+- `provider` - For state management
+- `StreakProvider` - For streak data
+
+## State Management
+
+Both components use Provider for state management:
+
+```dart
+Consumer<StreakProvider>(
+  builder: (context, provider, child) {
+    // Component implementation
+  }
+)
+```
+
+## Styling
+
+The components use a consistent styling approach:
+
+1. **Colors**
+   - Default gradient: `UiGradient.instance.defaultGradient`
+   - Text color: `Color(0xff525252)`
+   - Error color: `Color(0xffDC2626)`
+
+2. **Typography**
+   - Weekday text: 16px, FontWeight.w500
+   - Date text: 14px, FontWeight.w400
+
+3. **Layout**
+   - Timeline item width: 45.0
+   - Indicator size: 18x18
+   - Padding: 16px all around
+
+## Example Implementation
+
+Here's a complete example of how to use these components together:
+
+```dart
+Container(
+  decoration: BoxDecoration(
+    color: Theme.of(context).canvasColor,
+    borderRadius: BorderRadius.circular(16),
+  ),
+  padding: EdgeInsets.all(16),
+  child: Column(
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text("${provider.currentStreak()}"),
+          SizedBox(width: 10),
+          GradientText(
+            "day streak",
+            gradient: UiGradient.instance.defaultGradient,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Color(0xff525252),
+            ),
+          )
+        ],
+      ),
+      SizedBox(height: 16),
+      StreakTimelineBar(),
+    ],
+  ),
+)
+```
+
+## Best Practices
+
+1. **Performance**
+   - Use `Consumer` widgets to rebuild only necessary parts
+   - Implement proper disposal of controllers
+   - Use `addPostFrameCallback` for scroll operations
+
+2. **Accessibility**
+   - Provide sufficient contrast for text and indicators
+   - Use semantic labels for interactive elements
+   - Ensure proper touch targets for mobile devices
+
+3. **Maintenance**
+   - Keep streak logic in the provider
+   - Use constants for repeated values
+   - Document custom painting logic
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Timeline not scrolling to current date**
+   - Ensure `_scrollToToday()` is called after build
+   - Check if `_scrollController` has clients
+   - Verify date calculations
+
+2. **Streak line not appearing**
+   - Check login dates array
+   - Verify streak calculation logic
+   - Ensure proper paint implementation
+
+3. **Performance issues**
+   - Optimize rebuilds using `Consumer`
+   - Implement proper disposal
+   - Use efficient date calculations

@@ -1,0 +1,71 @@
+import { Meta } from "@storybook/addon-docs";
+
+<Meta title="Components/CustomTimePicker" />
+
+# Custom Time Picker
+
+A fully customizable time picker dialog with 12-hour format and dark theme styling, designed to match your app's design system.
+
+## Features
+
+- 12-hour format presentation (AM/PM)
+- Complete theme customization
+- Dark-mode friendly color scheme
+- Consistent typography using Lato font
+- Customizable background and accent colors
+- Responsive design that adapts to device size
+
+## Implementation Code
+
+```dart
+TimeOfDay? pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                            builder: (BuildContext context, Widget? child) {
+                              return MediaQuery(
+                                data: MediaQuery.of(context)
+                                    .copyWith(alwaysUse24HourFormat: false),
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    timePickerTheme: TimePickerThemeData(
+                                      helpTextStyle: GoogleFonts.lato(
+                                        color: fontColor1,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      dayPeriodBorderSide: const BorderSide(
+                                        color: buttonColor1,
+                                      ),
+                                      dayPeriodColor: buttonColor1,
+                                      backgroundColor:
+                                          backgroundColor, // Background color
+                                      hourMinuteColor:
+                                          buttonColor2, // Hour/Minute box color
+                                      dayPeriodTextColor: fontColor1,
+                                      dialBackgroundColor: Colors
+                                          .grey[900], // Dial background color
+                                      dialHandColor:
+                                          buttonColor1, // Dial hand color
+                                      dialTextColor:
+                                          fontColor1, // Dial text color
+                                      hourMinuteTextColor:
+                                          fontColor1, // Selected hour/minute text color
+                                      hourMinuteTextStyle: GoogleFonts.lato(
+                                          fontSize: 20, color: fontColor1),
+                                      entryModeIconColor:
+                                          fontColor1, // Entry mode button color
+                                    ),
+                                    textButtonTheme: TextButtonThemeData(
+                                      style: TextButton.styleFrom(
+                                        backgroundColor: buttonColor2,
+                                        foregroundColor:
+                                            fontColor1, // OK & CANCEL button text color
+                                      ),
+                                    ),
+                                  ),
+                                  child: child!,
+                                ),
+                              );
+                            },
+                          );
+```
