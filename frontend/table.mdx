@@ -11,13 +11,15 @@ description: "Integrate and customize a dynamic and paginated table in your Next
 
 #### Overview
 
-The `DynamicTable` component is a versatile and customizable table that supports pagination, search, row selection, and enhanced features such as dynamic page ranges and more user-friendly pagination controls. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
+The `DynamicTable` component is a versatile and customizable table that supports pagination, search, row selection, sorting, and conditional styling. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
 
 #### Features
 
 - **Searchable Columns**: Each column includes a search field for filtering data.
+- **Sortable Columns**: Click column headers to toggle ascending/descending sort.
 - **Pagination**: Enhanced pagination with ellipses for large datasets and better navigation.
 - **Row Selection**: Supports selecting and deselecting rows for further actions, including a "select all" feature.
+- **Preselect Rows**: Initialize selected rows using `preselectedItems` from `useData`.
 - **Details Column**: Optional column for additional actions like editing or viewing details.
 - **Customizable Keys**: Each row can be uniquely identified using the `uniqueKey` prop.
 - **Custom Cell Styles**: Apply conditional styles to specific columns based on values.
@@ -45,6 +47,7 @@ const ExampleComponent = () => {
         { id: "2", name: "Jane Doe", email: "jane@example.com", role: "User" },
       ],
       totalPages: 2,
+      preselectedItems: ["1"],
     };
   };
 
@@ -71,40 +74,39 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop                | Type                                                                                                  | Default     | Description                                                                |
-| ------------------- | ----------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
-| `columns`           | `Array<{ key: string; header: string }>`                                                              | `[]`        | Defines the structure and headers of the table.                            |
-| `headerColor`       | `string`                                                                                              | `"#000"`    | Background color for the table header.                                     |
-| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number; preselectedItems?: string[]; }` | `undefined` | Function to fetch table data dynamically based on page and search queries. |
-| `showBorder`        | `boolean`                                                                                             | `true`      | Whether to display a border around the table.                              |
-| `showDetailsColumn` | `boolean`                                                                                             | `true`      | Whether to include a "Details" column for additional actions.              |
-| `onDetailsClick`    | `(item: any) => void`                                                                                 | `undefined` | Callback for when the details button is clicked.                           |
-| `uniqueKey`         | `string`                                                                                              | `undefined` | The key used to uniquely identify rows.                                    |
-| `customStyles`      | `Array<{ columnKey: string; condition: (value: string) => boolean; styles: object }>`                 | `[]`        | Styles applied conditionally to specific columns.                          |
-| `showTimeRange`     | `boolean`                                                                                             | `true`      | Displays formatted time range if applicable.                               |
-| `onSelectionChange` | `(selectedIds: string[]) => void`                                                                     | `undefined` | Callback when row selections change.                                       |
+| Prop                | Type                                                                                                 | Default     | Description                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------- |
+| `columns`           | `Array<{ key: string; header: string }>`                                                             | `[]`        | Defines the structure and headers of the table.                     |
+| `headerColor`       | `string`                                                                                             | `"#000"`    | Background color for the table header.                              |
+| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number; preselectedItems?: string[] }` | `undefined` | Function to fetch table data dynamically.                           |
+| `showBorder`        | `boolean`                                                                                            | `true`      | Whether to display a border around the table.                       |
+| `showDetailsColumn` | `boolean`                                                                                            | `true`      | Whether to include a "Details" column for additional actions.       |
+| `onDetailsClick`    | `(item: any) => void`                                                                                | `undefined` | Callback for when the details button is clicked.                    |
+| `uniqueKey`         | `string`                                                                                             | `undefined` | The key used to uniquely identify rows.                             |
+| `customStyles`      | `Array<{ columnKey: string; condition: (value: string) => boolean; styles: object }>`                | `[]`        | Styles applied conditionally to specific columns.                   |
+| `showTimeRange`     | `boolean`                                                                                            | `true`      | Displays formatted time range if applicable.                        |
+| `onSelectionChange` | `(selectedIds: string[]) => void`                                                                    | `undefined` | Callback when row selections change.                                |
+| `sortColumn`        | `string`                                                                                             | `uniqueKey` | Column key to sort by initially.                                    |
+| `sortOrder`         | `'asc' \| 'desc'`                                                                                    | `'desc'`    | Sorting order for rows.                                             |
+| `preselectedItems`  | `string[]`                                                                                           | `[]`        | Optional initial list of selected row IDs, returned from `useData`. |
 
-#### Anatomy
+### Anatomy
 
 1. **Table Header**:
 
    - Displays column names and search inputs.
-   - Includes a checkbox for selecting all rows.
+   - Includes sorting icons and a "select all" checkbox.
 
 2. **Table Body**:
 
-   - Renders the rows based on the fetched data.
-   - Includes individual checkboxes for row selection.
-   - Supports custom cell rendering with styles and time range formatting.
+   - Renders rows based on fetched and sorted data.
+   - Includes row checkboxes and optional custom cell rendering.
 
 3. **Pagination**:
-   - Provides navigation buttons for moving between pages.
-   - Includes ellipses for large datasets and dynamic page ranges.
-   - Starts pagination in reverse order for efficient navigation.
+   - Navigation buttons with ellipses for long page lists.
+   - Starts on the last page by default for reverse-ordered data.
 
 #### Component Code
-
-**Code Snippet:**
 
 ```tsx
 "use client";
@@ -594,7 +596,8 @@ export default function DynamicTable({
 
 ### Customization
 
-- **Styling**: Modify header and row styles using `headerColor` and CSS classes.
-- **Actions**: Add custom actions or buttons in the "Details" column.
-- **Data Fetching**: Integrate with APIs for dynamic data loading.
-- **Selection Handling**: Monitor row selections with `onSelectionChange`.
+- **Styling**: Modify table styling with `headerColor` and custom CSS classes.
+- **Custom Cell Rendering**: Use `customStyles` for dynamic value formatting.
+- **Row Actions**: Add edit or detail buttons using the `onDetailsClick` prop.
+- **Selection Handling**: Monitor and respond to row selections via `onSelectionChange`.
+- **Sorting & Paging**: Fine-tune default sort behavior and start page.
