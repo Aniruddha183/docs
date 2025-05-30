@@ -11,7 +11,7 @@ description: "Integrate and customize a dynamic and paginated table in your Next
 
 #### Overview
 
-The `DynamicTable` component is a versatile and customizable table that supports pagination, search, row selection, sorting, and conditional styling. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
+The `DynamicTable` component is a versatile and customizable table that supports pagination, search, sorting, row selection, expandable rows, and conditional styling. It is designed to handle large datasets efficiently with a dynamic data-fetching mechanism.
 
 #### Features
 
@@ -19,6 +19,7 @@ The `DynamicTable` component is a versatile and customizable table that supports
 - **Sortable Columns**: Click column headers to toggle ascending/descending sort.
 - **Pagination**: Enhanced pagination with ellipses for large datasets and better navigation.
 - **Row Selection**: Supports selecting and deselecting rows for further actions, including a "select all" feature.
+- **Expandable Rows**: Use `expandableKey` to show child entries under each row.
 - **Preselect Rows**: Initialize selected rows using `preselectedItems` from `useData`.
 - **Details Column**: Optional column for additional actions like editing or viewing details.
 - **Customizable Keys**: Each row can be uniquely identified using the `uniqueKey` prop.
@@ -43,8 +44,20 @@ const ExampleComponent = () => {
   const useData = (page, search) => {
     return {
       data: [
-        { id: "1", name: "John Doe", email: "john@example.com", role: "Admin" },
-        { id: "2", name: "Jane Doe", email: "jane@example.com", role: "User" },
+        {
+          id: "1",
+          name: "John Doe",
+          email: "john@example.com",
+          role: "Admin",
+          children: [],
+        },
+        {
+          id: "2",
+          name: "Jane Doe",
+          email: "jane@example.com",
+          role: "User",
+          children: [],
+        },
       ],
       totalPages: 2,
       preselectedItems: ["1"],
@@ -67,6 +80,7 @@ const ExampleComponent = () => {
       onSelectionChange={(selectedIds) =>
         console.log("Selected IDs:", selectedIds)
       }
+      expandableKey="children"
     />
   );
 };
@@ -74,23 +88,24 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop                | Type                                                                                                 | Default     | Description                                                         |
-| ------------------- | ---------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------- |
-| `columns`           | `Array<{ key: string; header: string }>`                                                             | `[]`        | Defines the structure and headers of the table.                     |
-| `headerColor`       | `string`                                                                                             | `"#000"`    | Background color for the table header.                              |
-| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number; preselectedItems?: string[] }` | `undefined` | Function to fetch table data dynamically.                           |
-| `showBorder`        | `boolean`                                                                                            | `true`      | Whether to display a border around the table.                       |
-| `showDetailsColumn` | `boolean`                                                                                            | `true`      | Whether to include a "Details" column for additional actions.       |
-| `onDetailsClick`    | `(item: any) => void`                                                                                | `undefined` | Callback for when the details button is clicked.                    |
-| `uniqueKey`         | `string`                                                                                             | `undefined` | The key used to uniquely identify rows.                             |
-| `customStyles`      | `Array<{ columnKey: string; condition: (value: string) => boolean; styles: object }>`                | `[]`        | Styles applied conditionally to specific columns.                   |
-| `showTimeRange`     | `boolean`                                                                                            | `true`      | Displays formatted time range if applicable.                        |
-| `onSelectionChange` | `(selectedIds: string[]) => void`                                                                    | `undefined` | Callback when row selections change.                                |
-| `sortColumn`        | `string`                                                                                             | `uniqueKey` | Column key to sort by initially.                                    |
-| `sortOrder`         | `'asc' \| 'desc'`                                                                                    | `'desc'`    | Sorting order for rows.                                             |
-| `preselectedItems`  | `string[]`                                                                                           | `[]`        | Optional initial list of selected row IDs, returned from `useData`. |
+| Prop                | Type                                                                                                 | Default     | Description                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `columns`           | `Array<{ key: string; header: string }>`                                                             | `[]`        | Defines the structure and headers of the table.                           |
+| `headerColor`       | `string`                                                                                             | `"#000"`    | Background color for the table header.                                    |
+| `useData`           | `(page: number, search: string) => { data: any[]; totalPages: number; preselectedItems?: string[] }` | `undefined` | Function to fetch table data dynamically.                                 |
+| `showBorder`        | `boolean`                                                                                            | `true`      | Whether to display a border around the table.                             |
+| `showDetailsColumn` | `boolean`                                                                                            | `true`      | Whether to include a "Details" column for additional actions.             |
+| `onDetailsClick`    | `(item: any) => void`                                                                                | `undefined` | Callback for when the details button is clicked.                          |
+| `uniqueKey`         | `string`                                                                                             | `undefined` | The key used to uniquely identify rows.                                   |
+| `customStyles`      | `Array<{ columnKey: string; condition: (value: string) => boolean; styles: object }>`                | `[]`        | Styles applied conditionally to specific columns.                         |
+| `showTimeRange`     | `boolean`                                                                                            | `true`      | Displays formatted time range if applicable.                              |
+| `onSelectionChange` | `(selectedIds: string[]) => void`                                                                    | `undefined` | Callback when row selections change.                                      |
+| `sortColumn`        | `string`                                                                                             | `uniqueKey` | Column key to sort by initially.                                          |
+| `sortOrder`         | `'asc' \| 'desc'`                                                                                    | `'desc'`    | Sorting order.                                                            |
+| `preselectedItems`  | `string[]`                                                                                           | `[]`        | Optional initial list of selected row IDs.                                |
+| `expandableKey`     | `string`                                                                                             | `undefined` | Optional key for accessing nested/child rows for expandable row handling. |
 
-### Anatomy
+#### Anatomy
 
 1. **Table Header**:
 
@@ -100,6 +115,7 @@ const ExampleComponent = () => {
 2. **Table Body**:
 
    - Renders rows based on fetched and sorted data.
+   - Supports expandable child rows if `expandableKey` is defined.
    - Includes row checkboxes and optional custom cell rendering.
 
 3. **Pagination**:
@@ -164,12 +180,13 @@ interface DynamicTableProps {
     };
   }[];
   showTimeRange?: boolean;
-
+  expandableKey?: string;
   onSelectionChange?: (selectedIds: string[]) => void; // ✅ New prop
 }
 function getFormattedTimeRange(dateTime: string, duration: number): string {
   const [date, time, period] = dateTime.split(" ");
   const [hours, minutes] = time.split(":").map(Number);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({}); // State to track expanded rows
 
   // Convert to 24-hour format for calculation
   const startHours = period === "PM" && hours < 12 ? hours + 12 : hours;
@@ -199,7 +216,7 @@ export default function DynamicTable({
   onDetailsClick,
   uniqueKey,
   customStyles = [],
-
+  expandableKey,
   showTimeRange = true,
   onSelectionChange, // ✅ New prop
 }: DynamicTableProps) {
@@ -207,7 +224,7 @@ export default function DynamicTable({
   const pathname = usePathname();
   const { replace } = useRouter();
   const [page, setPage] = useState(1); // Initially set to 1, updated dynamically
-
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>(
     Object.fromEntries(columns.map((col) => [col.key, ""]))
   );
@@ -510,7 +527,7 @@ export default function DynamicTable({
           </TableHeader>
         </Table>
 
-        {/* ✅ SCROLLABLE BODY TABLE (keeps alignment with header) */}
+        {/* ✅ SCROLLABLE BODY TABLE (supports optional expandable rows) */}
         <div
           className="overflow-y-auto"
           style={{
@@ -522,40 +539,111 @@ export default function DynamicTable({
         >
           <Table className="table-fixed w-full">
             <TableBody>
-              {sortedData.map((item, rowIndex) => (
-                <TableRow key={`${item[uniqueKey]}-${rowIndex}`}>
-                  <TableCell className="text-center w-[48px]">
-                    <Checkbox
-                      checked={selectedRows.has(item[uniqueKey])}
-                      onCheckedChange={() =>
-                        toggleRowSelection(item[uniqueKey])
-                      }
-                    />
-                  </TableCell>
-                  {columns.map((column, colIndex) => (
-                    <TableCell
-                      key={`${item[uniqueKey]}-${column.key}-${colIndex}`}
-                      className="text-center"
-                    >
-                      {customCellRender(item[column.key], column.key)}
-                    </TableCell>
-                  ))}
-                  {showDetailsColumn && (
-                    <TableCell className="text-center w-[80px]">
-                      <Button
-                        variant="ghost"
-                        className="text-neutral-400 hover:text-neutral-200"
-                        onClick={() => onDetailsClick?.(item)}
-                      >
-                        <Edit
-                          className="h-5 w-5 text-[#fafafa]"
-                          strokeWidth={2}
+              {sortedData.flatMap((item, rowIndex) => {
+                const hasChildren =
+                  expandableKey && Array.isArray(item[expandableKey]);
+                const isExpanded = expandedRows[item[uniqueKey]];
+
+                const mainRow = (
+                  <TableRow key={`${item[uniqueKey]}-main`}>
+                    <TableCell className="text-center w-[48px]">
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          checked={selectedRows.has(item[uniqueKey])}
+                          onCheckedChange={() =>
+                            toggleRowSelection(item[uniqueKey])
+                          }
                         />
-                      </Button>
+                        {hasChildren ? (
+                          <button
+                            onClick={() =>
+                              setExpandedRows((prev) => ({
+                                ...prev,
+                                [item[uniqueKey]]: !prev[item[uniqueKey]],
+                              }))
+                            }
+                            className="ml-1 text-white"
+                          >
+                            {isExpanded ? <ChevronDown /> : <ChevronRight />}
+                          </button>
+                        ) : null}
+                      </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+
+                    {columns.map((column, colIndex) => (
+                      <TableCell
+                        key={`${item[uniqueKey]}-${column.key}-${colIndex}`}
+                        className="text-center"
+                      >
+                        {customCellRender(item[column.key], column.key)}
+                      </TableCell>
+                    ))}
+
+                    {showDetailsColumn && (
+                      <TableCell className="text-center w-[80px]">
+                        <Button
+                          variant="ghost"
+                          className="text-neutral-400 hover:text-neutral-200"
+                          onClick={() => onDetailsClick?.(item)}
+                        >
+                          <Edit
+                            className="h-5 w-5 text-[#fafafa]"
+                            strokeWidth={2}
+                          />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+
+                const childRows =
+                  isExpanded && hasChildren
+                    ? item[expandableKey].map((child: any, i: number) => (
+                        <TableRow key={`${item[uniqueKey]}-child-${i}`}>
+                          <TableCell className="text-center w-[48px]">
+                            <Checkbox
+                              checked={selectedRows.has(child[uniqueKey])}
+                              onCheckedChange={() =>
+                                toggleRowSelection(child[uniqueKey])
+                              }
+                            />
+                          </TableCell>
+                          {columns.map((column, colIndex) => (
+                            <TableCell
+                              key={`${child[uniqueKey]}-${column.key}-${colIndex}`}
+                              className="text-center"
+                            >
+                              {column.key === "workoutId"
+                                ? `|________ ${customCellRender(
+                                    child[column.key],
+                                    column.key
+                                  )}`
+                                : customCellRender(
+                                    child[column.key],
+                                    column.key
+                                  )}
+                            </TableCell>
+                          ))}
+                          {showDetailsColumn && (
+                            <TableCell className="text-center w-[80px]">
+                              <Button
+                                variant="ghost"
+                                className="text-neutral-400 hover:text-neutral-200"
+                                onClick={() => onDetailsClick?.(child)}
+                              >
+                                <Edit
+                                  className="h-5 w-5 text-[#fafafa]"
+                                  strokeWidth={2}
+                                />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    : [];
+
+                return [mainRow, ...childRows];
+              })}
             </TableBody>
           </Table>
         </div>
@@ -597,6 +685,7 @@ export default function DynamicTable({
 ### Customization
 
 - **Styling**: Modify table styling with `headerColor` and custom CSS classes.
+- **Expandable Rows**: Add nested row support using the `expandableKey` prop.
 - **Custom Cell Rendering**: Use `customStyles` for dynamic value formatting.
 - **Row Actions**: Add edit or detail buttons using the `onDetailsClick` prop.
 - **Selection Handling**: Monitor and respond to row selections via `onSelectionChange`.
