@@ -176,7 +176,8 @@
             "backend/razorpay-setup",
             "backend/aws-iam-setup",
             "backend/multi-device-session-management",
-            "backend/secure-s3-access-cognito"
+            "backend/secure-s3-access-cognito",
+            "backend/newsletter-setup"
           ]
         },
         
