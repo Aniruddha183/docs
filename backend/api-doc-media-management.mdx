@@ -1,0 +1,444 @@
+***
+
+# Media Management API Documentation
+
+This document outlines the API endpoints for managing media files, including S3 bucket exploration, bulk uploads via CSV, and single media file handling for the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/admin
+```
+
+## S3 Explorer
+
+These endpoints provide an interface for browsing and managing S3 buckets and their contents directly.
+
+### 1. List Buckets or Bucket Contents
+
+Fetches a list of allowed S3 buckets or the contents (files and folders) of a specific bucket and prefix.
+
+- **Method**: `GET`
+- **Endpoint**: `/s3-explorer/list`
+- **Authentication**: `authenticateAdminToken`, `authorize('S3_EXPLORER_LIST')`, `authenticateCognitoUser`
+- **Query Parameters**:
+  - `bucket` (string, optional): The name of the S3 bucket to explore. If omitted, a list of allowed buckets is returned.
+  - `prefix` (string, optional): The folder path (prefix) within the bucket to list.
+- **Response (Listing Buckets)**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "buckets": [
+        { "Name": "fitnearn-videos", "CreationDate": "..." },
+        { "Name": "fitnearn-images", "CreationDate": "..." }
+      ]
+    }
+    ```
+- **Response (Listing Bucket Contents)**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "folders": ["workouts/yoga/", "workouts/hiit/"],
+      "objects": [
+        {
+          "key": "workouts/intro.mp4",
+          "size": 10485760,
+          "lastModified": "2023-10-27T10:00:00.000Z"
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 401 Unauthorized
+    ```json
+    { "success": false, "error": "AWS credentials missing" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "error": "Internal server error" }
+    ```
+
+### 2. Create a Folder in S3
+
+Creates a new "folder" (an empty object with a trailing slash) in a specified S3 bucket.
+
+- **Method**: `POST`
+- **Endpoint**: `/s3-explorer/create-folder`
+- **Authentication**: `authenticateAdminToken`, `authorize('S3_EXPLORER_CREATE_FOLDER')`, `authenticateCognitoUser`
+- **Request Body**:
+  ```json
+  {
+    "bucket": "fitnearn-videos",
+    "folderPath": "new-workouts/2024/"
+  }
+  ```
+  - `bucket` (string, required): The target S3 bucket.
+  - `folderPath` (string, required): The path for the new folder. **Must end with a `/`**.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Folder created successfully"
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Bucket name and folder path are required" }
+    ```
+    ```json
+    { "success": false, "error": "Folder path must end with '/'" }
+    ```
+
+### 3. Get Pre-signed URL for an S3 Object
+
+Generates a temporary, secure, pre-signed URL to view a private S3 object.
+
+- **Method**: `GET`
+- **Endpoint**: `/s3-explorer/get`
+- **Authentication**: `authenticateAdminToken`, `authorize('GET_OBJECT_PRESIGNED_URL')`
+- **Query Parameters**:
+  - `bucket` (string, required): The S3 bucket where the object is stored.
+  - `objectKey` (string, required): The full path/key of the object.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "url": "https://<bucket-name>.s3.amazonaws.com/<objectKey>?AWSAccessKeyId=...&Expires=...&Signature=..."
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Bucket name and object key are required as query parameters" }
+    ```
+
+---
+
+## Bulk Upload Workflow
+
+This is a multi-step process for uploading multiple media files and their metadata at once.
+
+### 1. Upload CSV for Validation
+
+Uploads a CSV file containing metadata for multiple media files. The backend validates the CSV structure and content, then stores the valid data in Redis for the next step.
+
+- **Method**: `POST`
+- **Endpoint**: `/upload-csv`
+- **Authentication**: `authenticateAdminToken`, `authorize('BULK_UPLOAD_MEDIA')`
+- **Request Body**: A `multipart/form-data` request with a single field:
+  - `file`: The CSV file to be uploaded.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Upload successful",
+      "redisKey": "metadata:1678886400000",
+      "totalRecords": 50
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "No file uploaded" }
+    ```
+    ```json
+    { "success": false, "message": "Missing required headers: MEDIA_NAME" }
+    ```
+    ```json
+    { "success": false, "message": "CSV contains invalid rows", "wrongRecords": [...] }
+    ```
+
+### 2. Download Sample CSV
+
+Provides a sample CSV template for admins to use for the bulk upload process.
+
+- **Method**: `GET`
+- **Endpoint**: `/s3-explorer/download-sample`
+- **Authentication**: `authenticateAdminToken`, `authorize('DOWNLOAD_SAMPLE_CSV')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**: A direct file download of `sample.csv` with the required headers.
+
+### 3. Generate Pre-signed URLs for Bulk Upload
+
+Takes the `redisKey` from the CSV upload step and generates a unique, secure S3 pre-signed `PUT` URL for each valid media file.
+
+- **Method**: `POST`
+- **Endpoint**: `/bulk-upload/generate-presigned-urls`
+- **Authentication**: `authenticateAdminToken`, `authorize('BULK_UPLOAD_MEDIA')`, `authenticateCognitoUser`
+- **Request Body**:
+  ```json
+  {
+    "redisKey": "metadata:1678886400000",
+    "inputType": "Video"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "presignedUrls": [
+        {
+          "fileName": "my_video_01.mp4",
+          "s3Key": "bulk_uploads/CARDIO/my_video_01.mp4.mp4",
+          "preSignedUrl": "https://<bucket-name>.s3.amazonaws.com/...",
+          "permanentUrl": "https://<bucket-name>.s3.amazonaws.com/..."
+        }
+      ],
+      "validationErrors": []
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "No metadata found for the given Redis key." }
+    ```
+
+### 4. Validate Upload Status
+
+After the frontend uploads files to S3 using the pre-signed URLs, this endpoint is called to verify that each file was successfully uploaded.
+
+- **Method**: `POST`
+- **Endpoint**: `/bulk-upload/validate-upload`
+- **Authentication**: `authenticateAdminToken`, `authorize('BULK_UPLOAD_MEDIA')`
+- **Request Body**:
+  ```json
+  {
+    "redisKey": "metadata:1678886400000",
+    "inputType": "Video"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "statusUpdates": [
+        { "fileName": "my_video_01.mp4", "status": "video_success" },
+        { "fileName": "my_video_02.mp4", "status": "Fail" }
+      ]
+    }
+    ```
+
+### 5. Bulk Insert Media to Database
+
+Once all files are validated in S3, this final step writes the metadata from Redis into the main MongoDB database.
+
+- **Method**: `POST`
+- **Endpoint**: `/bulk-upload/bulkInsertMedia`
+- **Authentication**: `authenticateAdminToken`, `authorize('BULK_UPLOAD_MEDIA')`
+- **Request Body**:
+  ```json
+  {
+    "redisKey": "metadata:1678886400000"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Bulk insert completed successfully for new records.",
+      "data": [
+        // Array of newly inserted media documents from MongoDB
+      ]
+    }
+    ```
+
+### 6. Clear Redis Cache
+
+Clears the temporary metadata stored in Redis after the bulk upload process is complete or needs to be aborted.
+
+- **Method**: `POST`
+- **Endpoint**: `/bulk-upload/clear-cache`
+- **Authentication**: `authenticateAdminToken`, `authorize('BULK_UPLOAD_MEDIA')`
+- **Request Body**:
+  ```json
+  {
+    "redisKey": "metadata:1678886400000"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Redis key (metadata:...) successfully cleared." }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No data found for redisKey: ..." }
+    ```
+
+---
+
+## Single Media Management
+
+These endpoints are for managing individual media files.
+
+### 1. Get Media Data (Filtered)
+
+Retrieves a list of media records from the database with filtering options.
+
+- **Method**: `GET`
+- **Endpoint**: `/media`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_VIEW')`, `authenticateCognitoUser`
+- **Query Parameters**:
+  - `page`, `limit`, `search`, `mediaType`, `category`, `status`, `startDate`, `endDate`, `sort`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Media data retrieved successfully.",
+      "data": {
+        "media": [
+          {
+            "mediaId": "MEDIA-001",
+            "mediaName": "Yoga_Pose_1",
+            "mediaType": "Image",
+            "presignedUrl": "https://..."
+          }
+        ],
+        "total": 100,
+        "page": 1,
+        "limit": 10
+      }
+    }
+    ```
+
+### 2. Generate Pre-signed URL for Single Upload
+
+Generates a pre-signed URL for uploading a single media file's thumbnail and/or video.
+
+- **Method**: `POST`
+- **Endpoint**: `/uploadMediaData/generatePresignedUrls`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_CREATE')`, `authenticateCognitoUser`
+- **Request Body**:
+  ```json
+  {
+    "thumbnail": { "name": "thumb.jpg", "type": "image/jpeg" },
+    "video": { "name": "video.mp4", "type": "video/mp4" }
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "thumbnail": { "uploadUrl": "https://...", "key": "...", "mediaId": "..." },
+        "video": { "uploadUrl": "https://...", "key": "...", "mediaId": "..." }
+      }
+    }
+    ```
+
+### 3. Upload Single Media Metadata
+
+After a file is uploaded to S3 using the pre-signed URL, this endpoint saves its metadata to the database.
+
+- **Method**: `POST`
+- **Endpoint**: `/uploadMediaData`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "mediaName": "New Yoga Video",
+    "category": "YOGA",
+    "mediaType": "Video",
+    "imageKey": "s3-key-for-thumbnail.jpg",
+    "videoKey": "s3-key-for-video.mp4"
+  }
+  ```
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Media uploaded and metadata stored successfully.",
+      "data": {
+        // The new media document from MongoDB
+      }
+    }
+    ```
+
+### 4. Edit Media Metadata
+
+Updates the metadata for an existing single media file.
+
+- **Method**: `PUT`
+- **Endpoint**: `/editMediaData/:mediaId`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_EDIT')`
+- **Path Parameters**:
+  - `mediaId` (string, required): The `mediaId` of the record to edit.
+- **Request Body**:
+  ```json
+  {
+    "mediaName": "Updated Yoga Video Name",
+    "category": "YOGA"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Media data updated successfully." }
+    ```
+
+### 5. Soft Delete Media
+
+Marks a media record as "deleted" without permanently removing it from the database.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/media/delete/:mediaId`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_DELETE')`
+- **Path Parameters**:
+  - `mediaId` (string, required): The `mediaId` of the record to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Media soft deleted successfully." }
+    ```
+
+### 6. Get All Media with Usage
+
+Retrieves a list of all media and shows where each item is being used (e.g., in which workouts).
+
+- **Method**: `GET`
+- **Endpoint**: `/media/get-Media-Attached-All`
+- **Authentication**: `authenticateAdminToken`, `authorize('MEDIA_VIEW_ALL')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "mediaId": "MEDIA-001",
+          "mediaName": "Yoga_Pose_1",
+          "usedIn": [
+            { "type": "Workout", "id": "WORKOUT-123", "name": "Morning Yoga Flow" }
+          ]
+        }
+      ]
+    }
+    ```

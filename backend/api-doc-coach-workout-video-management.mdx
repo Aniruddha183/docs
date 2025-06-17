@@ -1,0 +1,320 @@
+***
+
+# Coach Workout Management API Documentation
+
+This document outlines the API endpoints specifically for coaches to manage their workout videos within the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/coach/workout
+```
+
+## Endpoints
+
+### 1. Create or Submit a Workout
+
+Creates a new workout record. Initially, it's saved as a `draft`. If all required fields are provided, its status can be updated to `under review`. This endpoint can handle optional, simultaneous file uploads for the thumbnail and video.
+
+- **Method**: `POST`
+- **Endpoint**: `/video/create`
+- **Authentication**: Implied Coach Authentication.
+- **Request Body**: A `multipart/form-data` request containing:
+  - `publisherId` (string, required): The coach's ID.
+  - `title` (string, required): The title of the workout.
+  - `description` (string, required): A description of the workout.
+  - `category` (string, required): The workout category (e.g., "HIIT").
+  - `level` (string, required): Difficulty level (e.g., "Intermediate").
+  - `focusArea`, `equipment`, `intensityLevel`, `durationRange`, `calories` (strings/arrays): Other metadata.
+  - `video` (file, optional): The MP4 video file.
+  - `thumbnail` (file, optional): The image file for the thumbnail. The filename (without extension) must match the `title`.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Workout saved as draft",
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345",
+        "title": "Full Body HIIT",
+        "status": "draft",
+        "publisherId": "COACH-ABC"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "At least title or description is required to save draft." }
+    ```
+    ```json
+    { "success": false, "error": "Image file name must match workout title. Expected: full body hiit, Received: my_image" }
+    ```
+  - **Status**: 409 Conflict
+    ```json
+    { "success": false, "error": "A workout with the same title already exists in this category." }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "error": "Internal server error" }
+    ```
+
+### 2. Edit a Workout
+
+Edits an existing workout. If the workout is `published`, this will create a new version for review. If it is `under review` or a `draft`, it will update the existing record.
+
+- **Method**: `POST`
+- **Endpoint**: `/video/editDraft/:WORKOUT_ID`
+- **Authentication**: Implied Coach Authentication.
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The ID of the workout to edit.
+- **Request Body**: A `multipart/form-data` request with the same fields as the create endpoint. Any fields provided will overwrite the existing ones.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "New version created and submitted for review",
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345:V2.0",
+        "version": "2.0",
+        "status": "under review"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "Workout not found" }
+    ```
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Thumbnail file name must match the workout title." }
+    ```
+
+### 3. Generate Pre-signed URLs for Upload
+
+Generates a secure, temporary URL that the frontend can use to upload a video file directly to S3. This should be done *before* creating or editing a workout that uses a new video.
+
+- **Method**: `POST`
+- **Endpoint**: `/generatePresignedUrls`
+- **Authentication**: `authenticateCognitoUser`
+- **Request Body**:
+  ```json
+  {
+    "fileName": "My New HIIT Workout.mp4",
+    "mediaName": "My New HIIT Workout",
+    "category": "HIIT"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "preSignedUrl": "https://<bucket>.s3.amazonaws.com/...?AWSAccessKeyId=...",
+      "videoKey": "uploads/HIIT/My New HIIT Workout.mp4",
+      "permanentUrl": "https://<bucket>.s3.<region>.amazonaws.com/uploads/HIIT/My New HIIT Workout.mp4"
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Video file name must match media name." }
+    ```
+  - **Status**: 403 Forbidden
+    ```json
+    { "success": false, "error": "Missing AWS credentials from Cognito" }
+    ```
+
+### 4. Get All Workouts (Filtered)
+
+Retrieves a list of all workout videos with extensive filtering options. This is the main endpoint for displaying workouts to coaches.
+
+- **Method**: `GET`
+- **Endpoint**: `/getAll`
+- **Authentication**: None.
+- **Query Parameters**:
+  - `coachName` (string, optional): Comma-separated list of coach names to filter by.
+  - `outerFilter` / `internalFilter` (string, optional): Comma-separated list of categories.
+  - `postedAt` (string, optional): Filter by date (`Today`, `Week`, `Month`).
+  - `searchQuery` (string, optional): A search term to match against the workout title.
+  - `status` (string, optional): Filter by status (e.g., `draft`, `published`, `under review`).
+  - Other optional filters: `equipment`, `level`, `contentType`, `intensityLevel`, `duration`, `calories`, `focusArea`, `state`.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "videos": [
+          {
+            "id": "60c72b2f9b1d8c001f8e4c6a",
+            "title": "Full Body HIIT",
+            "status": "published",
+            "thumbnailUrl": "https://<cloudfront-url>/thumbnail.jpg",
+            "coach": {
+              "name": "Coach Jane"
+            }
+          }
+        ]
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "message": "Internal server error." }
+    ```
+
+### 5. Get All Workouts for a Specific Coach
+
+Retrieves all non-deleted workout videos published by a specific coach.
+
+- **Method**: `GET`
+- **Endpoint**: `/videos/get/:coachId`
+- **Authentication**: None.
+- **Path Parameters**:
+  - `coachId` (string, required): The ID of the coach.
+- **Query Parameters**:
+  - `by` (string, optional): Filter by time (`day`, `week`, `month`).
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        // Array of workout video objects
+      ]
+    }
+    ```
+
+### 6. Get Workouts by Status for a Coach
+
+Retrieves workout videos for a specific coach that match a given status.
+
+- **Method**: `GET`
+- **Endpoint**: `/videos/:status/:coachId`
+- **Authentication**: None.
+- **Path Parameters**:
+  - `status` (string, required): The workout status (e.g., `draft`, `published`).
+  - `coachId` (string, required): The ID of the coach.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        // Array of workout video objects matching the status
+      ]
+    }
+    ```
+
+### 7. Get Workout Details
+
+Fetches comprehensive details for a single workout, including pre-signed URLs and flags indicating which sections need editing.
+
+- **Method**: `GET`
+- **Endpoint**: `/get/:WORKOUT_ID`
+- **Authentication**: `authenticateCognitoUser`
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The ID of the workout.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345",
+        "title": "Full Body HIIT",
+        "presignVideoUrl": "https://...",
+        "publisherName": "Coach Jane"
+      },
+      "editCategoryScreen": false,
+      "thumbnailEditScreen": false,
+      "videoEditScreen": false
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "Workout not found" }
+    ```
+
+### 8. Get 'Under Review' Version of a Workout
+
+If a coach has submitted a new version of a published workout, this endpoint retrieves that specific "under review" version.
+
+- **Method**: `GET`
+- **Endpoint**: `/getUnderReviewVersion/:WORKOUT_ID`
+- **Authentication**: None.
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The *base* ID of the workout (without the `:V` suffix).
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345:V2.0",
+        "status": "under review",
+        "version": "2.0"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "No under review version found for this workout" }
+    ```
+
+### 9. Search Workouts for a Coach
+
+Performs a text search on workout videos for a specific coach.
+
+- **Method**: `GET`
+- **Endpoint**: `/videos/search/:coachId/:query`
+- **Authentication**: None.
+- **Path Parameters**:
+  - `coachId` (string, required): The ID of the coach.
+  - `query` (string, required): The search term.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        // Array of workout video objects matching the search query
+      ]
+    }
+    ```
+
+### 10. Delete a Workout Video
+
+Marks a workout video as deleted. This is a soft delete.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/video/:id/:coachId`
+- **Authentication**: None.
+- **Path Parameters**:
+  - `id` (string, required): The `WORKOUT_ID` of the video.
+  - `coachId` (string, required): The ID of the coach who owns the video.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "workout video has deleted" }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "workout video not found" }
+    ```

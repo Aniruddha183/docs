@@ -1,0 +1,291 @@
+
+***
+
+# Subscription Plan Management API Documentation
+
+This document outlines the API endpoints for creating, managing, and analyzing subscription plans for the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/admin/subscription-plan
+```
+
+## Endpoints
+
+### 1. Create a New Subscription Plan
+
+Creates a new subscription plan with specified features, pricing, and period.
+
+- **Method**: `POST`
+- **Endpoint**: `/create`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "plan_name": "Premium Annual",
+    "price": 9999,
+    "period": 365,
+    "features": [
+      "Access to all workout videos",
+      "Unlimited live sessions",
+      "Personalized diet plans"
+    ],
+    "planType": "premium",
+    "status": "active",
+    "discountPercent": 15,
+    "bookingDiscount": 10
+  }
+  ```
+  - `plan_name` (string, required): The public name of the plan.
+  - `price` (number, required): The base price of the plan in the lowest currency unit (e.g., paise).
+  - `period` (number, required): The duration of the plan in days.
+  - `features` (array of strings, required): A list of features included in the plan.
+  - `planType` (string, required): The type of plan (e.g., "premium", "basic").
+  - `status` (string, required): The status of the plan ("active" or "inactive").
+  - `discountPercent` (number, optional): A general discount percentage.
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription plan created successfully",
+      "plan": {
+        "SUBS_ID": "SUBSCRIPTION-12345",
+        "plan_name": "Premium Annual",
+        "price": 9999,
+        "period": 365,
+        "features": [
+          "Access to all workout videos",
+          "Unlimited live sessions",
+          "Personalized diet plans"
+        ],
+        "status": "active"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Missing required fields" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error" }
+    ```
+
+### 2. Update a Subscription Plan
+
+Updates the details of an existing subscription plan.
+
+- **Method**: `PUT`
+- **Endpoint**: `/edit/:planId`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_EDIT')`
+- **Path Parameters**:
+  - `planId` (string, required): The `SUBS_ID` of the plan to update.
+- **Request Body**:
+  ```json
+  {
+    "price": 8999,
+    "status": "inactive"
+  }
+  ```
+  - Any field from the creation process can be updated.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription plan updated successfully",
+      "plan": {
+        "SUBS_ID": "SUBSCRIPTION-12345",
+        "plan_name": "Premium Annual",
+        "price": 8999,
+        "status": "inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Subscription plan not found" }
+    ```
+
+### 3. Get All Subscription Plans
+
+Retrieves a list of all available subscription plans.
+
+- **Method**: `GET`
+- **Endpoint**: `/getAllPlans`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_VIEW')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription plans retrieved successfully",
+      "plans": [
+        {
+          "SUBS_ID": "SUBSCRIPTION-12345",
+          "plan_name": "Premium Annual",
+          "price": 9999,
+          "period": 365,
+          "status": "active"
+        },
+        {
+          "SUBS_ID": "SUBSCRIPTION-67890",
+          "plan_name": "Basic Monthly",
+          "price": 999,
+          "period": 30,
+          "status": "active"
+        }
+      ]
+    }
+    ```
+
+### 4. Get a Subscription Plan by ID
+
+Fetches the details of a single subscription plan by its ID.
+
+- **Method**: `GET`
+- **Endpoint**: `/getPlan/:planId`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_VIEW')`
+- **Path Parameters**:
+  - `planId` (string, required): The `SUBS_ID` of the plan.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription plan retrieved successfully",
+      "plan": {
+        "SUBS_ID": "SUBSCRIPTION-12345",
+        "plan_name": "Premium Annual",
+        "price": 9999,
+        "period": 365,
+        "features": [ "Feature 1", "Feature 2" ],
+        "status": "active",
+        "planType": "premium"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Subscription plan not found" }
+    ```
+
+### 5. Delete a Subscription Plan
+
+Permanently deletes a subscription plan.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deletePlan/:planId`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_DELETE')`
+- **Path Parameters**:
+  - `planId` (string, required): The `SUBS_ID` of the plan to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription plan deleted successfully"
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Plan not found" }
+    ```
+
+### 6. Get User Subscription Details
+
+Retrieves the complete details for a specific user's subscription instance, including user info, current plan details, and previous plan details if applicable.
+
+- **Method**: `GET`
+- **Endpoint**: `/getPlanDetails/:USR_SUB_ID`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_VIEW')`
+- **Path Parameters**:
+  - `USR_SUB_ID` (string, required): The unique ID for a user's specific subscription record.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "USR_SUB_ID": "USR-SUB-ABCDE",
+        "status": "active",
+        "startDate": "2023-01-01T00:00:00.000Z",
+        "renewalDate": "2024-01-01T00:00:00.000Z",
+        "user": {
+          "USR_ID": "USR-XYZ",
+          "name": "John Doe",
+          "email": "john.doe@example.com"
+        },
+        "subscriptionPlan": {
+          "SUBS_ID": "SUBSCRIPTION-12345",
+          "plan_name": "Premium Annual",
+          "price": 9999
+        },
+        "previousRepeatedPlan": null
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Subscription not found" }
+    ```
+
+### 7. Get User Subscriptions Analytics
+
+Provides aggregated analytics on user subscriptions over time.
+
+- **Method**: `GET`
+- **Endpoint**: `/getUserSubscriptionsAnalytics`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_VIEW')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "monthlyBreakdown": [
+          { "month": "2023-10", "newSubscriptions": 50, "revenue": 49950, "cancellations": 5 },
+          { "month": "2023-11", "newSubscriptions": 65, "revenue": 64935, "cancellations": 8 }
+        ],
+        "planDistribution": {
+          "Premium Annual": 500,
+          "Basic Monthly": 700
+        }
+      }
+    }
+    ```
+
+### 8. Get User Subscriptions Count Analytics
+
+Provides a high-level summary of subscription counts by status.
+
+- **Method**: `GET`
+- **Endpoint**: `/getUserSubscriptionsCountAnalytics`
+- **Authentication**: `authenticateAdminToken`, `authorize('SUBSCRIPTION_PLAN_VIEW')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "totalActive": 1200,
+        "totalCancelled": 300,
+        "totalExpired": 500,
+        "totalUpcoming": 50
+      }
+    }
+    ```
