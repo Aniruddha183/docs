@@ -1,0 +1,400 @@
+***
+
+# Category Management API Documentation
+
+This document outlines the API endpoints for creating, managing, and organizing categories and their parent types within the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/admin
+```
+
+## Category Type Management
+
+Category Types are the top-level containers for categories (e.g., "Workout", "Nutrition", "Challenges").
+
+### 1. Create a New Category Type
+
+Creates a new top-level category type.
+
+- **Method**: `POST`
+- **Endpoint**: `/createCategoryType`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_TYPE_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "categoryTypeName": "Workout Categories"
+  }
+  ```
+  - `categoryTypeName` (string, required): The name of the new category type.
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category Type Created",
+      "data": {
+        "categoryTypeID": "CATEGORY_TYPE-12345",
+        "categoryTypeName": "Workout Categories",
+        "status": "Active",
+        "categories": []
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Invalid categoryTypeName. It is required and should be a string." }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "An internal server error occurred." }
+    ```
+
+### 2. Get All Category Types
+
+Retrieves a list of all existing category types.
+
+- **Method**: `GET`
+- **Endpoint**: `/getAllCategoryType`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_TYPE_VIEW')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category types found",
+      "data": [
+        {
+          "categoryTypeID": "CATEGORY_TYPE-12345",
+          "categoryTypeName": "Workout Categories",
+          "status": "Active",
+          "categories": ["CATEGORY-001", "CATEGORY-002"]
+        }
+      ]
+    }
+    ```
+
+### 3. Edit a Category Type
+
+Updates the name of an existing category type.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/editCategoryType/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_TYPE_EDIT')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryTypeID` of the type to edit.
+- **Request Body**:
+  ```json
+  {
+    "categoryTypeName": "Fitness & Wellness"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category type updated successfully.",
+      "data": {
+        "categoryTypeID": "CATEGORY_TYPE-12345",
+        "categoryTypeName": "Fitness & Wellness",
+        "status": "Active"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category type not found." }
+    ```
+
+### 4. Delete a Category Type
+
+Permanently deletes a category type.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deleteCategoryType/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_TYPE_DELETE')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryTypeID` of the type to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Category type deleted successfully." }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category type not found." }
+    ```
+
+### 5. Change Category Type Status
+
+Changes the status of a category type to "Active" or "Inactive". A type cannot be inactivated if it has active categories under it.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/changeStatusCategoryType/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_TYPE_EDIT')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryTypeID` of the type to modify.
+- **Request Body**:
+  ```json
+  {
+    "status": "Inactive"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category type status updated successfully.",
+      "data": {
+        "categoryTypeID": "CATEGORY_TYPE-12345",
+        "categoryTypeName": "Workout Categories",
+        "status": "Inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Cannot set category type to \"Inactive\" while it has associated active categories." }
+    ```
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category type not found." }
+    ```
+
+---
+
+## Category Management
+
+Categories are the individual items within a Category Type (e.g., "HIIT", "Yoga", "Cardio" within "Workout Categories").
+
+### 1. Create a New Category
+
+Creates a new category and associates it with a parent category type.
+
+- **Method**: `POST`
+- **Endpoint**: `/createCategory/:categoryTypeID`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_CREATE')`
+- **Path Parameters**:
+  - `categoryTypeID` (string, required): The ID of the parent category type.
+- **Request Body**:
+  ```json
+  {
+    "categoryName": "HIIT Workouts"
+  }
+  ```
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category created successfully and added to category type.",
+      "data": {
+        "categoryID": "CATEGORY-001",
+        "categoryName": "HIIT Workouts",
+        "categoryTypeID": "CATEGORY_TYPE-12345",
+        "status": "Active"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category type not found." }
+    ```
+
+### 2. Get All Categories (for a specific Category Type)
+
+Retrieves all active categories belonging to a specific active category type.
+
+- **Method**: `GET`
+- **Endpoint**: `/getAllCategories/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_VIEW')` (currently disabled)
+- **Path Parameters**:
+  - `id` (string, required): The `categoryTypeID` of the parent.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Active categories under active category type fetched successfully.",
+      "categoryType": { ... },
+      "data": [
+        {
+          "categoryID": "CATEGORY-001",
+          "categoryName": "HIIT Workouts",
+          "status": "Active"
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Active category type not found." }
+    ```
+
+### 3. Get a Single Category
+
+Retrieves the details of a single category by its ID.
+
+- **Method**: `GET`
+- **Endpoint**: `/getCategory/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_VIEW')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryID` to fetch.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category fetched successfully.",
+      "data": {
+        "categoryID": "CATEGORY-001",
+        "categoryName": "HIIT Workouts",
+        "status": "Active"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category not found." }
+    ```
+
+### 4. Edit a Category
+
+Updates the name of an existing category.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/editCategory/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_EDIT')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryID` to edit.
+- **Request Body**:
+  ```json
+  {
+    "categoryName": "High-Intensity Interval Training"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category updated successfully.",
+      "data": {
+        "categoryID": "CATEGORY-001",
+        "categoryName": "High-Intensity Interval Training"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category not found." }
+    ```
+
+### 5. Delete a Category
+
+Permanently deletes a category and removes its reference from the parent category type.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deleteCategory/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_DELETE')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryID` to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Category deleted successfully." }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Category not found." }
+    ```
+
+### 6. Change Category Status
+
+Changes the status of a category to "Active" or "Inactive". A category cannot be inactivated if it is currently in use.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/changeStatusCategory/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_EDIT')`
+- **Path Parameters**:
+  - `id` (string, required): The `categoryID` to modify.
+- **Request Body**:
+  ```json
+  {
+    "status": "Inactive"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Category status updated successfully.",
+      "data": {
+        "categoryID": "CATEGORY-001",
+        "status": "Inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Cannot set category to Inactive as it is being used somewhere." }
+    ```
+
+### 7. Filter and Fetch All Categories
+
+Retrieves a comprehensive, filtered list of all category types, with their associated categories nested inside.
+
+- **Method**: `GET`
+- **Endpoint**: `/category/filter`
+- **Authentication**: `authenticateAdminToken`, `authorize('CATEGORY_VIEW')`
+- **Query Parameters**:
+  - `status` (string, optional): Filter by the status of the Category Type.
+  - `startDate` / `endDate` (string, optional): Filter by creation date range of the Category Type.
+  - `categoryTypeName` (string, optional): Search for a Category Type by its name.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Categories grouped by type fetched successfully",
+      "data": [
+        {
+          "categoryTypeID": "CATEGORY_TYPE-12345",
+          "categoryTypeName": "Workout Categories",
+          "status": "Active",
+          "categories": [
+            {
+              "categoryID": "CATEGORY-001",
+              "categoryName": "HIIT Workouts",
+              "status": "Active"
+            }
+          ]
+        }
+      ]
+    }
+    ```

@@ -1,0 +1,343 @@
+***
+
+# Query Management API Documentation
+
+This document outlines the API endpoints for managing user-submitted queries and MFA reset requests in the FitEarn application's admin panel.
+
+## Base URL
+```
+/api/fitnearn/web/admin/queryManagement
+```
+
+## Standard Query Management
+
+### 1. Get All Queries
+
+Retrieves a list of all user queries, excluding MFA reset requests. Queries are sorted by the most recent creation date.
+
+- **Method**: `GET`
+- **Endpoint**: `/getAllQuery`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_VIEW')`
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Data Found",
+      "data": [
+        {
+          "query_ID": "QRY-1716369019230",
+          "userId": "USR-12345",
+          "fullName": "John Doe",
+          "email": "john.doe@example.com",
+          "message": "I am unable to log in to my account.",
+          "query_status": "Pending",
+          "issueType": "Technical",
+          "urgency_level": "High",
+          "responses": [
+            {
+              "responseText": "We are looking into your issue.",
+              "responseFromAdminId": "ADM-001",
+              "sentAt": "2023-10-27T10:00:00.000Z",
+              "sentAtDate": "2023-10-27",
+              "sentAtTime": "15:30:00"
+            }
+          ],
+          "createdAt": "2023-10-26T12:00:00.000Z"
+        }
+      ]
+    }
+    ```
+- **Error Response**:
+  - **Status**: 500 Internal Server Error
+  - **Body**:
+    ```json
+    {
+      "success": false,
+      "message": "An internal server error occurred."
+    }
+    ```
+
+### 2. Get Filtered Queries
+
+Retrieves a list of queries based on status, date range, and sort order.
+
+- **Method**: `GET`
+- **Endpoint**: `/getFilteredQuery`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_VIEW')`
+- **Query Parameters**:
+  - `status` (string, optional): Filter by query status (e.g., "Pending", "In Progress", "Resolved").
+  - `startDate` (string, optional): Start date for filtering in `YYYY-MM-DD` format.
+  - `endDate` (string, optional): End date for filtering in `YYYY-MM-DD` format.
+  - `sort` (string, optional): Sort order. Accepts `asc` for ascending or `desc` for descending (default).
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/queryManagement/getFilteredQuery?status=Pending&startDate=2023-01-01&endDate=2023-01-31
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Filtered queries retrieved successfully",
+      "data": [
+        // Array of query objects similar to 'Get All Queries'
+      ]
+    }
+    ```
+- **Error Response**:
+  - **Status**: 500 Internal Server Error
+  - **Body**:
+    ```json
+    {
+      "success": false,
+      "error": "Internal server error",
+      "details": "[error message]"
+    }
+    ```
+
+### 3. Search Queries
+
+Searches for queries across multiple fields like `query_ID`, `fullName`, `email`, `userId`, and `message`.
+
+- **Method**: `GET`
+- **Endpoint**: `/search`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_VIEW')`
+- **Query Parameters**:
+  - `query_ID` (string, optional): A search term to match against various fields. The API uses this parameter for a broad search.
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/queryManagement/search?query_ID=John
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Search results retrieved successfully",
+      "data": [
+        // Array of matching query objects
+      ]
+    }
+    ```
+
+### 4. Get Query by ID
+
+Fetches complete details for a single query, including pre-signed URLs for attachments and enriched response data.
+
+- **Method**: `GET`
+- **Endpoint**: `/getQuery/:queryId`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_VIEW')`, `authenticateCognitoUser`
+- **Path Parameters**:
+  - `queryId` (string, required): The unique identifier of the query (e.g., "QRY-1716369019230").
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "query_ID": "QRY-1716369019230",
+        "userId": "USR-12345",
+        "fullName": "John Doe",
+        "email": "john.doe@example.com",
+        "message": "Attachment issue.",
+        "attachment": "https://<presigned-url-for-attachment>",
+        "query_status": "In Progress",
+        "responses": [
+          {
+            "responseText": "We are reviewing your attachment.",
+            "sentAt": "2023-10-27T10:00:00.000Z",
+            "sentAtDate": "2023-10-27",
+            "sentAtTime": "15:30:00",
+            "sentAtFormatted": "27 Oct 2023, 03:30 PM",
+            "responseFromAdmin": {
+              "id": "ADM-001",
+              "name": "Admin User",
+              "imageUrl": "https://<presigned-url-for-admin-avatar>"
+            }
+          }
+        ]
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Query not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error" }
+    ```
+
+### 5. Respond to a Query
+
+Adds a new response to a query and sends an email notification to the user.
+
+- **Method**: `POST`
+- **Endpoint**: `/respond/:query_ID`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_RESPOND')`
+- **Path Parameters**:
+  - `query_ID` (string, required): The ID of the query to respond to.
+- **Request Body**:
+  ```json
+  {
+    "responseText": "We have resolved the issue with your account. Please try logging in again.",
+    "responseFromAdminId": "ADM-001"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "Query response sent successfully",
+      "data": {
+        "latestResponse": {
+          "responseText": "We have resolved the issue with your account. Please try logging in again.",
+          "sentAt": "16:45:30",
+          "sentAtDate": "2023-10-27",
+          "responseFromAdminId": "ADM-001"
+        },
+        "query": {
+          // The full updated query object
+        }
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "message": "Query not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "message": "Failed to send email notification" }
+    ```
+
+### 6. Edit a Query
+
+Updates query details such as the responsible person, issue type, status, or urgency. Can optionally add a response at the same time.
+
+- **Method**: `PUT`
+- **Endpoint**: `/edit/:query_ID`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_EDIT')`
+- **Path Parameters**:
+  - `query_ID` (string, required): The ID of the query to edit.
+- **Request Body**:
+  ```json
+  {
+    "responsiblePerson": "ADM-002",
+    "issueType": "Billing",
+    "query_status": "Resolved",
+    "urgencyLevel": "Low",
+    "response": "Your billing issue has been corrected.",
+    "responseFromAdminId": "ADM-001"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Query updated and email notification sent successfully",
+      "data": {
+        // The full updated query object
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Query not found" }
+    ```
+
+### 7. Delete a Query
+
+Permanently deletes a query.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deleteQuery/:queryId`
+- **Authentication**: `authenticateAdminToken`, `authorize('QUERY_DELETE')`
+- **Path Parameters**:
+  - `queryId` (string, required): The ID of the query to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Query deleted" }
+    ```
+- **Error Response**:
+  - **Status**: 500 Internal Server Error
+  - **Body**:
+    ```json
+    { "success": false, "message": "An internal server error occurred." }
+    ```
+
+---
+
+## MFA Reset Management
+
+### 1. Create MFA Reset Request
+
+Creates a query specifically for a user's MFA reset request.
+
+- **Method**: `POST`
+- **Endpoint**: `/MFA/reset-mfa`
+- **Authentication**: Currently disabled in the router.
+- **Request Body**:
+  ```json
+  {
+    "userId": "USR-12345",
+    "fullName": "John Doe",
+    "email": "john.doe@example.com",
+    "message": "Requesting MFA reset due to lost device."
+  }
+  ```
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "MFA reset query submitted successfully.",
+      "data": {
+        // The newly created MFA query object
+      }
+    }
+    ```
+
+### 2. Get All MFA Reset Requests
+
+Retrieves a list of all queries with the issue type "MFA RESET".
+
+- **Method**: `GET`
+- **Endpoint**: `/MFA/reset-mfa/get`
+- **Authentication**: Currently disabled in the router.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "MFA reset queries retrieved successfully.",
+      "data": [
+        {
+          "query_ID": "QRY-98765",
+          "userId": "USR-12345",
+          "issueType": "MFA RESET",
+          "query_status": "Pending"
+          // ...other query fields
+        }
+      ]
+    }
+    ```
+
+## Notes
+- All endpoints require appropriate authentication and authorization for administrative access unless otherwise noted.
+- The `idGenerationMiddleware` is used to create unique, prefixed IDs for new records (e.g., `PERM-`, `ACTIONKEY-`).
