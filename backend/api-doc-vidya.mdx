@@ -1,0 +1,1279 @@
+# User Permission and Role Management API
+
+This document outlines the API endpoints for managing user permissions, roles, and related functionalities in the FitEarn application. All endpoints require authentication and appropriate administrative authorization.
+
+## Base URL
+```
+/api/fitnearn/web/admin/access
+```
+
+## User Permission Management
+
+### Add Permissions to a User
+
+Assigns a list of permissions to a specified user.
+
+- **Method**: PUT
+- **Endpoint**: `/users/add-Permission/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+- **Request Body**:
+  ```json
+  {
+    "permissionIds": ["string"],
+    "priority": number
+  }
+  ```
+  - `permissionIds` (array of strings, required): List of permission IDs to assign (e.g., `["PERM_VIEW_DASHBOARD", "PERM_GET_USERS"]`).
+  - `priority` (number, optional): Priority level for the assigned permissions (e.g., `2`).
+
+- **Request Example**:
+  ```bash
+  curl --request PUT \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/add-Permission/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "permissionIds": ["PERM_VIEW_DASHBOARD", "PERM_GET_USERS"],
+      "priority": 2
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permissions assigned successfully",
+      "data": {
+        "USR_ID": "string",
+        "permissions": ["string"],
+        "priority": number
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid permissionIds or priority"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error assigning permissions: [error message]"
+      }
+      ```
+
+### Remove Permissions from a User
+
+Removes specified permissions from a user.
+
+- **Method**: POST
+- **Endpoint**: `/users/remove-Permission/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+- **Request Body**:
+  ```json
+  {
+    "permissionIds": ["string"]
+  }
+  ```
+  - `permissionIds` (array of strings, required): List of permission IDs to remove (e.g., `["PERM_VIEW_DASHBOARD"]`).
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/remove-Permission/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "permissionIds": ["PERM_VIEW_DASHBOARD"]
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permissions removed successfully",
+      "data": {
+        "USR_ID": "string",
+        "permissions": ["string"]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid permissionIds"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error removing permissions: [error message]"
+      }
+      ```
+
+### Get Permissions by User or Group
+
+Fetches assigned and missing permissions for a specific user or group.
+
+- **Method**: GET
+- **Endpoints**:
+  - `/users/get-permissions/:USR_ID` (for user)
+  - `/groups/get-permissions/:groupId` (for group)
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user (for user endpoint).
+  - `groupId` (string, required): The ID of the group (for group endpoint).
+
+- **Request Examples**:
+  ```bash
+  # User
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/get-permissions/USR_123'
+  ```
+  ```bash
+  # Group
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/groups/get-permissions/GROUP_ABC'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "userOrGroupPermissions": [
+          {
+            "permissionID": "string",
+            "description": "string"
+          }
+        ],
+        "missingPermissions": [
+          {
+            "permissionID": "string",
+            "description": "string"
+          }
+        ]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User or group not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching permissions: [error message]"
+      }
+      ```
+
+### Remove Permission Boundaries from a User
+
+Removes specified permission boundaries from a user.
+
+- **Method**: POST
+- **Endpoint**: `/users/remove-permission-boundary/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+- **Request Body**:
+  ```json
+  {
+    "permissionBoundaryIds": ["string"]
+  }
+  ```
+  - `permissionBoundaryIds` (array of strings, required): List of permission boundary IDs to remove (e.g., `["PERM_BOUND_1"]`).
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/remove-permission-boundary/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "permissionBoundaryIds": ["PERM_BOUND_1"]
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permission boundaries removed successfully",
+      "data": {
+        "USR_ID": "string",
+        "permissionBoundary": ["string"],
+        "removedBoundaries": ["string"]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid permissionBoundaryIds"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error removing permission boundaries: [error message]"
+      }
+      ```
+
+## User Role Management
+
+### Add Role to a User
+
+Assigns one or more roles to a user.
+
+- **Method**: PUT
+- **Endpoint**: `/users/add-Role/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+- **Request Body**:
+  ```json
+  {
+    "roleIds": ["string"]
+  }
+  ```
+  - `roleIds` (array of strings, required): List of role IDs to assign (e.g., `["ROLE_ADMIN"]`).
+
+- **Request Example**:
+  ```bash
+  curl --request PUT \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/add-Role/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "roleIds": ["ROLE_ADMIN"]
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Roles assigned successfully",
+      "data": {
+        "USR_ID": "string",
+        "roles": ["string"]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid roleIds"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error assigning roles: [error message]"
+      }
+      ```
+
+### Remove Roles from a User
+
+Removes specified roles from a user.
+
+- **Method**: POST
+- **Endpoint**: `/users/remove-Role/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+- **Request Body**:
+  ```json
+  {
+    "roleIds": ["string"]
+  }
+  ```
+  - `roleIds` (array of strings, required): List of role IDs to remove (e.g., `["ROLE_ADMIN"]`).
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/remove-Role/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "roleIds": ["ROLE_ADMIN"]
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Roles removed successfully",
+      "data": {
+        "USR_ID": "string",
+        "roles": ["string"]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid roleIds"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error removing roles: [error message]"
+      }
+      ```
+
+## User Management
+
+### Create Admin User
+
+Creates a new administrative user.
+
+- **Method**: POST
+- **Endpoint**: `/users/add`
+- **Request Body**:
+  ```json
+  {
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "password": "string",
+    "roleIds": ["string"],
+    "permissionIds": ["string"]
+  }
+  ```
+  - `firstName` (string, required): First name of the user.
+  - `lastName` (string, required): Last name of the user.
+  - `email` (string, required): Email address of the user.
+  - `password` (string, required): Password for the user.
+  - `roleIds` (array of strings, optional): List of role IDs to assign.
+  - `permissionIds` (array of strings, optional): List of permission IDs to assign.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/add' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@example.com",
+      "password": "password123",
+      "roleIds": ["ROLE_EDITOR"],
+      "permissionIds": ["PERM_VIEW_ANALYTICS"]
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Admin user created successfully",
+      "data": {
+        "USR_ID": "string",
+        "email": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid input data"
+      }
+      ```
+    - **Status**: 409 Conflict
+      ```json
+      {
+        "success": false,
+        "message": "Email already exists"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error creating admin user: [error message]"
+      }
+      ```
+
+### Get All Users
+
+Retrieves a list of all users.
+
+- **Method**: GET
+- **Endpoint**: `/users/get/all`
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/get/all'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "USR_ID": "string",
+          "email": "string",
+          "firstName": "string",
+          "lastName": "string",
+          "status": "string"
+        }
+      ]
+    }
+    ```
+  - **Error Response**:
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching users: [error message]"
+      }
+      ```
+
+### Get User Details
+
+Retrieves details for a specific user.
+
+- **Method**: GET
+- **Endpoint**: `/users/get/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/get/USR_123'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "USR_ID": "string",
+        "email": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "permissions": ["string"],
+        "roles": ["string"],
+        "status": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching user details: [error message]"
+      }
+      ```
+
+### Get Admin Personal Details
+
+Retrieves personal details for an admin user.
+
+- **Method**: GET
+- **Endpoint**: `/users/get/adminPersonalDetails/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the admin user.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/get/adminPersonalDetails/USR_123'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string",
+        "phoneNumber": "string",
+        "address": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Admin user not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching admin details: [error message]"
+      }
+      ```
+
+### Edit Admin User
+
+Updates the details of an existing admin user.
+
+- **Method**: PUT
+- **Endpoint**: `/users/edit/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the admin user.
+- **Request Body**:
+  ```json
+  {
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "image": "file"
+  }
+  ```
+  - `firstName` (string, optional): New first name.
+  - `lastName` (string, optional): New last name.
+  - `email` (string, optional): New email address.
+  - `image` (file, optional): New profile image.
+
+- **Request Example**:
+  ```bash
+  curl --request PUT \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/edit/USR_123' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "email": "jane.doe@example.com"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "User updated successfully",
+      "data": {
+        "USR_ID": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid input data"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error updating user: [error message]"
+      }
+      ```
+
+### Soft Delete User
+
+Marks a user as soft-deleted (e.g., sets `isActive` to false).
+
+- **Method**: DELETE
+- **Endpoint**: `/users/remove-user/:USR_ID`
+- **Path Parameters**:
+  - `USR_ID` (string, required): The ID of the user.
+
+- **Request Example**:
+  ```bash
+  curl --request DELETE \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/remove-user/USR_123'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "User soft deleted successfully",
+      "data": {
+        "USR_ID": "string",
+        "email": "string",
+        "status": "inactive"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error soft deleting user: [error message]"
+      }
+      ```
+
+### Get Accessible Pages
+
+Retrieves a list of pages accessible to a specific admin user.
+
+- **Method**: GET
+- **Endpoint**: `/users/accessible-pages/:adminId`
+- **Path Parameters**:
+  - `adminId` (string, required): The ID of the admin user.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/accessible-pages/ADMIN_123'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "pageId": "string",
+          "pageName": "string",
+          "path": "string"
+        }
+      ]
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Admin user not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching accessible pages: [error message]"
+      }
+      ```
+
+### Get Admin Basic Info
+
+Retrieves basic information (name and image) for an admin user.
+
+- **Method**: GET
+- **Endpoint**: `/users/basic-info/:adminId`
+- **Path Parameters**:
+  - `adminId` (string, required): The ID of the admin user.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/basic-info/ADMIN_123'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "firstName": "string",
+        "lastName": "string",
+        "profileImage": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Admin user not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching admin basic info: [error message]"
+      }
+      ```
+
+### Check if Super Admin
+
+Checks if the authenticated user has super admin privileges.
+
+- **Method**: GET
+- **Endpoint**: `/users/check-superadmin`
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/check-superadmin'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "isSuperAdmin": boolean
+    }
+    ```
+  - **Error Response**:
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error checking super admin status: [error message]"
+      }
+      ```
+
+## Authentication and Password Management
+
+### Verify Email
+
+Verifies a user's email address.
+
+- **Method**: GET
+- **Endpoint**: `/users/verify-email/:email`
+- **Path Parameters**:
+  - `email` (string, required): The email address to verify.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/verify-email/user@example.com'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Email verified successfully"
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid email"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Email not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error verifying email: [error message]"
+      }
+      ```
+
+### Forget Password
+
+Initiates the forgotten password process for a user.
+
+- **Method**: POST
+- **Endpoint**: `/users/reset-password`
+- **Request Body**:
+  ```json
+  {
+    "email": "string"
+  }
+  ```
+  - `email` (string, required): The email address of the user.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/reset-password' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "email": "user@example.com"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Password reset email sent successfully"
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid email"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Email not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error initiating password reset: [error message]"
+      }
+      ```
+
+### Admin Reset User Password
+
+Allows an admin to reset a user's password.
+
+- **Method**: POST
+- **Endpoint**: `/users/admin-reset-password`
+- **Request Body**:
+  ```json
+  {
+    "USR_ID": "string",
+    "newPassword": "string"
+  }
+  ```
+  - `USR_ID` (string, required): The ID of the user.
+  - `newPassword` (string, required): The new password.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/admin-reset-password' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "USR_ID": "USR_123",
+      "newPassword": "newSecurePassword123"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "User password reset successfully"
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid USR_ID or newPassword"
+      }
+      ```
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "User not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error resetting password: [error message]"
+      }
+      ```
+
+### Change Password
+
+Allows a user to change their own password.
+
+- **Method**: POST
+- **Endpoint**: `/users/change-password`
+- **Request Body**:
+  ```json
+  {
+    "oldPassword": "string",
+    "newPassword": "string"
+  }
+  ```
+  - `oldPassword` (string, required): The current password.
+  - `newPassword` (string, required): The new password.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/users/change-password' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "oldPassword": "currentPassword",
+      "newPassword": "anotherSecurePassword"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Password changed successfully"
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid oldPassword or newPassword"
+      }
+      ```
+    - **Status**: 401 Unauthorized
+      ```json
+      {
+        "success": false,
+        "message": "Incorrect old password"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error changing password: [error message]"
+      }
+      ```
+
+## Module Management
+
+### Create Module
+
+Creates a new access module.
+
+- **Method**: POST
+- **Endpoint**: `/modules/add`
+- **Request Body**:
+  ```json
+  {
+    "moduleName": "string",
+    "description": "string"
+  }
+  ```
+  - `moduleName` (string, required): Name of the module.
+  - `description` (string, optional): Description of the module.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/modules/add' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "moduleName": "Dashboard",
+      "description": "Module for dashboard functionalities"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Module created successfully",
+      "data": {
+        "moduleId": "string",
+        "moduleName": "string",
+        "description": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid moduleName"
+      }
+      ```
+    - **Status**: 409 Conflict
+      ```json
+      {
+        "success": false,
+        "message": "Module already exists"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error creating module: [error message]"
+      }
+      ```
+
+### Get Modules
+
+Retrieves a list of all available modules.
+
+- **Method**: GET
+- **Endpoint**: `/modules/list`
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/modules/list'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "moduleId": "string",
+          "moduleName": "string"
+        }
+      ]
+    }
+    ```
+  - **Error Response**:
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching modules: [error message]"
+      }
+      ```
+
+## Permission Management
+
+### Add Permission
+
+Adds a new permission to the system.
+
+- **Method**: POST
+- **Endpoint**: `/permissions/add`
+- **Request Body**:
+  ```json
+  {
+    "permissionID": "string",
+    "description": "string",
+    "moduleId": "string",
+    "actionKeyId": "string"
+  }
+  ```
+  - `permissionID` (string, required): Unique ID for the permission.
+  - `description` (string, optional): Description of the permission.
+  - `moduleId` (string, optional): The ID of the module.
+  - `actionKeyId` (string, optional): The ID of the action key.
+
+- **Request Example**:
+  ```bash
+  curl --request POST \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/permissions/add' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "permissionID": "PERM_CREATE_USER",
+      "description": "Allows creating new users",
+      "moduleId": "MOD_USERS",
+      "actionKeyId": "ACTIONKEY_CREATE"
+    }'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permission added successfully",
+      "data": {
+        "permissionID": "string",
+        "description": "string"
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      {
+        "success": false,
+        "message": "Invalid permissionID"
+      }
+      ```
+    - **Status**: 409 Conflict
+      ```json
+      {
+        "success": false,
+        "message": "Permission already exists"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error adding permission: [error message]"
+      }
+      ```
+
+### Get All Permissions with Search Filter
+
+Retrieves all permissions with optional search and filter capabilities.
+
+- **Method**: GET
+- **Endpoint**: `/permissions/get-all`
+- **Query Parameters**:
+  - `search` (string, optional): Search term to filter permissions by ID or description.
+  - `moduleId` (string, optional): Filter permissions by module ID.
+
+- **Request Example**:
+  ```bash
+  curl --request GET \
+    --url 'https://api.example.com/api/fitnearn/web/admin/access/permissions/get-all?search=view&moduleId=MOD_DASHBOARD'
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "permissionID": "string",
+          "description": "string",
+          "moduleId": "string"
+        }
+      ]
+    }
+    ```
+  - **Error Response**:
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching permissions: [error message]"
+      }
+      ```
+
+## Notes
+- All endpoints require appropriate authentication and authorization for administrative access.
+- Error responses include specific status codes (400, 404, 409, 500) to handle various failure scenarios.
+- The `roles` field is used consistently instead of `Roleid` to align with standard naming conventions.
+- The `image` field in the Edit Admin User endpoint expects a file upload, typically handled via multipart/form-data.
+- All endpoints assume proper validation and error logging on the server side, similar to the report controller.

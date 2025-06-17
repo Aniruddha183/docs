@@ -163,9 +163,14 @@
         },
         {
           "group": "API",
-          "pages": ["backend/api-integration-security"]
+          "pages": [
+            "backend/api-integration-security",
+            "backend/api-doc-vidya",
+            "backend/report-abuse-api"
+          ]
         },
         {
+          
           "group": "Serverless",
           "pages": ["backend/serverless-jenkins-setup"]
         },
@@ -180,7 +185,7 @@
             "backend/newsletter-setup"
           ]
         },
-        
+
         {
           "group": "Developer Tools",
           "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
@@ -263,9 +268,10 @@
             "swasthi/swasthi-purchases",
             "swasthi/swasthi-admob"
           ]
-        },{
-          "group":"Swasthi Widgets",
-          "pages":[
+        },
+        {
+          "group": "Swasthi Widgets",
+          "pages": [
             "swasthi/widgets/navbar-widget",
             "swasthi/widgets/drawer-widget",
             "swasthi/widgets/search-bar-widget",
@@ -299,7 +305,6 @@
             "swasthi/widgets/PaymentTile-widget",
             "swasthi/widgets/UPIPayment-widget",
             "swasthi/widgets/WalletPayment-widget"
-            
           ]
         },
         {
@@ -314,7 +319,6 @@
             "swasthi/mfa-verify",
             "swasthi/signin",
             "swasthi/open-sidebar"
-           
           ]
         },
         {
@@ -332,13 +336,13 @@
       ]
     },
     {
-      "group" : "FitnEarnPal",
+      "group": "FitnEarnPal",
       "pages": [
         "fitnearnpal/fitnearnpal-overview",
         "fitnearnpal/fitnearnpal-ui-components",
         {
-          "group" : "UI COMPONENTS",
-          "pages" : [
+          "group": "UI COMPONENTS",
+          "pages": [
             "fitnearnpal/widgets/custom-textfield",
             "fitnearnpal/widgets/custom-buttons",
             "fitnearnpal/widgets/live-session-card",
@@ -350,7 +354,6 @@
         }
       ]
     }
-
   ],
   "tabs": [
     {
