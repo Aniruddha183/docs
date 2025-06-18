@@ -203,9 +203,9 @@
           "group": "API Documentations",
           "pages": [
             "backend/api-documentation-access",
+            "backend/api-doc-admin-content-management",
             "backend/report-abuse-api",
             "backend/api-doc-adminAuthAndSession",
-            "backend/api-documentation-access",
             "backend/api-doc-user_management",
             "backend/api-doc-permissions",
             "backend/api-doc-query",
