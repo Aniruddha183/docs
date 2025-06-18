@@ -1,0 +1,129 @@
+# Bulk Upload Architecture & Process
+
+## 1. Overview
+
+The bulk upload system is designed to efficiently handle large-scale media uploads (images and videos) by validating metadata from a CSV file, generating pre-signed URLs for direct-to-S3 uploads, tracking real-time progress via Redis, and ensuring final data consistency in MongoDB.
+
+This document provides a detailed breakdown of each implementation step, including frontend-backend interactions, S3 integration, Redis-based tracking, and database storage.
+
+### Key Features
+- **Metadata-Driven Processing**: All uploads are controlled and validated by a metadata CSV.
+- **Efficient & Scalable**: Handles large files using AWS S3 multipart uploads and can process up to 500 files per batch.
+- **Real-Time Progress Tracking**: Provides live feedback to the user on the status of each file.
+- **Robust Error Handling**: Includes validation, network, and timeout recovery mechanisms.
+- **Intelligent Storage**: Uses Redis for temporary processing and MongoDB for permanent, structured storage.
+- **Conditional Logic**: Supports different workflows for videos, images, and video thumbnails.
+
+## 2. Bulk Upload Workflow
+
+The process consists of five major steps. For video uploads, an additional step is required to handle thumbnail images when the `NEXT_BULK_IMAGES_FOR_VIDEOS` flag is enabled.
+
+| Step | Description |
+| :--- | :--- |
+| **Step 1** | **Upload CSV Metadata to Redis**: The backend validates the CSV and stores its content temporarily in Redis. |
+| **Step 2** | **Generate Pre-Signed URLs**: The backend generates secure, temporary URLs for the frontend to upload files directly to S3. |
+| **Step 3** | **Frontend Uploads Files to S3**: The frontend uses the pre-signed URLs to upload each media file. |
+| **Step 4** | **Backend Validates Uploads**: The backend confirms that each file was successfully uploaded to S3. |
+| **Step 5** | **Store Data in MongoDB**: The backend writes the metadata for all successfully uploaded files to the database. |
+| **(Extra)** | **Upload Thumbnails for Videos**: A separate image upload pass is initiated to link thumbnails to their corresponding videos. |
+
+> **Key Benefits of the Workflow**
+> - **Separation of Concerns**: The frontend's role is limited to uploading files, making it lightweight. The backend handles all complex logic, including validation, URL generation, and database operations.
+> - **High-Performance Temporary Storage**: Using Redis for staging metadata ensures high-speed operations and avoids database load during the upload process.
+> - **Reliable Error Handling**: Tracking the status of each file in Redis allows for granular error reporting and ensures only successful uploads are persisted.
+
+## 3. Input & Validation
+
+### 3.1. Input Sources
+
+The process requires two distinct inputs from the user:
+
+1.  **Metadata CSV File**: A CSV file containing structured information for each media file.
+    - **Required Columns**: `MEDIA_NAME` (must be unique and match the filename) and `FILE_TYPE` (`Image` or `Video`).
+    - **Storage**: Temporarily stored in Redis for processing, then permanently in MongoDB with the final S3 URL.
+2.  **Media Files (Images/Videos)**: The actual image or video files.
+    - **Naming**: Filenames must exactly match the corresponding `MEDIA_NAME` in the CSV.
+    - **Storage**: Uploaded to AWS S3. The destination bucket is chosen dynamically based on `inputType`:
+        - Videos → `process.env.AWS_VIDEO_BUCKET`
+        - Images → `process.env.AWS_IMAGES_BUCKET`
+
+### 3.2. Input Constraints
+
+| Parameter | Constraint |
+| :--- | :--- |
+| **File Count** | Maximum **500 files** per batch. |
+| **Total Size** | Maximum **5 TB** per upload. |
+| **Allowed Formats** | **Video**: `.mp4` only. <br/> **Image**: `.png`, `.jpeg` only. |
+| **Batch Type** | A single batch must contain either all images or all videos. Mixed types are not allowed. |
+| **Thumbnail Flag** | The `NEXT_BULK_IMAGES_FOR_VIDEOS` flag is only applicable for image uploads intended as video thumbnails. |
+
+### 3.3. Validation Workflow
+
+The system performs a multi-stage validation process before any files are uploaded to S3:
+
+1.  **CSV Validation**:
+    - Confirms that mandatory columns (`MEDIA_NAME`, `FILE_TYPE`) exist.
+    - Checks for duplicate `MEDIA_NAME` entries within the CSV.
+2.  **File Count & Name Validation**:
+    - Verifies that the number of media files provided by the user matches the number of rows in the CSV.
+    - Ensures every filename matches a `MEDIA_NAME` entry in the CSV.
+3.  **File Type & Format Validation**:
+    - Checks that all files in a batch are of the same type (all images or all videos).
+    - Validates file extensions against the allowed formats.
+4.  **System Checks**:
+    - Implements timeouts for long-running uploads to prevent system hangs.
+    - Monitors for network failures and allows for retries.
+
+## 4. Step-by-Step Implementation
+
+### Step 1: Upload CSV Metadata to Redis
+- **Frontend**: The user uploads a CSV file via the `/api/fitnearn/web/admin/upload-csv` endpoint.
+- **Backend**:
+    1.  Parses and validates the CSV for required columns, duplicate names, and correct file formats.
+    2.  If valid, stores the entire metadata set in Redis under a unique key (e.g., `bulk_upload_<uuid>`).
+    3.  Responds to the frontend with the unique Redis key to track this batch.
+
+### Step 2: Generate Pre-Signed URLs
+- **Backend**: Triggered by a call to `/api/fitnearn/web/admin/bulk-upload/generate-presigned-urls`.
+    1.  Retrieves the metadata from Redis using the provided key.
+    2.  For each file entry, it generates a unique S3 key with structured folder paths (e.g., `.../YOGA/Videos/`).
+    3.  Creates a pre-signed S3 URL for uploading the file.
+    4.  Updates the Redis record for each file with its S3 key and pre-signed URL.
+    5.  Returns the list of pre-signed URLs to the frontend.
+
+### Step 3: Frontend Uploads Files to S3
+- **Frontend**:
+    1.  Iterates through the list of media files and their corresponding pre-signed URLs.
+    2.  Uploads each file directly to S3 using a `PUT` request to the pre-signed URL.
+    3.  Tracks the success or failure of each upload and implements a retry mechanism for failures.
+
+### Step 4: Backend Validates Uploads
+- **Backend**: Triggered by a call to `/api/fitnearn/web/admin/bulk-upload/validate-upload`.
+    1.  Retrieves the metadata from Redis.
+    2.  For each file, it performs an `HeadObjectCommand` against S3 to verify the file's existence.
+    3.  Updates the status of each file in Redis to `success` or `failed`.
+
+### Step 5: Store Data in MongoDB
+- **Backend**: Triggered by a final call to `/api/fitnearn/web/admin/bulk-upload/bulkInsertMedia`.
+    1.  Retrieves all records from Redis marked with a `success` status.
+    2.  Performs a bulk write operation to insert the metadata (including the final S3 URL and key) into the MongoDB collection.
+    3.  Finally, clears the temporary data from Redis using the `/api/fitnearn/web/admin/bulk-upload/clear-cache` endpoint.
+
+## 5. Special Case: Uploading Video Thumbnails
+
+When `inputType = Video`, the system can handle a two-pass upload to associate thumbnail images with videos using the `NEXT_BULK_IMAGES_FOR_VIDEOS` flag.
+
+1.  **Pass 1 (Videos)**: The standard video upload process (Steps 1-4) is completed. The status in Redis is updated to `video_success`, but the data is **not** yet written to MongoDB.
+2.  **Pass 2 (Thumbnails)**: The frontend initiates a second bulk upload, this time for images and with the `NEXT_BULK_IMAGES_FOR_VIDEOS` flag set. The CSV for this pass must contain `MEDIA_NAME` entries that match the videos from Pass 1.
+3.  **Finalization**: After the images are successfully uploaded, the backend (in Step 5) matches the videos and their thumbnails and writes the complete, combined records to MongoDB.
+
+## 6. API Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/fitnearn/web/admin/upload-csv` | Uploads and validates the CSV, storing its data in Redis. |
+| `POST` | `/api/fitnearn/web/admin/bulk-upload/generate-presigned-urls` | Generates S3 pre-signed URLs for the file batch. |
+| `POST` | `/api/fitnearn/web/admin/bulk-upload/validate-upload` | Validates that files exist in S3 and updates their status in Redis. |
+| `POST` | `/api/fitnearn/web/admin/bulk-upload/bulkInsertMedia` | Performs a bulk insert of all successful uploads from Redis into MongoDB. |
+| `POST` | `/api/fitnearn/web/admin/bulk-upload/clear-cache` | Clears the temporary batch data from Redis after the process is complete. |
+```
