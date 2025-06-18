@@ -164,6 +164,14 @@
           "pages": ["backend/backend-code-guidelines"]
         },
         {
+          "group": "Architecture Guides",
+          "pages": [
+            "backend/architecture/admin-auth-architecture",
+            "backend/architecture/user-management",
+            "backend/architecture/access-architecture"
+          ]
+        },
+        {
           "group": "API",
           "pages": [
             "backend/api-integration-security",
@@ -196,6 +204,9 @@
           "pages": [
             "backend/api-documentation-access",
             "backend/report-abuse-api",
+            "backend/api-doc-adminAuthAndSession",
+            "backend/api-documentation-access",
+            "backend/api-doc-user_management",
             "backend/api-doc-permissions",
             "backend/api-doc-query",
             "backend/api-doc-workout",
@@ -204,7 +215,12 @@
             "backend/api-doc-media-management",
             "backend/api-doc-category-management",
             "backend/api-doc-coach-workout-video-management",
-            "backend/api-doc-report-generation"
+            "backend/api-doc-report-generation",
+            "backend/api-doc-media-management",
+            "backend/api-doc-category-management",
+            "backend/api-doc-coach-workout-video-management",
+            "backend/api-doc-report-generation",
+            "backend/report-abuse-api"
           ]
         }
       ]
