@@ -109,7 +109,9 @@
             "frontend/dynamic-form",
             "frontend/single-select-searchbox",
             "frontend/map-card",
-            "frontend/ReasonBox"
+            "frontend/ReasonBox",
+            "frontend/analytics-card",
+            "frontend/filter-card"
           ]
         },
         {
@@ -170,7 +172,6 @@
           ]
         },
         {
-          
           "group": "Serverless",
           "pages": ["backend/serverless-jenkins-setup"]
         },
@@ -190,19 +191,20 @@
           "group": "Developer Tools",
           "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
         },
-           {
+        {
           "group": "API Documentations",
-          "pages": ["backend/api-documentation-access",
-           "backend/report-abuse-api",
-           "backend/api-doc-permissions",
-           "backend/api-doc-query",
-           "backend/api-doc-workout",
-           "backend/api-doc-subscriptions" ,
-           "backend/api-doc-adminAuthAndSession",
-           "backend/api-doc-media-management",
-           "backend/api-doc-category-management",
-           "backend/api-doc-coach-workout-video-management",
-            "backend/api-doc-report-generation"   
+          "pages": [
+            "backend/api-documentation-access",
+            "backend/report-abuse-api",
+            "backend/api-doc-permissions",
+            "backend/api-doc-query",
+            "backend/api-doc-workout",
+            "backend/api-doc-subscriptions",
+            "backend/api-doc-adminAuthAndSession",
+            "backend/api-doc-media-management",
+            "backend/api-doc-category-management",
+            "backend/api-doc-coach-workout-video-management",
+            "backend/api-doc-report-generation"
           ]
         }
       ]
