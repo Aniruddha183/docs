@@ -166,7 +166,10 @@
           "pages": [
             "backend/architecture/admin-auth-architecture",
             "backend/architecture/user-management",
-            "backend/architecture/access-architecture"
+            "backend/architecture/access-architecture",
+            "backend/architecture/workout-architecture",
+            "backend/architecture/subscription-architecture",
+            "backend/architecture/bulk-upload-architecture"
          
           ]
         },
