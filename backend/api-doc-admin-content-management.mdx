@@ -1,0 +1,233 @@
+---
+title: "Api Documentation Admin Content Management"
+description: "REST API reference for managing content (Contact/Footer and General) by Admins in FitnEarn."
+---
+
+# Admin Content Management API
+
+This document outlines the API endpoints available to **admins** for managing content such as **Contact/Footer data** and **General content blocks** within the FitnEarn system.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/content
+```
+
+---
+
+## Endpoints
+
+### 1. Create New Content
+
+Creates a new content item (either `ContactFooter` or `GeneralContent`).
+
+- **Method**: `POST`
+- **URL**: `/create`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_CONTENT`
+- **Middleware**: `idGenerationMiddleware('CNT')`
+
+#### Request Body
+
+```json
+{
+  "title": "Contact Us",
+  "type": "ContactFooter",
+  "applicationType": "FitnEarn Website",
+  "fitnearnFooter": { "copyright": "2024" },
+  "contactDetails": { "email": "support@fitnearn.com" },
+  "faqs": [{ "question": "Q?", "answer": "A." }]
+}
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website",
+    "fitnearnFooter": { ... },
+    "contactDetails": { ... },
+    "faqs": [ ... ]
+  }
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request`: Missing ID, invalid `type` or `applicationType`
+- `500 Internal Server Error`
+
+---
+
+### 2. Get All Contents
+
+Fetches all content entries.
+
+- **Method**: `GET`
+- **URL**: `/get`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_CONTENT`
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "contentId": "CNT00001",
+      "title": "Contact Us",
+      "type": "ContactFooter",
+      "applicationType": "FitnEarn Website"
+    },
+    ...
+  ]
+}
+```
+
+#### Error Response
+
+- `500 Internal Server Error`
+
+---
+
+### 3. Get Content By ID
+
+Retrieves a content item by its `contentId`.
+
+- **Method**: `GET`
+- **URL**: `/get/:id`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_CONTENT`
+
+#### Example Request
+
+```
+GET /api/fitnearn/web/admin/content/get/CNT00001
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website",
+    "fitnearnFooter": { ... },
+    "contactDetails": { ... },
+    "faqs": [ ... ]
+  }
+}
+```
+
+#### Error Response
+
+- `404 Not Found`: Content not found
+- `500 Internal Server Error`
+
+---
+
+### 4. Update Content By ID
+
+Modifies an existing content record.
+
+- **Method**: `PATCH`
+- **URL**: `/update/:id`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `UPDATE_CONTENT`
+
+#### Example Request
+
+```json
+{
+  "title": "Updated Title",
+  "description": [
+    { "type": "paragraph", "data": { "text": "Updated description." } }
+  ],
+  "applicationType": "Coach App"
+}
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Updated Title",
+    "description": "[ { \"type\": \"paragraph\", ... } ]",
+    "applicationType": "Coach App"
+  }
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request`: Invalid applicationType or malformed data
+- `404 Not Found`: Content not found
+- `500 Internal Server Error`
+
+---
+
+### 5. Delete Content By ID
+
+Deletes a content entry by its `contentId`. This is a hard delete.
+
+- **Method**: `DELETE`
+- **URL**: `/delete/:id`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_CONTENT`
+
+#### Example Request
+
+```
+DELETE /api/fitnearn/web/admin/content/delete/CNT00001
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Content deleted successfully"
+}
+```
+
+#### Error Response
+
+- `404 Not Found`: Content not found
+- `500 Internal Server Error`
+
+---
+
+## Notes
+
+- All routes are secured by `authenticateAdminToken`.
+- Each route uses `authorize(permission)` middleware to ensure RBAC.
+- Content types include:
+  - `ContactFooter` for footer and contact tab data
+  - `GeneralContent` for other CMS content blocks (e.g. About Us)
+- When using `description`, ensure it's passed as `EditorJS OutputData` and converted to JSON if needed.
+
+---
+
+## Summary Table
+
+| Method | Endpoint      | Description          |
+| ------ | ------------- | -------------------- |
+| POST   | `/create`     | Create new content   |
+| GET    | `/get`        | Get all contents     |
+| GET    | `/get/:id`    | Get content by ID    |
+| PATCH  | `/update/:id` | Update content by ID |
+| DELETE | `/delete/:id` | Delete content by ID |
