@@ -180,24 +180,27 @@
             "backend/newsletter-setup"
           ]
         },
-        
+
         {
           "group": "Developer Tools",
           "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
         },
-           {
+        {
           "group": "API Documentations",
-          "pages": ["backend/api-documentation-access",
-           "backend/report-abuse-api",
-           "backend/api-doc-permissions",
-           "backend/api-doc-query",
-           "backend/api-doc-workout",
-           "backend/api-doc-subscriptions" ,
-           "backend/api-doc-adminAuthAndSession",
-           "backend/api-doc-media-management",
-           "backend/api-doc-category-management",
-           "backend/api-doc-coach-workout-video-management",
-            "backend/api-doc-report-generation"   
+          "pages": [
+            "backend/api-documentation-access",
+            "backend/report-abuse-api",
+            "backend/api-doc-permissions",
+            "backend/api-doc-query",
+            "backend/api-doc-workout",
+            "backend/api-doc-subscriptions",
+            "backend/api-doc-adminAuthAndSession",
+            "backend/api-doc-media-management",
+            "backend/api-doc-category-management",
+            "backend/api-doc-coach-workout-video-management",
+            "backend/api-doc-report-generation",
+            "backend/api-doc-Product-Management",
+            "backend/api-doc-Studio-Management"
           ]
         }
       ]
@@ -278,9 +281,10 @@
             "swasthi/swasthi-purchases",
             "swasthi/swasthi-admob"
           ]
-        },{
-          "group":"Swasthi Widgets",
-          "pages":[
+        },
+        {
+          "group": "Swasthi Widgets",
+          "pages": [
             "swasthi/widgets/navbar-widget",
             "swasthi/widgets/drawer-widget",
             "swasthi/widgets/search-bar-widget",
@@ -314,7 +318,6 @@
             "swasthi/widgets/PaymentTile-widget",
             "swasthi/widgets/UPIPayment-widget",
             "swasthi/widgets/WalletPayment-widget"
-            
           ]
         },
         {
@@ -329,7 +332,6 @@
             "swasthi/mfa-verify",
             "swasthi/signin",
             "swasthi/open-sidebar"
-           
           ]
         },
         {
@@ -347,13 +349,13 @@
       ]
     },
     {
-      "group" : "FitnEarnPal",
+      "group": "FitnEarnPal",
       "pages": [
         "fitnearnpal/fitnearnpal-overview",
         "fitnearnpal/fitnearnpal-ui-components",
         {
-          "group" : "UI COMPONENTS",
-          "pages" : [
+          "group": "UI COMPONENTS",
+          "pages": [
             "fitnearnpal/widgets/custom-textfield",
             "fitnearnpal/widgets/custom-buttons",
             "fitnearnpal/widgets/live-session-card",
@@ -365,7 +367,6 @@
         }
       ]
     }
-
   ],
   "tabs": [
     {
