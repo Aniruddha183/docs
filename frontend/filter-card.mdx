@@ -1,0 +1,254 @@
+---
+title: "Filter Card Component"
+description: "Add the Filter Card components in your Next.js project"
+---
+
+### Filter Card Component
+
+<Frame>
+  <img src="/images/filter-card.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+Here's how to use the component:
+
+### filter-dialog.tsx
+
+```jsx
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { useState } from "react";
+import { addDays } from "date-fns";
+
+interface FilterDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApplyFilter: (filters: FilterState) => void;
+}
+
+interface FilterState {
+  sorting: "A_Z" | "Z-A" | null;
+  date: {
+    from: Date | null;
+    to: Date | null;
+  };
+  categories: string[];
+  startDate?: string;
+    endDate?: string;
+    category?: string;
+    sortOrder?: string;
+    users?: string[];
+
+}
+
+const CATEGORIES = ["Strength", "Kickboxing", "Zumba", "Yoga","Cardio","Meditation"];
+const USERS = ["Website", "Admin", "Coach"];
+
+export function FilterDialog({
+  open,
+  onOpenChange,
+  onApplyFilter,
+}: FilterDialogProps) {
+  const [filters, setFilters] = useState<FilterState>({
+    sorting: null,
+    date: {
+      from: null,
+      to: null,
+    },
+    categories: [],
+    users: [],
+  });
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  const handleCategoryToggle = (category: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      categories: prev.categories.includes(category)
+        ? prev.categories.filter((c) => c !== category)
+        : [...prev.categories, category],
+    }));
+  };
+
+  const handleUsersToggle = (category: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      users: prev.users.includes(category)
+        ? prev.users.filter((c) => c !== category)
+        : [...prev.users, category],
+    }));
+  };
+
+  const handleClearAll = () => {
+    setFilters({
+      sorting: null,
+      date: {
+        from: null,
+        to: null,
+      },
+      categories: [],
+    });
+    window.location.reload();
+  };
+
+  const handleApplyFilter = () => {
+    // Create filter object with only non-empty values
+    const filterToApply: any = {};
+
+    // Add category filter if categories are selected
+    if (filters.categories.length > 0) {
+      filterToApply.category = filters.categories.join(",");
+    }
+
+    // Add user type filter if user types are selected
+    if (filters.users && filters.users.length > 0) {
+      filterToApply.userType = filters.users.join(",");
+    }
+
+    // Add date filters if selected
+    if (filters.date.from) {
+      filterToApply.startDate = filters.date.from.toISOString();
+    }
+
+    if (filters.date.to) {
+      filterToApply.endDate = filters.date.to.toISOString();
+    }
+
+    // Add sorting if selected
+    if (filters.sorting) {
+      filterToApply.sortOrder = filters.sorting;
+    }
+
+    onApplyFilter(filterToApply);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#262626] text-white border-neutral-700 max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Refine by</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl mb-4">Sorting</h3>
+            <RadioGroup
+              value={filters.sorting || ""}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  sorting: value as "A_Z" | "Z-A",
+                }))
+              }
+              className="grid grid-cols-2 gap-4"
+            >
+              <div className="relative">
+                <Label
+                  htmlFor="a_z"
+                  className={`border border-neutral-700 rounded-lg p-4 cursor-pointer hover:bg-neutral-800 block ${
+                    filters.sorting === "A_Z"
+                      ? "bg-neutral-700 border-white"
+                      : ""
+                  }`}
+                >
+                  <RadioGroupItem value="A_Z" id="a_z" className="sr-only" />
+                  A-Z
+                </Label>
+              </div>
+              <div className="relative">
+                <Label
+                  htmlFor="z-a"
+                  className={`border border-neutral-700 rounded-lg p-4 cursor-pointer hover:bg-neutral-800 block ${
+                    filters.sorting === "Z-A"
+                      ? "bg-neutral-700 border-white"
+                      : ""
+                  }`}
+                >
+                  <RadioGroupItem value="Z-A" id="z-a" className="sr-only" />
+                  Z-A
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div>
+            <h3 className="text-xl mb-4">User Type</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {USERS.map((category) => (
+                <Button
+                  key={category}
+                  variant="outline"
+                  className={`border-neutral-700 justify-start ${
+                    filters.users.includes(category)
+                      ? "bg-neutral-700 border-white"
+                      : ""
+                  }`}
+                  onClick={() => handleUsersToggle(category)}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl mb-4">Categories</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {CATEGORIES.map((category) => (
+                <Button
+                  key={category}
+                  variant="outline"
+                  className={`border-neutral-700 justify-start ${
+                    filters.categories.includes(category)
+                      ? "bg-neutral-700 border-white"
+                      : ""
+                  }`}
+                  onClick={() => handleCategoryToggle(category)}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-between pt-4">
+            <Button
+              variant="ghost"
+              onClick={handleClearAll}
+              className="text-white hover:text-neutral-300"
+            >
+              Clear all
+            </Button>
+            <Button
+              onClick={handleApplyFilter}
+              className="bg-white text-black hover:bg-neutral-200"
+            >
+              Apply Filter
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default FilterDialog;
+
+```
+
+### This is how you can use it in the parent component
+
+```jsx
+<FilterDialog
+  open={isFilterOpen}
+  onOpenChange={setIsFilterOpen}
+  onApplyFilter={handleFilterApply}
+/>
+```

@@ -109,7 +109,9 @@
             "frontend/dynamic-form",
             "frontend/single-select-searchbox",
             "frontend/map-card",
-            "frontend/ReasonBox"
+            "frontend/ReasonBox",
+            "frontend/analytics-card",
+            "frontend/filter-card"
           ]
         },
         {
@@ -162,8 +164,23 @@
           "pages": ["backend/backend-code-guidelines"]
         },
         {
+          "group": "Architecture Guides",
+          "pages": [
+            "backend/architecture/admin-auth-architecture",
+            "backend/architecture/user-management",
+            "backend/architecture/access-architecture",
+            "backend/architecture/workout-architecture",
+            "backend/architecture/subscription-architecture",
+            "backend/architecture/bulk-upload-architecture"
+          ]
+        },
+        {
           "group": "API",
-          "pages": ["backend/api-integration-security"]
+          "pages": [
+            "backend/api-integration-security",
+            "backend/api-doc-vidya",
+            "backend/report-abuse-api"
+          ]
         },
         {
           "group": "Serverless",
@@ -189,7 +206,10 @@
           "group": "API Documentations",
           "pages": [
             "backend/api-documentation-access",
+            "backend/api-doc-admin-content-management",
             "backend/report-abuse-api",
+            "backend/api-doc-adminAuthAndSession",
+            "backend/api-doc-user_management",
             "backend/api-doc-permissions",
             "backend/api-doc-query",
             "backend/api-doc-workout",
@@ -199,6 +219,11 @@
             "backend/api-doc-category-management",
             "backend/api-doc-coach-workout-video-management",
             "backend/api-doc-report-generation",
+            "backend/api-doc-media-management",
+            "backend/api-doc-category-management",
+            "backend/api-doc-coach-workout-video-management",
+            "backend/api-doc-report-generation",
+            "backend/report-abuse-api",
             "backend/api-doc-Product-Management",
             "backend/api-doc-Studio-Management"
           ]

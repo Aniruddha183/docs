@@ -1,0 +1,411 @@
+***
+
+# User & Profile Management API Documentation
+
+This document outlines the API endpoints for managing users, their profiles, subscriptions, and history within the FitEarn application's admin panel.
+
+## Base URLs
+- `/api/fitnearn/admin/user-management`
+- `/api/fitnearn/web/admin/user-management`
+
+---
+
+## User Data Retrieval
+
+Endpoints for fetching lists of users with comprehensive filtering.
+
+### 1. Get User Data with Filters
+
+Retrieves a list of users, which can be filtered by user type (Website, Admin, Coach), status, date range, and other user-specific attributes.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/get`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_GET')`
+- **Query Parameters**:
+  - `userType` (string, optional): Filter by user type. Accepts `Website`, `Admin`, or `Coach`.
+  - `userId` (string, optional): Fetch a specific user by their `USR_ID`.
+  - `status` (string, optional): Filter users by their status (e.g., `active`, `inactive`).
+  - `startDate` (string, optional): Start date for creation date filtering (format: `YYYY-MM-DD`). Requires `endDate`.
+  - `endDate` (string, optional): End date for creation date filtering (format: `YYYY-MM-DD`). Requires `startDate`.
+  - `sortOrder` (string, optional): Sort users by creation date. Accepts `asc` or `desc`.
+  - `fitnessLevel` (string, optional): Comma-separated list of fitness level IDs.
+  - `plan` (string, optional): Comma-separated list of subscription plan IDs.
+  - `category` (string, optional): Comma-separated list of workout categories (e.g., `Cardio`).
+  - `coachId` (string, optional): Filter by a specific coach's ID.
+  - `planType` (string, optional): Filter by active subscription plan type. Accepts `FREE` or `PAID`.
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/user-management/users/get?userType=Website&status=active&planType=PAID
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "_id": "60d0fe4f5311236168a109ca",
+          "name": "John Doe",
+          "email": "john.doe@example.com",
+          "gender": "Male",
+          "USR_ID": "USR-12345",
+          "appType": "Website",
+          "createdAt": "2023-10-26T10:00:00.000Z",
+          "status": "active",
+          "phoneNumber": "1234567890",
+          "profileImage": "http://example.com/image.png",
+          "subscription": {
+            "planType": "PAID",
+            "planName": "Premium Plan",
+            "price": 19.99,
+            "period": "Monthly",
+            "startDate": "2024-05-01T00:00:00.000Z",
+            "renewalDate": "2024-06-01T00:00:00.000Z",
+            "status": "Active"
+          }
+        }
+      ],
+      "counts": {
+        "WebsiteUsers": 1,
+        "AdminUsers": 0,
+        "CoachUsers": 0
+      },
+      "appTypes": ["Website"]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Invalid user type" }
+    ```
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No users found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Server Error", "error": "..." }
+    ```
+
+---
+
+## User Profile Management
+
+Endpoints for reading and updating a specific user's profile information.
+
+### 1. Get User Profile
+
+Fetches a comprehensive profile for a single user, including personal details, fitness info, verification status, and active subscription.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/profile/get-profile`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_PROFILE_GET')`
+- **Query Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user whose profile is to be fetched.
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/user-management/users/profile/get-profile?userId=USR-12345
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "User profile retrieved successfully",
+      "userProfile": {
+        "name": "Jane Doe",
+        "email": "jane.doe@example.com",
+        "fitnessLevel": { /* ...fitness level object... */ },
+        "healthAssessment": { /* ...health assessment object... */ },
+        "workoutCategory": ["Yoga", "Strength"],
+        "blogCategory": ["Nutrition"],
+        "avatarImage": { "url": "http://example.com/avatar.png" },
+        "bio": "Fitness enthusiast and blogger.",
+        "isVerified": true,
+        "appType": "Website",
+        "createdAt": "2023-10-26T10:00:00.000Z",
+        "updatedAt": "2024-05-20T14:30:00.000Z",
+        "subscription": { /* ...active subscription details... */ }
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "User ID is required" }
+    ```
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Error retrieving user profile", ... }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Failed to retrieve user profile: [error message]" }
+    ```
+
+### 2. Edit User Profile
+
+Updates various attributes of a user's profile. You can update one or more fields in a single request.
+
+- **Method**: `PUT`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/profile/edit-profile`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_PROFILE_UPDATE')`
+- **Request Body**:
+  ```json
+  {
+    "userId": "USR-12345",
+    "name": "Jane Smith",
+    "fitnessLevelId": 3,
+    "healthAssessment": "Good",
+    "workoutCategory": ["Yoga", "Pilates"],
+    "blogCategory": ["Nutrition", "Wellness"],
+    "avatarImageUrl": "http://example.com/new-avatar.png",
+    "bioContent": "Fitness enthusiast, blogger, and coach."
+  }
+  ```
+  - `userId` (string, required): The `USR_ID` of the user to update.
+  - All other fields are optional.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "User profile updated successfully",
+      "userNameUpdated": true,
+      "fitnessLevelUpdated": true,
+      "healthAssessmentUpdated": true,
+      "workoutCategoryUpdated": true,
+      "blogCategoryUpdated": true,
+      "avatarImageUpdated": true,
+      "bioUpdated": true
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "User ID is required" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Failed to edit user profile: [error message]" }
+    ```
+
+---
+
+## User Subscription Management
+
+Endpoints for viewing user subscription history and status.
+
+### 1. Get All User Subscription Bookings
+
+Retrieves a list of all subscription bookings across all users, with filtering options for subscription status and date range.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/subscription-plan/plan-purchase-history`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_GET')`
+- **Query Parameters**:
+  - `userSubscriptionStatus` (string, optional): Filter by user subscription status. Accepts `Active` or `Inactive`.
+  - `subscriptionPlanStatus` (string, optional): Filter by the status of the *plan itself*. Accepts `Active` or `Inactive`.
+  - `startDate` (string, optional): Start date of subscription creation (format: `YYYY-MM-DD`). Requires `endDate`.
+  - `endDate` (string, optional): End date of subscription creation (format: `YYYY-MM-DD`). Requires `startDate`.
+  - `sortOrder` (string, optional): Sort by creation date. Accepts `asc` or `desc`.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "USR_SUB_ID": "SUB-54321",
+          "userId": "USR-12345",
+          "status": "Active",
+          /* ...other user subscription fields... */
+          "subscriptionPlan": {
+            "plan_name": "Premium Plan",
+            "planType": "PAID",
+            "status": "Active",
+            /* ...other plan fields... */
+          }
+        }
+      ],
+      "total": 1,
+      "counts": {
+        "total": { "active": 50, "inactive": 20, "free": 10, "paid": 60 },
+        "filtered": { "active": 1, "inactive": 0, "free": 0, "paid": 1 }
+      },
+      "filters": { /* ...applied filters... */ }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No subscriptions found matching the criteria" }
+    ```
+
+### 2. Get User's Subscription Purchase History
+
+Retrieves all non-free subscription purchase records for a specific user.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/subscription-plan/purchase-history/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_PROFILE_GET')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "USR_SUB_ID": "SUB-54321",
+          "status": "Active",
+          /* ...subscription details... */
+        },
+        {
+          "USR_SUB_ID": "SUB-54320",
+          "status": "Expired",
+          /* ...subscription details... */
+        }
+      ]
+    }
+    ```
+
+### 3. Get User's Active Subscription
+
+Fetches the currently active (or pending deactivation) subscription for a specific user.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/subscription-plan/active/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_PROFILE_GET')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+        "success": true,
+        "message": "Here are the user subscriptions",
+        "label": "", // e.g., "Hey, you have cancelled the plan and it is about to expire on..."
+        "subscription": {
+            "status": "Active",
+            /* ...full subscription object... */
+            "subscriptionPlan": {
+                "plan_name": "Premium",
+                "price": 19.99,
+                "discountPercent": 10,
+                "discountValue": 1.99
+                /* ...other plan details... */
+            },
+            "previousRepeatedPlanPrice": 19.99,
+            "previousActivePlanPrice": 9.99
+        }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No active or yet-to-deactivate subscription found for the user" }
+    ```
+
+### 4. Get User's Inactive Subscriptions
+
+Retrieves all inactive (e.g., expired, cancelled) subscription records for a specific user.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/user-management/users/subscription-plan/inactive/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_PROFILE_GET')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Here are Inactive User Subscriptions",
+      "inactiveSubscriptions": [
+        {
+          "status": "Expired",
+          /* ...subscription details... */
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No inactive subscriptions found for the user" }
+    ```
+
+---
+
+## User History & Progress
+
+Endpoints for viewing specific user activity and history records.
+
+### 1. Get User Progress Board
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/admin/user-management/progress-board/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_GET_PROGRESS_BOARD')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+- **Response**: (Assumed based on controller name)
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": { /* ...user's progress data... */ }
+    }
+    ```
+
+### 2. Get Live Session Purchase History
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/admin/user-management/live-session-history/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_GET_PURCHASE_HISTORY')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+- **Response**: (Assumed based on controller name)
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [ /* ...list of live session purchases... */ ]
+    }
+    ```
+
+### 3. Get Coach Booking History
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/admin/user-management/coach-booking-history/:userId`
+- **Authentication**: `authenticateAdminToken`, `authorize('USER_GET_PURCHASE_HISTORY')`
+- **Path Parameters**:
+  - `userId` (string, required): The `USR_ID` of the user.
+- **Response**: (Assumed based on controller name)
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [ /* ...list of coach bookings... */ ]
+    }
+    ```
