@@ -224,7 +224,11 @@
             "backend/api-doc-category-management",
             "backend/api-doc-coach-workout-video-management",
             "backend/api-doc-report-generation",
-            "backend/report-abuse-api"
+            "backend/report-abuse-api",
+            "backend/api-doc-admin-coach-booking-management",
+            "backend/api-doc-admin-live-session-management",
+            "backend/api-doc-admin-blog-management",
+            "backend/api-doc-admin-refund-management"
           ]
         }
       ]

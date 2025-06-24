@@ -1,0 +1,480 @@
+## Live Session Admin Controller API Documentation
+
+This document outlines all admin-level controller functions and their associated models, utility, and middleware support for live session management.
+
+
+## Middleware
+
+### `authenticateAdminToken`
+
+- **Purpose**: Authenticates admin users using a JWT (`gentoken` header).
+- **How it works**:  
+  - Verifies the JWT.
+  - Checks for a valid session in the database.
+  - Loads the admin user and attaches it to `req.adminUser`.
+- **Failure**: Returns 401 if token is missing, expired, or user/session is invalid.
+
+### `authorize(requiredActionKey)`
+
+- **Purpose**: Authorizes admin users based on RBAC and permission boundaries.
+- **How it works**:
+  - Checks if the user has the required action key (e.g., `CREATE_LIVE_SESSION`, `REVIEW_LIVE_SESSION`).
+  - Handles special cases for `SUPERADMIN` and `ACCESSMANAGER` roles.
+  - Ensures the user has the corresponding `_VIEW` permission before allowing higher-level actions.
+  - Denies access if the action is restricted by the user's permission boundaries.
+- **Failure**: Returns 403 if the user lacks the required permission.
+
+### `multer.single(field)`
+
+- **Purpose**: Handles file uploads (e.g., `thumbnail`) in multipart/form-data requests.
+
+---
+
+## Utility Functions
+
+### `uploadImage`
+
+- **Purpose**: Uploads an image to AWS S3 using temporary AWS credentials.
+- **How it works**:
+  - Verifies the provided Cognito `id_token` (from `Authorization` header).
+  - If expired, uses `x-refresh-token` and `x-username` to refresh the token.
+  - Obtains temporary AWS credentials and uploads the image to S3.
+  - Returns the S3 URL and key.
+- **Required headers**:  
+  - `Authorization: Bearer <id_token>`
+  - `x-refresh-token`
+  - `x-username`
+
+### `deleteImageFromS3`
+
+- **Purpose**: Deletes an image from AWS S3 by its key.
+- **How it works**:  
+  - Uses AWS SDK to delete the object from the specified S3 bucket.
+
+---
+
+## Endpoints
+
+### 1. Create Public Live Session
+
+Creates a new public live session.
+
+- **Method**: `POST`
+- **URL**: `/create`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_LIVE_SESSION`
+- **Middleware**: `multer.single('thumbnail')`
+- **Controller**: `adminCreatePublicLiveSession`
+- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `adminId`, `title`, `coachId`, `date`, `startTime`, `duration`, `description`, `category`, `level`, `focusArea`, `thumbnailURL`, `thumbnailKey`, `equipment`, `intensityLevel`, `calories`, `meetLink`
+  - File: `thumbnail` (image)
+- **Success Response**:
+  ```json
+  {
+    "message": "Public Live Session created successfully",
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input, time slot unavailable, or missing coach.
+  - `500 Internal Server Error`
+
+---
+
+### 2. Save Live Session as Draft
+
+Saves a live session as a draft.
+
+- **Method**: `POST`
+- **URL**: `/save-draft`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_LIVE_SESSION`
+- **Middleware**: `multer.single('thumbnail')`
+- **Controller**: `saveLiveSession`
+- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - Similar to `/create`
+- **Success Response**:
+  ```json
+  {
+    "message": "Session saved to draft successfully",
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input.
+  - `500 Internal Server Error`
+
+---
+
+### 3. Duplicate Session
+
+Duplicates a session with a new ID and sets it as draft.
+
+- **Method**: `POST`
+- **URL**: `/copy/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_LIVE_SESSION`
+- **Controller**: `duplicateSession`
+- **Headers**: `gentoken`
+- **Success Response**:
+  ```json
+  {
+    "message": "Session duplicated successfully",
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 4. Reviewer Review (Stage 1)
+
+Adds reviewer comments and sets session status to `pending approval`.
+
+- **Method**: `POST`
+- **URL**: `/review/stage1`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `REVIEW_LIVE_SESSION`
+- **Controller**: `reviewerAdminReview`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - `sessionId`, `adminId`, `comment`, `visibility`
+- **Success Response**:
+  ```json
+  {
+    "message": "Comment added successfully",
+    "success": true,
+    "data": { ...reviewComment }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 5. Approver Review (Stage 2)
+
+Approves or denies session and adds comment accordingly.
+
+- **Method**: `PATCH`
+- **URL**: `/review/stage2`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `APPROVE_LIVE_SESSION`
+- **Controller**: `approverAdminReview`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - `sessionId`, `status`, `adminId`, `comment`, `seats`, `price`, `isFree`, `discountPercentage`, `visibility`
+- **Success Response**:
+  ```json
+  {
+    "message": "Session status updated to approved",
+    "success": true,
+    "data": { ...sessionObject },
+    "approverComment": { ... }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 6. Edit Live Session
+
+Edits an existing live session.
+
+- **Method**: `PATCH`
+- **URL**: `/edit`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_LIVE_SESSION`
+- **Middleware**: `multer.single('thumbnail')`
+- **Controller**: `editLiveSession`
+- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - Fields to update (see creation)
+- **Success Response**:
+  ```json
+  {
+    "message": "Live Session updated successfully",
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input or time slot unavailable.
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 7. Edit Review/Cancel Comment
+
+Edits a reviewer or approver comment, or the cancel reason.
+
+- **Method**: `PATCH`
+- **URL**: `/review-comment/edit` or `/edit-cancel`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_COMMENT`
+- **Controller**: `editComment` or `editCancelReason`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - For review comment: `sessionId`, `commentId`, `comment`, `adminType`, `commentType`
+  - For cancel reason: `sessionId`, `comment`
+- **Success Response**:
+  ```json
+  {
+    "message": "Comment updated successfully",
+    "success": true,
+    "data": { ... }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session or comment not found.
+  - `500 Internal Server Error`
+
+---
+
+### 8. Add Meeting Link
+
+Adds a meeting link to a session.
+
+- **Method**: `PATCH`
+- **URL**: `/meet-link`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `UPDATE_LIVE_SESSION`
+- **Controller**: `addMeetingLink`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - `meetingLink`, `sessionId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Meeting link added successfully",
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 9. Cancel Session
+
+Cancels a session and stores reason.
+
+- **Method**: `PATCH`
+- **URL**: `/cancel`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CANCEL_LIVE_SESSION`
+- **Controller**: `cancelSession`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - `sessionId`, `comment`
+- **Success Response**:
+  ```json
+  {
+    "message": "Session cancelled successfully",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 10. Assign Reviewer/Approver
+
+Assigns a reviewer or approver admin to a session.
+
+- **Method**: `PATCH`
+- **URL**: `/blog/assign-reviewer` or `/blog/assign-approver`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER` or `ASSIGN_APPROVER`
+- **Controller**: `assignReviewer` or `assignApprover`
+- **Headers**: `gentoken`
+- **Request Body**:  
+  - `sessionId`, `adminId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Reviewer assigned successfully",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 11. Get All Live Sessions
+
+Fetches all live sessions, optionally filtered by status.
+
+- **Method**: `GET`
+- **URL**: `/get`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_LIVE_SESSIONS`
+- **Controller**: `fetchLiveSession`
+- **Headers**: `gentoken`
+- **Query Params**: `filter` (optional)
+- **Success Response**:
+  ```json
+  {
+    "data": [ ...sessionObjects ],
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `403 Forbidden`: No sessions found.
+  - `500 Internal Server Error`
+
+---
+
+### 12. Get Sessions Under Review
+
+Fetches all sessions under review.
+
+- **Method**: `GET`
+- **URL**: `/under-review`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_LIVE_SESSIONS`
+- **Controller**: `fetchSessionUnderReview`
+- **Headers**: `gentoken`
+
+---
+
+### 13. Get Cancelled Sessions
+
+Fetches all cancelled sessions.
+
+- **Method**: `GET`
+- **URL**: `/get-cancelled`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_LIVE_SESSIONS`
+- **Controller**: `fetchCancelledSessions`
+- **Headers**: `gentoken`
+
+---
+
+### 14. Get Session By ID
+
+Returns a session and coach name.
+
+- **Method**: `GET`
+- **URL**: `/get-session/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_LIVE_SESSION`
+- **Controller**: `getSessionById`
+- **Headers**: `gentoken`
+
+---
+
+### 15. Get Admin Review Comments
+
+Fetches reviewer and approver comments along with admin names.
+
+- **Method**: `GET`
+- **URL**: `/review-comments/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_COMMENTS`
+- **Controller**: `getAdminComments`
+- **Headers**: `gentoken`
+
+---
+
+### 16. Get Live Session Analytics
+
+Returns metrics like attendance, likes, seats, participants, and report reasons.
+
+- **Method**: `GET`
+- **URL**: `/analytics/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_LIVE_SESSION`
+- **Controller**: `liveSessionAnalytics`
+- **Headers**: `gentoken`
+
+---
+
+### 17. Delete Live Session
+
+Deletes a session and its booked slots.
+
+- **Method**: `DELETE`
+- **URL**: `/delete/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_LIVE_SESSION`
+- **Controller**: `deleteLiveSession`
+- **Headers**: `gentoken`
+
+---
+
+### 18. Delete Review/Approver Comment
+
+Deletes a reviewer or approver comment.
+
+- **Method**: `DELETE`
+- **URL**: `/review-comment/delete`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_COMMENT`
+- **Controller**: `deleteAdminComment`
+- **Headers**: `gentoken`
+
+---
+
+## Notes
+
+- All routes are secured by `authenticateAdminToken` and require a valid `gentoken` header.
+- Each route uses `authorize(permission)` middleware to ensure RBAC.
+- File upload endpoints require additional Cognito tokens for AWS S3 access.
+- Live session review, approval, analytics, and duplication workflows are supported.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                        | Description                        | Required Headers                |
+|--------|---------------------------------|------------------------------------|---------------------------------|
+| POST   | `/create`                       | Create public live session         | gentoken, Authorization, x-refresh-token, x-username |
+| POST   | `/save-draft`                   | Save live session as draft         | gentoken, Authorization, x-refresh-token, x-username |
+| POST   | `/copy/:sessionId`              | Duplicate session                  | gentoken                        |
+| POST   | `/review/stage1`                | Reviewer review (stage 1)          | gentoken                        |
+| PATCH  | `/review/stage2`                | Approver review (stage 2)          | gentoken                        |
+| PATCH  | `/edit`                         | Edit live session                  | gentoken, Authorization, x-refresh-token, x-username |
+| PATCH  | `/review-comment/edit`          | Edit review/approver comment       | gentoken                        |
+| PATCH  | `/meet-link`                    | Add meeting link                   | gentoken                        |
+| PATCH  | `/cancel`                       | Cancel session                     | gentoken                        |
+| PATCH  | `/edit-cancel`                  | Edit cancel reason                 | gentoken                        |
+| PATCH  | `/blog/assign-reviewer`         | Assign reviewer                    | gentoken                        |
+| PATCH  | `/blog/assign-approver`         | Assign approver                    | gentoken                        |
+| GET    | `/get`                          | Get all live sessions              | gentoken                        |
+| GET    | `/under-review`                 | Get sessions under review          | gentoken                        |
+| GET    | `/get-cancelled`                | Get cancelled sessions             | gentoken                        |
+| GET    | `/get-session/:sessionId`       | Get session by ID                  | gentoken                        |
+| GET    | `/review-comments/:sessionId`   | Get admin review comments          | gentoken                        |
+| GET    | `/analytics/:sessionId`         | Get live session analytics         | gentoken                        |
+| DELETE | `/delete/:sessionId`            | Delete live session                | gentoken                        |
+| DELETE | `/review-comment/delete`        | Delete review/approver comment     | gentoken                        |
+
+---
+### ✅ Status Summary
+This setup supports the full lifecycle of public/private live sessions including:
+- Reviewer/approver workflows
+- Meeting link management
+- Analytics
+- Secure image upload (with auto token refresh)
+- Session duplication, cancellation
+- Role-based reviewer/approver assignment via modules/groups
+
+Ready for scale and admin panel integration.
