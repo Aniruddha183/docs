@@ -225,7 +225,11 @@
             "backend/api-doc-report-generation",
             "backend/report-abuse-api",
             "backend/api-doc-Product-Management",
-            "backend/api-doc-Studio-Management"
+            "backend/api-doc-Studio-Management",
+            "backend/api-doc-admin-coach-booking-management",
+            "backend/api-doc-admin-live-session-management",
+            "backend/api-doc-admin-blog-management",
+            "backend/api-doc-admin-refund-management"
           ]
         }
       ]
