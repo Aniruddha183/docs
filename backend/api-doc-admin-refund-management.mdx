@@ -1,0 +1,405 @@
+---
+title: "Admin Refund Management"
+description: "REST API reference for managing refunds and refund requests by Admins in FitnEarn."
+---
+
+# Admin Refund Management API
+
+This API allows **admins** to view and manage refund requests within the FitnEarn system, including filtering by booking type, payment mode, status, and date.
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/refund
+```
+
+## Authentication
+
+All endpoints require admin authentication using `authenticateAdminToken` middleware and appropriate RBAC permissions.
+
+---
+
+## Get All Refunds
+
+<RequestExample>
+
+```bash cURL
+curl -X GET \
+  '/api/fitnearn/web/admin/refund/get?bookingType=Live%20Session&payment_mode=razorpay&status=pending&date=2024-01-15&sort=a-z' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/refund/get?bookingType=Live Session&payment_mode=razorpay&status=pending&sort=a-z', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "refunds": [
+    {
+      "refundId": "REF001",
+      "razorpay_refund_id": "rfnd_MqkL8QQoXXXXXX",
+      "bookingId": "BK001",
+      "userId": "USR001",
+      "refund_amount": 500,
+      "refund_reason": "Session cancelled by coach",
+      "refund_status": "processed",
+      "payment_mode": "razorpay",
+      "status": "completed",
+      "refundedBy": "ADMIN001",
+      "bookingType": "Live Session"
+    },
+    {
+      "refundId": "REF002",
+      "razorpay_refund_id": "rfnd_NqlM9RRpYYYYYY",
+      "bookingId": "BK002",
+      "userId": "USR002",
+      "refund_amount": 750,
+      "refund_reason": "User requested cancellation",
+      "refund_status": "pending",
+      "payment_mode": "razorpay",
+      "status": "pending",
+      "refundedBy": "ADMIN001",
+      "bookingType": "Booking Individual"
+    }
+  ]
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "No Refunds found"
+}
+```
+
+</ResponseExample>
+
+Retrieves all refund requests with optional filtering and sorting capabilities.
+
+**Method**: `GET`  
+**Endpoint**: `/get`  
+**Authentication**: Required (`VIEW_REFUNDS` permission)
+
+### Query Parameters
+
+<ParamField query="bookingType" type="string" optional>
+  Filter by booking type: `"Live Session"`, `"Booking Individual"`, or `"Booking Group"`
+</ParamField>
+
+<ParamField query="payment_mode" type="string" optional>
+  Filter by payment mode (e.g., "razorpay", "stripe", "cash")
+</ParamField>
+
+<ParamField query="status" type="string" optional>
+  Filter by refund status (e.g., "pending", "completed", "failed")
+</ParamField>
+
+<ParamField query="date" type="string" optional>
+  Filter by refund date (YYYY-MM-DD format)
+</ParamField>
+
+<ParamField query="sort" type="string" optional>
+  Sort order: `a-z` (ascending) or `z-a` (descending) by refundId
+</ParamField>
+
+---
+
+## Get Refund Details
+
+<RequestExample>
+
+```bash cURL
+curl -X GET \
+  '/api/fitnearn/web/admin/refund/get/REF001' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/refund/get/REF001', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": {
+    "refundId": "REF001",
+    "razorpay_refund_id": "rfnd_MqkL8QQoXXXXXX",
+    "bookingId": "BK001",
+    "userId": "USR001",
+    "refund_amount": 500,
+    "refund_reason": "Session cancelled by coach",
+    "refund_status": "processed",
+    "payment_mode": "razorpay",
+    "status": "completed",
+    "refundedBy": "ADMIN001",
+    "bookingType": "Live Session",
+    "booking": {
+      "userId": "USR001",
+      "bookingId": "BK001",
+      "orderId": "ORD001",
+      "paymentId": "PAY001",
+      "transactionId": "TXN001",
+      "currency": "INR",
+      "status": "refunded",
+      "sessionId": "SES001",
+      "sessionType": "Live Session",
+      "grandTotal": 500,
+      "actualAmount": 500,
+      "discountAmount": 0,
+      "discountPercent": 0,
+      "payment_mode": "razorpay",
+      "payment_date": "2024-01-15",
+      "seats": 1,
+      "note": "Yoga session booking"
+    }
+  }
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "No Refund found"
+}
+```
+
+</ResponseExample>
+
+Retrieves detailed information for a specific refund including the associated booking details.
+
+**Method**: `GET`  
+**Endpoint**: `/get/:refundId`  
+**Authentication**: Required (`VIEW_REFUNDS` permission)
+
+### Path Parameters
+
+<ParamField path="refundId" type="string" required>
+  Unique identifier for the refund
+</ParamField>
+
+---
+
+## Data Models
+
+### Refund Model
+
+```typescript
+interface IRefundModel {
+  refundId: string;
+  razorpay_refund_id: string;
+  bookingId: string;
+  userId: string;
+  refund_amount: number;
+  refund_reason: string;
+  refund_status: string;
+  payment_mode: string;
+  status: string;
+  refundedBy: string;
+  bookingType: string;
+}
+```
+
+### User Booking Model
+
+```typescript
+interface IUserBooking {
+  userId: string;
+  bookingId: string;
+  orderId: string;
+  paymentId: string;
+  transactionId: string;
+  currency: string;
+  status: "success" | "failed" | "refunded" | "pending" | "declined";
+  sessionId: string;
+  sessionType: "Live Session" | "Booking Individual" | "Booking Group";
+  grandTotal: number;
+  actualAmount: number;
+  discountAmount: number;
+  discountPercent: number;
+  payment_mode: string;
+  payment_date: string;
+  seats: number;
+  note: string;
+  requestRaised?: Date;
+}
+```
+
+---
+
+## Refund Status Values
+
+The refund system uses several status indicators:
+
+### Refund Status (`refund_status`)
+- `"pending"` - Refund request initiated but not processed
+- `"processing"` - Refund is being processed by payment gateway
+- `"processed"` - Refund successfully processed by payment gateway
+- `"failed"` - Refund processing failed
+- `"cancelled"` - Refund request was cancelled
+
+### Overall Status (`status`)
+- `"pending"` - Awaiting admin action
+- `"approved"` - Refund approved by admin
+- `"rejected"` - Refund rejected by admin
+- `"completed"` - Refund fully completed
+- `"failed"` - Refund process failed
+
+### Booking Types (`bookingType`)
+- `"Live Session"` - Real-time group fitness sessions
+- `"Booking Individual"` - One-on-one coaching sessions
+- `"Booking Group"` - Small group coaching sessions
+
+---
+
+## Authentication Details
+
+### Admin Token Authentication
+
+All endpoints require the `authenticateAdminToken` middleware which:
+- Validates the JWT token from the `gentoken` header
+- Checks for active admin session in the database
+- Verifies admin user existence
+- Attaches admin user information to the request
+
+```typescript
+// Required headers
+headers: {
+  'gentoken': 'your_admin_jwt_token'
+}
+```
+
+### Authorization Permissions
+
+- `VIEW_REFUNDS` - Required for all refund viewing operations
+
+---
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+<ResponseField name="401 Unauthorized" type="object">
+  ```json
+  {
+    "success": false,
+    "error": "Session expired or invalid token"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401 Not Found (No Refunds)" type="object">
+  ```json
+  {
+    "success": false,
+    "message": "No Refunds found"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401 Not Found (Specific Refund)" type="object">
+  ```json
+  {
+    "success": false,
+    "message": "No Refund found"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403 Forbidden" type="object">
+  ```json
+  {
+    "success": false,
+    "error": "Insufficient permissions"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="500 Internal Server Error" type="object">
+  ```json
+  {
+    "success": false,
+    "message": "Internal server Error: [detailed error message]",
+    "error": true
+  }
+  ```
+</ResponseField>
+
+---
+
+## Usage Examples
+
+### Filter Pending Refunds by Payment Mode
+
+```javascript
+const pendingRazorpayRefunds = await fetch(
+  '/api/fitnearn/web/admin/refund/get?status=pending&payment_mode=razorpay&sort=a-z',
+  {
+    headers: { 'gentoken': 'your_admin_token' }
+  }
+);
+```
+
+### Get All Live Session Refunds
+
+```javascript
+const liveSessionRefunds = await fetch(
+  '/api/fitnearn/web/admin/refund/get?bookingType=Live Session',
+  {
+    headers: { 'gentoken': 'your_admin_token' }
+  }
+);
+```
+
+### Get Refunds for Specific Date
+
+```javascript
+const dailyRefunds = await fetch(
+  '/api/fitnearn/web/admin/refund/get?date=2024-01-15',
+  {
+    headers: { 'gentoken': 'your_admin_token' }
+  }
+);
+```
+
+---
+
+## Summary
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/get` | Get all refunds with filters | `VIEW_REFUNDS` |
+| GET | `/get/:refundId` | Get specific refund with booking details | `VIEW_REFUNDS` |
+
+---
+
+## Notes
+
+- All refund amounts are in the smallest currency unit (e.g., paise for INR)
+- Refund processing is handled through external payment gateways (primarily Razorpay)
+- The system maintains audit trails through `refundedBy` field tracking which admin processed the refund
+- Booking details are automatically included when fetching individual refund information
+- Sorting is case-insensitive and based on refundId alphanumeric comparison

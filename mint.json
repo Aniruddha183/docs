@@ -168,7 +168,10 @@
           "pages": [
             "backend/architecture/admin-auth-architecture",
             "backend/architecture/user-management",
-            "backend/architecture/access-architecture"
+            "backend/architecture/access-architecture",
+            "backend/architecture/workout-architecture",
+            "backend/architecture/subscription-architecture",
+            "backend/architecture/bulk-upload-architecture"
           ]
         },
         {
@@ -220,7 +223,13 @@
             "backend/api-doc-category-management",
             "backend/api-doc-coach-workout-video-management",
             "backend/api-doc-report-generation",
-            "backend/report-abuse-api"
+            "backend/report-abuse-api",
+            "backend/api-doc-Product-Management",
+            "backend/api-doc-Studio-Management",
+            "backend/api-doc-admin-coach-booking-management",
+            "backend/api-doc-admin-live-session-management",
+            "backend/api-doc-admin-blog-management",
+            "backend/api-doc-admin-refund-management"
           ]
         }
       ]

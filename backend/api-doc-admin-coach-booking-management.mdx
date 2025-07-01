@@ -1,0 +1,651 @@
+---
+title: "Admin Coach Bookings"
+description: "REST API reference for managing coach bookings and private sessions by Admins in FitnEarn."
+---
+
+# Admin Coach Bookings API
+
+This API allows **admins** to manage coach bookings, private sessions, and participant management within the FitnEarn system.
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/coach-bookings
+```
+
+## Authentication
+
+All endpoints require admin authentication using `authenticateAdminToken` middleware and appropriate RBAC permissions.
+
+---
+
+## Get All Bookings
+
+<RequestExample>
+
+```bash cURL
+curl -X GET \
+  '/api/fitnearn/web/admin/coach-bookings/get?sort=a-z&category=fitness&status=approved&date=2024-01-15' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/get', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": [
+    {
+      "sessionId": "SES001",
+      "coachId": "COACH001",
+      "userId": "USR001",
+      "coachName": "John Doe",
+      "title": "Morning Yoga Session",
+      "category": "yoga",
+      "dateTime": "2024-01-15T09:00:00Z",
+      "endDateTime": "2024-01-15T10:00:00Z",
+      "date": "2024-01-15",
+      "seats": 10,
+      "bookedSeats": 5,
+      "timeSlot": "09:00-10:00",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "participantEmail": ["user1@email.com", "user2@email.com"],
+      "invitedEmail": ["invite1@email.com"],
+      "meetLink": "https://meet.google.com/abc-def-ghi",
+      "status": "approved",
+      "price": 500,
+      "requestPayment": true
+    }
+  ]
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Bookings not found"
+}
+```
+
+</ResponseExample>
+
+Retrieves all coach bookings with optional filtering and sorting.
+
+**Method**: `GET`  
+**Endpoint**: `/get`  
+**Authentication**: Required (`GET_COACH_BOOKINGS` permission)
+
+### Query Parameters
+
+<ParamField query="sort" type="string" optional>
+  Sort order: `a-z` (ascending) or `z-a` (descending) by title
+</ParamField>
+
+<ParamField query="category" type="string" optional>
+  Filter by session category (e.g., "fitness", "yoga")
+</ParamField>
+
+<ParamField query="status" type="string" optional>
+  Filter by booking status (e.g., "approved", "pending")
+</ParamField>
+
+<ParamField query="date" type="string" optional>
+  Filter by session date (YYYY-MM-DD format)
+</ParamField>
+
+---
+
+## Get Booking Details
+
+<RequestExample>
+
+```bash cURL
+curl -X GET \
+  '/api/fitnearn/web/admin/coach-bookings/get-details/SES001' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/get-details/SES001', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": {
+    "sessionId": "SES001",
+    "coachId": "COACH001",
+    "title": "Morning Yoga Session",
+    "category": "yoga",
+    "dateTime": "2024-01-15T09:00:00Z",
+    "participantEmail": ["user1@email.com", "user2@email.com"],
+    "status": "approved",
+    "price": 500,
+    "users": [
+      {
+        "USR_ID": "USR001",
+        "email": "user1@email.com",
+        "name": "Alice Smith"
+      }
+    ],
+    "paymentDetails": [
+      {
+        "userId": "USR001",
+        "bookingId": "BK001",
+        "orderId": "ORD001",
+        "paymentId": "PAY001",
+        "status": "success",
+        "sessionId": "SES001",
+        "sessionType": "Booking Individual",
+        "grandTotal": 500,
+        "actualAmount": 500,
+        "discountAmount": 0,
+        "seats": 1
+      }
+    ]
+  }
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found"
+}
+```
+
+</ResponseExample>
+
+Retrieves detailed information for a specific booking including participant details and payment information.
+
+**Method**: `GET`  
+**Endpoint**: `/get-details/:sessionId`  
+**Authentication**: Required (`READ_COACH_BOOKING` permission)
+
+### Path Parameters
+
+<ParamField path="sessionId" type="string" required>
+  Unique identifier for the session
+</ParamField>
+
+---
+
+## Get Coach Specific Bookings
+
+<RequestExample>
+
+```bash cURL
+curl -X GET \
+  '/api/fitnearn/web/admin/coach-bookings/get-coach/COACH001' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/get-coach/COACH001', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": [
+    {
+      "sessionId": "SES001",
+      "coachId": "COACH001",
+      "coachName": "John Doe",
+      "title": "Morning Yoga Session",
+      "category": "yoga",
+      "dateTime": "2024-01-15T09:00:00Z",
+      "status": "approved",
+      "bookedSeats": 5,
+      "seats": 10
+    }
+  ]
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found for the coach"
+}
+```
+
+</ResponseExample>
+
+Retrieves all bookings for a specific coach.
+
+**Method**: `GET`  
+**Endpoint**: `/get-coach/:coachId`  
+**Authentication**: Required (`GET_COACH_BOOKINGS` permission)
+
+### Path Parameters
+
+<ParamField path="coachId" type="string" required>
+  Unique identifier for the coach
+</ParamField>
+
+---
+
+## Add Meeting Link
+
+<RequestExample>
+
+```bash cURL
+curl -X PATCH \
+  '/api/fitnearn/web/admin/coach-bookings/add-link' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "sessionId": "SES001",
+    "meetingLink": "https://meet.google.com/abc-def-ghi"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/add-link', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    sessionId: 'SES001',
+    meetingLink: 'https://meet.google.com/abc-def-ghi'
+  })
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "message": "Meeting link added successfully"
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found"
+}
+```
+
+</ResponseExample>
+
+Adds a meeting link to a booking and updates the status to 'approved'.
+
+**Method**: `PATCH`  
+**Endpoint**: `/add-link`  
+**Authentication**: Required (`UPDATE_COACH_BOOKING` permission)
+
+### Request Body
+
+<ParamField body="sessionId" type="string" required>
+  Unique identifier for the session
+</ParamField>
+
+<ParamField body="meetingLink" type="string" required>
+  Meeting link URL for the session
+</ParamField>
+
+---
+
+## Add Participants
+
+<RequestExample>
+
+```bash cURL
+curl -X PATCH \
+  '/api/fitnearn/web/admin/coach-bookings/add-participant' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "sessionId": "SES001",
+    "email": ["user3@email.com", "user4@email.com"]
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/add-participant', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    sessionId: 'SES001',
+    email: ['user3@email.com', 'user4@email.com']
+  })
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "message": "Users added to session successfully",
+  "data": {
+    "sessionId": "SES001",
+    "participantEmail": ["user1@email.com", "user2@email.com", "user3@email.com", "user4@email.com"],
+    "bookedSeats": 4
+  }
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found"
+}
+```
+
+</ResponseExample>
+
+Adds registered users to a session as participants.
+
+**Method**: `PATCH`  
+**Endpoint**: `/add-participant`  
+**Authentication**: Required (`UPDATE_COACH_BOOKING` permission)
+
+### Request Body
+
+<ParamField body="sessionId" type="string" required>
+  Unique identifier for the session
+</ParamField>
+
+<ParamField body="email" type="array" required>
+  Array of email addresses to add as participants. Only registered users will be added.
+</ParamField>
+
+---
+
+## Remove Participants
+
+<RequestExample>
+
+```bash cURL
+curl -X PATCH \
+  '/api/fitnearn/web/admin/coach-bookings/remove-participant' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "sessionId": "SES001",
+    "email": "user3@email.com"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/remove-participant', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    sessionId: 'SES001',
+    email: 'user3@email.com'
+  })
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "message": "User removed from session successfully",
+  "data": {
+    "sessionId": "SES001",
+    "participantEmail": ["user1@email.com", "user2@email.com"],
+    "bookedSeats": 2
+  }
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found"
+}
+```
+
+</ResponseExample>
+
+Removes a participant from a session and handles cleanup of related records.
+
+**Method**: `PATCH`  
+**Endpoint**: `/remove-participant`  
+**Authentication**: Required (`UPDATE_COACH_BOOKING` permission)
+
+### Request Body
+
+<ParamField body="sessionId" type="string" required>
+  Unique identifier for the session
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address of the participant to remove
+</ParamField>
+
+---
+
+## Delete Booking
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE \
+  '/api/fitnearn/web/admin/coach-bookings/delete/BK001' \
+  -H 'Authorization: Bearer {admin_token}' \
+  -H 'gentoken: {admin_jwt_token}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/fitnearn/web/admin/coach-bookings/delete/BK001', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer {admin_token}',
+    'gentoken': '{admin_jwt_token}'
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "message": "Booking deleted successfully"
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Booking not found"
+}
+```
+
+</ResponseExample>
+
+Permanently deletes a booking and frees up the associated coach time slot.
+
+**Method**: `DELETE`  
+**Endpoint**: `/delete/:bookingId`  
+**Authentication**: Required (`DELETE_COACH_BOOKING` permission)
+
+### Path Parameters
+
+<ParamField path="bookingId" type="string" required>
+  Unique identifier for the booking to delete
+</ParamField>
+
+---
+
+## Data Models
+
+### Private Session
+
+```typescript
+interface IPrivateSession {
+  sessionId: string;
+  coachId: string;
+  userId: string;
+  coachName: string;
+  title: string;
+  category: string;
+  dateTime: Date;
+  endDateTime: Date;
+  date: string;
+  seats: number;
+  bookedSeats: number;
+  timeSlot: string;
+  startTime: string;
+  endTime: string;
+  participantEmail: string[];
+  invitedEmail: string[];
+  meetLink: string;
+  status: string;
+  price: number;
+  cancelReason?: string;
+  sessionReminder: Date;
+  reviewer: string;
+  approver: string;
+  requestPayment: boolean;
+}
+```
+
+### User Booking
+
+```typescript
+interface IUserBooking {
+  userId: string;
+  bookingId: string;
+  orderId: string;
+  paymentId: string;
+  transactionId: string;
+  currency: string;
+  status: "success" | "failed" | "refunded" | "pending" | "declined";
+  sessionId: string;
+  sessionType: "Live Session" | "Booking Individual" | "Booking Group";
+  grandTotal: number;
+  actualAmount: number;
+  discountAmount: number;
+  discountPercent: number;
+  payment_mode: string;
+  payment_date: string;
+  seats: number;
+  note: string;
+  requestRaised?: Date;
+}
+```
+
+---
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+<ResponseField name="401 Unauthorized" type="object">
+  ```json
+  {
+    "success": false,
+    "error": "Session expired or invalid token"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403 Forbidden" type="object">
+  ```json
+  {
+    "success": false,
+    "error": "Insufficient permissions"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="404 Not Found" type="object">
+  ```json
+  {
+    "success": false,
+    "message": "Booking not found"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="500 Internal Server Error" type="object">
+  ```json
+  {
+    "success": false,
+    "message": "Internal Server Error",
+    "error": true,
+    "errorMessage": "Detailed error message"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Summary
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/get` | Get all bookings with filters | `GET_COACH_BOOKINGS` |
+| GET | `/get-details/:sessionId` | Get booking details | `READ_COACH_BOOKING` |
+| GET | `/get-coach/:coachId` | Get coach specific bookings | `GET_COACH_BOOKINGS` |
+| PATCH | `/add-link` | Add meeting link to booking | `UPDATE_COACH_BOOKING` |
+| PATCH | `/add-participant` | Add participants to session | `UPDATE_COACH_BOOKING` |
+| PATCH | `/remove-participant` | Remove participant from session | `UPDATE_COACH_BOOKING` |
+| DELETE | `/delete/:bookingId` | Delete booking | `DELETE_COACH_BOOKING` |

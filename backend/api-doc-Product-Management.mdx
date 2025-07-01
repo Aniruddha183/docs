@@ -1,0 +1,696 @@
+***
+
+# Product Management API Documentation
+
+This document outlines the API endpoints for Product Management of the FitEarn application.
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/store
+```
+
+## Endpoints
+
+### 1. Add Draft Product
+
+This endpoint allows an admin to create a draft product with necessary details. The product is saved in a "Draft" state and must include exactly 4 images.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addDraftProduct`
+- **Authentication**: `authenticateAdminToken` (Admin)
+
+- **Request Body**:
+
+  ```json
+  {
+    "name": "T-shirt",
+    "description": "Premium cotton t-shirt",
+    "category": "Clothing",
+    "price": 499,
+    "images": ["url1", "url2", "url3", "url4"],
+    "quantity": 20,
+    "isActive": true,
+    "bestSeller": false,
+    "isCoupon": true,
+    "discountRate": 15,
+    "couponCode": "SAVE15",
+    "modelNumber": "TSH-2024",
+    "highlights": ["100% cotton", "Unisex"],
+    "freeDelivery": true,
+    "adminId": "ADM-001",
+    "sizeGuide": "Refer to our sizing chart"
+  }
+  ```
+
+  - `name` (string, required): Name of the product.
+  - `description` (string, required): Detailed description of the product.
+  - `category` (string, required): Product category name.
+  - `price` (number, required): Price of the product.
+  - `images` (array of strings, required): Exactly 4 image URLs.
+  - `quantity` (number, required): Inventory count.
+  - `isActive` (boolean, optional): Is the product available for purchase.
+  - `bestSeller` (boolean, optional): Mark as best seller.
+  - `isCoupon` (boolean, optional): Is a coupon applicable.
+  - `discountRate` (number, optional): Discount percentage if any.
+  - `couponCode` (string, optional): Coupon code if any.
+  - `modelNumber` (string, optional): Unique model identifier.
+  - `highlights` (array of strings, optional): Key selling points.
+  - `freeDelivery` (boolean, optional): Eligible for free delivery.
+  - `adminId` (string, required): Admin ID who is creating the product.
+  - `sizeGuide` (string, optional): Reference to size guide text or URL.
+
+- **Response**:
+
+  - **Status**: `201 Created`
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Product is Saved",
+      "data": "PROD1234"
+    }
+    ```
+
+- **Error Responses**:
+
+  - **Status**: `400 Bad Request` – Required field(s) missing
+
+    ```json
+    {
+      "success": false,
+      "message": "Missing required fields"
+    }
+    ```
+
+  - **Status**: `400 Bad Request` – Invalid number of images
+
+    ```json
+    {
+      "success": false,
+      "message": "Exactly 4 images are required"
+    }
+    ```
+
+  - **Status**: `401 Unauthorized` – Token not provided or invalid
+
+    ```json
+    {
+      "success": false,
+      "message": "Unauthorized: Admin token is missing or invalid"
+    }
+    ```
+
+  - **Status**: `403 Forbidden` – No permission
+
+    ```json
+    {
+      "success": false,
+      "message": "You do not have permission to perform this action"
+    }
+    ```
+
+  - **Status**: `500 Internal Server Error` – General server error
+    ```json
+    {
+      "success": false,
+      "message": "Error while adding product: [error details]"
+    }
+    ```
+
+---
+
+### 2. Publish Product
+
+This endpoint allows an admin to publish a product that was previously saved as a draft.
+
+- **Method**: `PUT`
+- **Endpoint**: `/api/fitnearn/web/admin/store/publishProduct/{productId}`
+- **Authentication**: `authenticateAdminToken` (Admin)
+
+- **Path Parameter**:
+
+  - `productId` (string, required): The ID of the draft product to be published.
+
+- **Response**:
+
+  - **Status**: `200 OK`
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Product has been published successfully"
+    }
+    ```
+
+- **Error Responses**:
+
+  - **Status**: `400 Bad Request` – Missing or invalid product ID
+
+    ```json
+    {
+      "success": false,
+      "message": "Invalid product ID"
+    }
+    ```
+
+  - **Status**: `404 Not Found` – Product not found
+
+    ```json
+    {
+      "success": false,
+      "message": "Draft product not found"
+    }
+    ```
+
+  - **Status**: `401 Unauthorized`
+
+    ```json
+    {
+      "success": false,
+      "message": "Unauthorized: Admin token is missing or invalid"
+    }
+    ```
+
+  - **Status**: `500 Internal Server Error`
+    ```json
+    {
+      "success": false,
+      "message": "Error while publishing product: [error details]"
+    }
+    ```
+
+---
+
+### 3. Edit Product
+
+This endpoint allows an admin to update an existing product's details (whether it's draft or published).
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/editProduct/{productId}`
+- **Authentication**: `authenticateAdminToken` (Admin)
+
+- **Path Parameter**:
+
+  - `productId` (string, required): The ID of the product to be edited.
+
+- **Request Body**:
+
+  ```json
+  {
+    "name": "Updated T-shirt",
+    "description": "Updated description",
+    "price": 599,
+    "images": ["url1", "url2", "url3", "url4"],
+    "quantity": 30,
+    "isActive": true,
+    "discountRate": 10,
+    "adminId": "ADM-001"
+  }
+  ```
+
+- **Response**:
+
+  - **Status**: `200 OK`
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Product has been updated successfully"
+    }
+    ```
+
+- **Error Responses**:
+
+  - **Status**: `400 Bad Request` – Invalid data
+
+    ```json
+    {
+      "success": false,
+      "message": "Invalid request body"
+    }
+    ```
+
+  - **Status**: `404 Not Found` – Product not found
+
+    ```json
+    {
+      "success": false,
+      "message": "Product not found"
+    }
+    ```
+
+  - **Status**: `401 Unauthorized`
+
+    ```json
+    {
+      "success": false,
+      "message": "Unauthorized: Admin token is missing or invalid"
+    }
+    ```
+
+  - **Status**: `500 Internal Server Error`
+    ```json
+    {
+      "success": false,
+      "message": "Error while updating product: [error details]"
+    }
+    ```
+
+### 4. Get Product List
+
+This endpoint allows the admin to retrieve a list of products with optional filters like product ID, name, category, price, status, and inventory level.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getProductList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_PRODUCTS`
+
+- **Query Parameters** (all optional):
+
+  - `productId` (string): Filter by Product ID (partial match allowed)
+  - `productName` (string): Filter by Product Name
+  - `category` (string): Filter by Product Category
+  - `price` (number): Exact match on price
+  - `status` (string): Filter by Product Status (e.g., "active")
+  - `inventoryStatus` (number): Filter products with quantity less than or equal to this value
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "productId": "PROD1234",
+        "name": "T-shirt",
+        "variantId": "2 Variants",
+        "price": 499,
+        "quantity": 10,
+        "status": "active",
+        "category": "Clothing",
+        "updatedAt": "2024-06-01T10:00:00.000Z"
+      }
+    ],
+    "totalProducts": 1
+  }
+  ```
+
+- **Error Response**:
+  ```json
+  {
+    "success": false,
+    "message": "Error while getting product list"
+  }
+  ```
+
+---
+
+### 5. Get Product By ID
+
+This endpoint allows the admin to get complete product details, including all variants, for a given `productId`.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getProduct/:productId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_PRODUCT`
+
+- **Path Parameter**:
+
+  - `productId` (string, required): Unique ID of the product
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "product": {
+        "productId": "PROD1234",
+        "name": "T-shirt",
+        "description": "Premium cotton tee",
+        "variantId": ["VAR001", "VAR002"],
+        ...
+      },
+      "variants": [
+        {
+          "variantId": "VAR001",
+          "size": "M",
+          "color": "Red"
+        },
+        {
+          "variantId": "VAR002",
+          "size": "L",
+          "color": "Blue"
+        }
+      ]
+    }
+  }
+  ```
+
+- **Error Responses**:
+
+  - **Status**: `404 Not Found`
+
+    ```json
+    {
+      "success": false,
+      "message": "Product not found"
+    }
+    ```
+
+  - **Status**: `500 Internal Server Error`
+    ```json
+    {
+      "success": false,
+      "message": "Error while getting product list"
+    }
+    ```
+
+### 6. Copy Product
+
+This endpoint allows the admin to create a new draft product by duplicating an existing one.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/copyProduct/:productId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `COPY_PRODUCT`
+- **Middleware**: `idGenerationMiddleware('PROD')`
+
+- **Path Parameter**:
+
+  - `productId` (string, required): ID of the product to copy
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Product copied successfully",
+    "data": {
+      "productId": "PROD5678",
+      "state": "Draft"
+    }
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – Missing Product ID
+  - `404 Not Found` – Product not found
+  - `500 Internal Server Error` – Server error while copying product
+
+---
+
+### 7. Delete Product (Single)
+
+This endpoint allows the admin to delete a single product by its ID.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/fitnearn/web/admin/store/deleteProduct/:productId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_PRODUCT`
+
+- **Path Parameter**:
+
+  - `productId` (string, required): ID of the product to delete
+
+- **Response**:
+
+  ```json
+  {
+    "message": "Product deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Product not found
+  - `500 Internal Server Error` – Error deleting product
+
+---
+
+### 8. Delete Products (Bulk)
+
+This endpoint allows the admin to delete multiple products by passing an array of product IDs.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/fitnearn/web/admin/store/deleteManyProduct`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_PRODUCT`
+
+- **Request Body**:
+
+  ```json
+  {
+    "productIds": ["PROD1234", "PROD5678"]
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Product deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – No product IDs provided
+  - `404 Not Found` – Product(s) not found
+  - `500 Internal Server Error` – Error deleting products
+
+---
+
+### 9. Add Product Variant
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addProductVariant`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_PRODUCT_VARIANT`
+- **Middleware**: `idGenerationMiddleware('VAR')`, `upload.array('image')`
+
+- **Request Body** (Form Data):
+
+  - `name`: (string) Name of the variant
+  - `size`: (string) Size (e.g., S, M, L)
+  - `color`: (string) Color
+  - `quantity`: (number) Quantity of the variant
+  - `addOn`: (string) Any additional features
+  - `adminId`: (string) Admin ID
+  - `productId`: (string) Associated product ID
+  - `image`: (file[]) Images to upload
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Variant ID VAR1234 is added"
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – Quantity constraints, product not found
+  - `401 Unauthorized` – Missing identity token
+  - `500 Internal Server Error` – Image upload or DB error
+
+---
+
+### 10. Edit Product Variant
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/editProductVariant`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_PRODUCT_VARIANT`
+- **Middleware**: `upload.array('image')`
+
+- **Request Body** (Form Data):
+
+  - `variantId`: (string) Variant ID to edit
+  - `name`: (string) Updated name
+  - `size`: (string) Updated size
+  - `color`: (string) Updated color
+  - `quantity`: (number) Updated quantity
+  - `addOn`: (string) Updated addOn
+  - `adminId`: (string) Admin ID
+  - `productId`: (string) Product ID
+  - `image`: (file[]) Optional new images
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Variant ID VAR1234 is Updated"
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – Quantity exceeds product stock
+  - `401 Unauthorized` – Missing token
+  - `404 Not Found` – Variant or product not found
+  - `500 Internal Server Error` – Image upload or update error
+
+---
+
+### 11. Delete Product Variants (Bulk)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/fitnearn/web/admin/store/deleteManyVariants`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_PRODUCT`
+
+- **Request Body**:
+
+  ```json
+  {
+    "variantIds": ["VAR1234", "VAR5678"]
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Variants deleted and references removed from products",
+    "deletedCount": 2,
+    "updatedProducts": 1
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – No variant IDs provided
+  - `404 Not Found` – No matching variants found
+  - `500 Internal Server Error` – Server error during deletion
+
+---
+
+## Order Management
+
+These endpoints are for Order Management and Task Management.
+
+
+### 1. Get Order List
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getOrderList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_ORDERS`
+
+- **Query Parameters**:
+
+  - `orderId` (optional)
+  - `customerName` (optional)
+  - `date` (optional) - Format: YYYY-MM-DD
+  - `paymentStatus` (optional)
+  - `fullfillment` (optional)
+  - `deliveryStatus` (optional)
+
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "orderId": "ORD123",
+        "customerName": "John Doe",
+        "paymentStatus": "Paid",
+        "deliveryStatus": "Delivered",
+        "amount": 499,
+        "fullfillment": "Fullfilled",
+        "date": "2024-06-17T09:00:00Z",
+        "userId": "USR001"
+      }
+    ]
+  }
+  ```
+
+---
+
+### 2. Get Order Detail
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/:userId/getOrderDetail/:orderId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "isActive": true,
+      "orderId": "ORD123",
+      "state": "NEW",
+      "createdAt": "2024-06-17T09:00:00Z",
+      "assignedTo": "Jane Admin",
+      "assignedToId": "USR123",
+      "status": "Delivered",
+      "orderPlacedAt": "2024-06-17T09:00:00Z",
+      "paymentStatus": "Paid",
+      "productsDetails": [
+        {
+          "productId": "PROD001",
+          "category": "Fitness",
+          "quantity": 1,
+          "size": "M",
+          "color": "Red"
+        }
+      ],
+      "paymentDetails": { ... },
+      "customerDetails": { ... },
+      "timelines": [ ... ],
+      "tasks": [ ... ]
+    }
+  }
+  ```
+
+---
+
+### 3. Add Task
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addEditTask`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_TASK`
+
+- **Request Body**:
+
+  ```json
+  {
+    "orderId": "ORD123",
+    "taskDetail": "Packing the order",
+    "assignedTo": "USR456",
+    "isActive": true,
+    "taskType": "PROCESSING"
+  }
+  ```
+
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "PROCESSING is created successfully",
+    "taskId": "TASK4567"
+  }
+  ```
+
+---
+
+### 4. Close Task
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/closeTask/:taskId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CLOSE_TASK`
+
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Task TASK1234 is closed successfully"
+  }
+  ```
+
+---

@@ -1,0 +1,1077 @@
+***
+
+# Studio Management API Documentation
+
+This document outlines the API endpoints for Studio Management in the FitEarn application.
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/studio
+```
+
+## Endpoints
+
+---
+
+### 1. Get Studio List
+
+- **Method**: `GET`
+- **Endpoint**: `/studioList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIOS`
+
+- **Query Parameters** (all optional):
+
+  - `studioId`: (string)
+  - `ownerId`: (string)
+  - `name`: (string)
+  - `city`: (string)
+  - `ownerName`: (string)
+  - `services`: (string, comma-separated)
+  - `studioType`: (string, comma-separated)
+  - `status`: (string)
+  - `sortBy`: (`A-Z` | `Z-A`)
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "studioId": "STU001",
+        "name": "StudioX",
+        "status": "Active",
+        "ownerName": "John Doe",
+        "ownerId": "OWN001",
+        "city": "Delhi",
+        "studioType": ["Yoga"],
+        "services": ["Cardio", "Meditation"],
+        "createdAt": "2024-05-01T08:30:00Z"
+      }
+    ],
+    "totalStudios": 1
+  }
+  ```
+
+- **Error Responses**:
+  - `500 Internal Server Error` – DB or fetch error
+
+---
+
+### 2. Get Studio By ID
+
+- **Method**: `GET`
+- **Endpoint**: `/details/:studioId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO`
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio data fetched successfully",
+    "data": {
+      "studio": {
+        "studioId": "STU001",
+        "name": "StudioX",
+        "address": "Locality, City, Pincode",
+        "geometry": { "lat": 28.123, "lng": 77.123 },
+        "certificates": [
+          { "certificateId": "CERT01", "certificateURL": "https://s3..." }
+        ]
+      },
+      "comments": {
+        "approvalComments": [],
+        "rejectionComments": [],
+        "cancelledComments": []
+      }
+    }
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB error
+
+---
+
+### 3. Edit Studio
+
+- **Method**: `PATCH`
+- **Endpoint**: `/edit`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO`
+
+- **Request Body**:
+
+  ```json
+  {
+    "studioId": "STU001",
+    "updates": {
+      "name": "Updated Name",
+      "status": "Inactive"
+    }
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio updated successfully",
+    "data": {updated studio object}
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB update error
+
+---
+
+### 4. Delete Studio (Single)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/delete/:studioId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO`
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio and all associated data deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB or cascade deletion error
+
+---
+
+### 5. Delete Studios (Bulk)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deleteMany`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO`
+
+- **Request Body**:
+
+  ```json
+  {
+    "studioIds": ["STU001", "STU002"]
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studios and related data deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – Empty or invalid studioIds array
+  - `500 Internal Server Error` – Cascade deletion or DB error
+
+---
+
+# Studio Booking Management
+
+This section outlines the API endpoints for managing **studio booking sessions** in the FitnEarn platform.
+
+---
+
+### 1. Get Studio Session List
+
+- **Method**: `GET`
+- **Endpoint**: `/sessionList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIO_BOOKINGS`
+
+- **Query Parameters (optional)**:
+
+  - `sortBy`: `A-Z | Z-A`
+  - `startDate`, `endDate`: `YYYY-MM-DD`
+  - `stage`: (string) Session status
+  - `category`: (string)
+  - `categories`: (comma-separated string)
+  - `bookingType`: (string)
+  - `bookingId`: (string)
+  - `studioId`: (string)
+  - `ownerId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "bookedSessions": [ ... ],
+  "totalSessions": 5,
+  "message": "Booking Sessions fetched successfully"
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request` – Invalid date range
+  - `404 Not Found` – No sessions matched
+  - `500 Internal Server Error` – Unexpected failure
+
+---
+
+### 2. Get Studio Session By ID
+
+- **Method**: `GET`
+- **Endpoint**: `/session/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_BOOKING`
+
+- **Path Parameters**:
+
+  - `sessionId`: (string) Session ID
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "bookingId": "SESSION1234",
+    "studioId": "STU1234",
+    "category": "Yoga",
+    "sessionStartTime": "2024-01-01T08:00:00Z",
+    "status": "Completed",
+    "creator": { ... },
+    "userPaymentInfo": [ ... ],
+    "participants": [ ... ],
+    "refunds": [ ... ],
+    "paymentComments": [],
+    ...
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session or Booking not found
+  - `500 Internal Server Error` – Internal error
+
+---
+
+### 3. Edit Studio Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/session/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO_BOOKING`
+
+- **Request Body**:
+
+```json
+{
+  "sessionId": "SESSION1234",
+  "updates": {
+    "status": "Cancelled",
+    "category": "Fitness"
+  }
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session updated successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session not found
+  - `500 Internal Server Error` – Update error
+
+---
+
+### 4. Delete Studio Session
+
+- **Method**: `DELETE`
+- **Endpoint**: `/session/delete/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO_BOOKING`
+
+- **Path Parameters**:
+
+  - `sessionId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio session and all associated data deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session not found
+  - `500 Internal Server Error` – Deletion failed
+
+---
+
+# Live Session Management
+
+This section outlines the API endpoints for managing **studio live sessions** in the FitnEarn platform.
+
+---
+
+### 1. Create Live Session Draft
+
+**Method**: `POST`
+
+**Endpoint**: `/LS/create`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+
+**Request Body**:
+
+```json
+{
+  "ownerId": "USR00001",
+  "sessionName": "Morning Yoga",
+  "description": "Energizing morning yoga session",
+  "studioId": "STUDIO001",
+  "intensity": "Medium",
+  "calories": 300,
+  "equipment": "Yoga Mat",
+  "thumbnail": "image-url",
+  "sessionType": "Yoga",
+  "category": "Fitness",
+  "level": "Beginner",
+  "focusArea": "Flexibility",
+  "sessionDate": "2025-07-10",
+  "sessionTime": "06:00 AM",
+  "duration": 60,
+  "sessionLink": "https://zoom.us/123",
+  "address": "Online"
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Morning Yoga is Created",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Studio not found
+`500 Internal Server Error` – Creation failed
+
+---
+
+### 2. Send Live Session for Review
+
+**Method**: `PATCH`
+
+**Endpoint**: `/LS/sendForReview/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session submitted for review",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 3. Request for Live Session Approval
+
+**Method**: `PATCH`
+
+**Endpoint**: `/LS/requestForApproval/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `ASSIGN_REVIEWER`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Request Body**:
+
+```json
+{
+  "reviewerId": "USR00002",
+  "reason": "Content looks good",
+  "isVisible": true
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Reviewer assigned successfully",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Failed to update
+
+---
+
+### 4. Approve or Reject Live Session
+
+**Method**: `PATCH`
+
+**Endpoint**: `/LS/approve/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `ASSIGN_APPROVER`
+
+\*Path Parameters\*\*:
+
+`sessionId`: (string)
+
+**Request Body**:
+
+```json
+{
+  "seats": 10,
+  "price": 200,
+  "discountRate": 10,
+  "reason": "Looks professional",
+  "approverId": "USR00003",
+  "type": "approve",
+  "isVisible": true
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session approve successfully",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`400 Bad Request` – Invalid type
+`500 Internal Server Error` – Update failed
+
+---
+
+### 5. Cancel Live Session
+
+**Method**: `PATCH`
+
+**Endpoint**: `/LS/cancel/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `CANCEL_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Request Body**:
+
+```json
+{
+  "reason": "Low registrations",
+  "adminId": "USR00004",
+  "isVisible": true
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session cancelled successfully with Reason",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 6. Edit Live Session
+
+**Method**: `PATCH`
+
+**Endpoint**: `/LS/edit/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `EDIT_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Request Body**: _(Only editable fields depending on session state)_
+
+```json
+{
+  "duration": 90,
+  "focusArea": "Strength",
+  "address": "New Studio Location"
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session updated successfully.",
+  "sessionId": "LSS00001"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 7. Copy Live Session
+
+**Method**: `POST`
+
+**Endpoint**: `/LS/copy/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session copied successfully",
+  "sessionId": "LSS00002"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Copy failed
+
+---
+
+### 8. Get Live Session by ID
+
+**Method**: `GET`
+
+**Endpoint**: `/LS/getDetail/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `READ_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": { ... },
+    "comments": { ... }
+  }
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 9. Get All Live Sessions (Filterable)
+
+**Method**: `GET`
+
+**Endpoint**: `/LS/list`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `GET_STUDIO_LIVE_SESSIONS`
+
+**Query Params**:
+
+`sortBy`: `A-Z` | `Z-A`
+`startDate`, `endDate`: Date range
+`sessionId`, `studioId`, `ownerId`, `sessionName`, `category`, `stage`, `stages`
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": [ { ...sessionData } ],
+  "totalSessions": 5
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – No matching sessions
+`500 Internal Server Error` – Query failed
+
+---
+
+### 10. Delete Live Session
+
+**Method**: `DELETE`
+
+**Endpoint**: `/LS/delete/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `DELETE_STUDIO_LIVE_SESSION`
+
+**Path Parameters**:
+
+`sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Live session and all associated data deleted successfully"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Deletion failed
+
+---
+
+# Owner Profile Management
+
+This section outlines the API endpoints for managing **studio owners** in the FitnEarn platform.
+
+---
+
+### 1. Get Studio Owner List
+
+**Method**: `GET`
+
+**Endpoint**: `/profileList`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `GET_OWNERS`
+
+**Query Parameters (Optional)**:
+
+`ownerId`: string
+`ownerName`: string
+`studioName`: string
+`city`: string
+`status`: string
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": [ {owner data} ],
+  "totalProfiles": 2
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – No owners found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 2. Get Studio Owner By ID
+
+**Method**: `GET`
+
+**Endpoint**: `/profileDetail/:ownerId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `READ_OWNER`
+
+**Path Parameters**:
+
+`ownerId`: string
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "profile": {profile object},
+    "reason": {
+      "ownerId": "string",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Profile not found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 3. Delete Studio Owner
+
+**Method**: `DELETE`
+
+**Endpoint**: `/profile/delete/:ownerId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `DELETE_OWNER`
+
+**Path Parameters**:
+
+`ownerId`: string
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio owner and all associated data deleted successfully"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Owner not found
+`500 Internal Server Error` – Deletion failed
+
+---
+
+### 4. Edit Studio Owner Profile
+
+**Method**: `PATCH`
+
+**Endpoint**: `/profile/edit/:ownerId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `EDIT_OWNER`
+
+**Path Parameters**:
+
+`ownerId`: string
+
+**Request Body**:
+
+```json
+{
+  "name": "string",
+  "about": "string",
+  "livePerSession": number,
+  "bookingPerSession": number
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Owner profile updated successfully",
+  "data": {
+    "ownerId": "string",
+    "name": "string",
+    "about": "string",
+    "livePerSession": number,
+    "bookingPerSession": number
+  }
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Profile not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 5. Get All KYC Profiles
+
+**Method**: `GET`
+
+**Endpoint**: `/kyc/profileList`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `VIEW_KYC`
+
+**Query Parameters (Optional)**:
+
+`name`: string
+`userId`: string
+`kycTokenId`: string
+`nationality`: string
+`stage`: string
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": [ {KYC profile} ],
+  "totalProfiles": 2
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – No KYC profile found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 6. Get KYC Profile Detail
+
+**Method**: `GET`
+
+**Endpoint**: `/kyc/profileDetail/:ownerId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `READ_KYC`
+
+**Path Parameters**:
+
+`ownerId`: string
+
+**Query Parameters (Optional)**:
+
+`decrypt`: boolean (to get decrypted values and S3 URLs)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "response": {
+      "status": "Verified",
+      "approver": { "USR_ID": "string", "name": "string" },
+      "stage": "Approved",
+      "holderName": "string",
+      "kycTokenId": "string",
+      "ownerId": "string",
+      "phoneNumber": "string",
+      "nationality": "Indian",
+      "refId": "N/A",
+      "profileImage": "url",
+      "accountNumber": "***********",
+      "ifscCode": "***********",
+      "payPalId": "***********",
+      "idProof": { "frontImageUrl": "url", "backImageUrl": "url" },
+      "panCard": { "frontImageUrl": "url", "backImageUrl": "url" }
+    },
+    "reason": {
+      "ownerId": "string",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Profile not found
+`500 Internal Server Error` – Fetch failed
+
+---
+
+# Analytics API Management
+
+This section outlines the API endpoints for managing **Analytics of sessions** in the FitnEarn platform.
+
+---
+
+### 1. Get Studio Analytics by Owner
+
+**Method**: `GET`
+
+**Endpoint**: `/analytics/:ownerId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `GET_ANALYTICS`
+
+**Path Parameters**:
+
+  `ownerId`: `string` – Unique ID of the studio owner
+
+**Query Parameters** (optional):
+
+  `range`: `string` – Can be `lastWeek`, `lastMonth`, or `allTime` (default: `lastWeek`)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "range": "lastWeek",
+    "liveSessions": {
+      "totalSessions": { "current": 5, "previous": 3, "percentageChange": 66.67 },
+      "completedSessions": { "current": 3, "previous": 2, "percentageChange": 50 },
+      "upcomingSessions": { "current": 1, "previous": 1, "percentageChange": 0 },
+      "underReviewSessions": { "current": 0, "previous": 1, "percentageChange": -100 },
+      "cancelledSessions": { "current": 1, "previous": 0, "percentageChange": 100 },
+      "deniedSessions": { "current": 0, "previous": 0, "percentageChange": 0 }
+    },
+    "bookingSessions": {
+      "totalSessions": { "current": 10, "previous": 7, "percentageChange": 42.86 },
+      "completedSessions": { "current": 6, "previous": 5, "percentageChange": 20 },
+      "upcomingSessions": { "current": 2, "previous": 1, "percentageChange": 100 },
+      "rejectedSessions": { "current": 1, "previous": 0, "percentageChange": 100 },
+      "cancelledSessions": { "current": 1, "previous": 1, "percentageChange": 0 }
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+  `404 Not Found` – Owner or sessions not found
+  `500 Internal Server Error` – Something went wrong
+
+---
+
+### 2. Get Live Session Analytics by Session ID
+
+**Method**: `GET`
+
+**Endpoint**: `/analytics/LS/:sessionId`
+
+**Authentication**: `authenticateAdminToken`
+
+**Authorization**: `GET_ANALYTICS`
+
+**Path Parameters**:
+
+  `sessionId`: `string` – Unique ID of the live session
+
+**Query Parameters** (optional):
+
+  `range`: `string` – `lastWeek`, `lastMonth`, `allTime`, or `custom`
+  `startDate`: `string` (if `range=custom`)
+  `endDate`: `string` (if `range=custom`)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "range": "lastWeek",
+    "totalSeats": 50,
+    "totalBookedSeats": 35,
+    "totalLikes": 10,
+    "totalShares": 3,
+    "totalAttended": 28,
+    "totalNotAttended": 7,
+    "usersWhoBooked": [
+      {
+        "userId": "USR001",
+        "bookingId": "BOOK001",
+        "name": "John Doe",
+        "date": "2025-06-01T12:00:00Z"
+      }
+    ],
+    "usersWhoCancelled": [
+      {
+        "userId": "USR002",
+        "bookingId": "BOOK002",
+        "name": "Jane Smith",
+        "date": "2025-06-02T12:00:00Z"
+      }
+    ],
+    "usersWhoAttended": [same format as usersWhoBooked],
+    "usersWhoDidNotAttend": [same format as usersWhoBooked]
+  }
+}
+```
+
+**Error Responses**:
+
+  `404 Not Found` – Session not found
+  `500 Internal Server Error` – Failed to retrieve analytics
+
+---
