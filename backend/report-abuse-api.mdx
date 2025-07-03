@@ -1,0 +1,241 @@
+# Report Management API Documentation
+
+This document outlines the API endpoints for managing reports in the FitEarn application, designed for administrative use.
+
+## Base URL
+```
+/api/fitnearn/web/admin/reports
+```
+
+## Endpoints
+
+### 1. Get All Reports
+
+Retrieves a list of all reports with optional filters for date range, responsible person, and stage.
+
+- **Method**: GET
+- **Endpoint**: `/`
+- **Query Parameters**:
+  - `startDate` (string, optional): Start date in `DD-MM-YYYY` format.
+  - `endDate` (string, optional): End date in `DD-MM-YYYY` format.
+  - `responsiblePerson` (string, optional): User ID of the responsible person.
+  - `stage` (string, optional): Report stage (e.g., "Pending", "Responded").
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/reports?startDate=01-01-2025&endDate=15-01-2025&stage=Pending
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "reportId": "string",
+          "contentType": "string",
+          "contentId": "string",
+          "reports": [
+            {
+              "userId": "string",
+              "userName": "string",
+              "emailId": "string",
+              "comment": "string",
+              "dateTime": "DD-MM-YYYY",
+              "stage": "string",
+              "urgencyLevel": "string",
+              "isAdmin": boolean
+            }
+          ]
+        }
+      ]
+    }
+    ```
+  - **Error Response**:
+    - **Status**: 500 Internal Server Error
+    - **Body**:
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching reports: [error message]"
+      }
+      ```
+
+### 2. Get Report by ID
+
+Fetches details of a specific report by its ID, including the initial report and any responses.
+
+- **Method**: GET
+- **Endpoint**: `/:reportId`
+- **Path Parameters**:
+  - `reportId` (string): Unique identifier for the report.
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/reports/12345
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "reportId": "string",
+        "contentType": "string",
+        "contentId": "string",
+        "reportData": {
+          "userId": "string",
+          "userName": "string",
+          "emailId": "string",
+          "dateTime": "string",
+          "comment": "string",
+          "stage": "string",
+          "isAdmin": boolean
+        },
+        "responses": [
+          {
+            "userId": "string",
+            "userName": "string",
+            "emailId": "string",
+            "dateTime": "string",
+            "comment": "string",
+            "stage": "string",
+            "isAdmin": boolean
+          }
+        ]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Report not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error fetching report: [error message]"
+      }
+      ```
+
+### 3. Delete Report by ID
+
+Deletes a specific report by its ID.
+
+- **Method**: DELETE
+- **Endpoint**: `/:reportId`
+- **Path Parameters**:
+  - `reportId` (string): Unique identifier for the report.
+
+- **Request Example**:
+  ```
+  DELETE /api/fitnearn/web/admin/reports/12345
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report deleted successfully"
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Report not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error deleting report: [error message]"
+      }
+      ```
+
+### 4. Respond to Report
+
+Adds a response to an existing report, updating its stage and details.
+
+- **Method**: POST
+- **Endpoint**: `/:reportId/respond`
+- **Path Parameters**:
+  - `reportId` (string): Unique identifier for the report.
+- **Request Body**:
+  ```json
+  {
+    "urgencyLevel": "low | moderate | high",
+    "responsiblePerson": "string",
+    "response": "string",
+    "isAdmin": boolean
+  }
+  ```
+
+- **Request Example**:
+  ```
+  POST /api/fitnearn/web/admin/reports/12345/respond
+  Content-Type: application/json
+  {
+    "urgencyLevel": "high",
+    "responsiblePerson": "admin123",
+    "response": "Issue addressed.",
+    "isAdmin": true
+  }
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Response added successfully",
+      "data": {
+        "reportId": "string",
+        "contentType": "string",
+        "contentId": "string",
+        "reportDetails": [
+          {
+            "userId": "string",
+            "comment": "string",
+            "stage": "string",
+            "urgencyLevel": "string",
+            "timestamp": "ISODate"
+          }
+        ]
+      }
+    }
+    ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      {
+        "success": false,
+        "message": "Report not found"
+      }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      {
+        "success": false,
+        "message": "Error responding to report: [error message]"
+      }
+      ```
+
+## Notes
+- All endpoints require appropriate authentication and authorization for administrative access.
+- Dates in responses are formatted as `DD-MM-YYYY` unless otherwise specified.
+- The `isAdmin` field indicates whether the user is an admin (non-ObjectId userId).
+- Error logging is handled via a configured MongoDB transport logger.

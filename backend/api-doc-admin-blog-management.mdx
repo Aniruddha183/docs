@@ -1,0 +1,384 @@
+---
+title: "Api Documentation Admin Blog Management"
+description: "REST API reference for managing Blogs by Admins in FitnEarn."
+---
+
+# Admin Blog Management API
+
+This document outlines the API endpoints available to **admins** for managing content such as **User/Coach/Admin created Blogs** within the FitnEarn system.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/blog
+```
+
+
+## Middleware
+
+### `authenticateAdminToken`
+
+- **Purpose**: Authenticates admin users using a JWT (`gentoken` header).
+- **How it works**:  
+  - Verifies the JWT.
+  - Checks for a valid session in the database.
+  - Loads the admin user and attaches it to `req.adminUser`.
+- **Failure**: Returns 401 if token is missing, expired, or user/session is invalid.
+
+### `authorize(requiredActionKey)`
+
+- **Purpose**: Authorizes admin users based on RBAC and permission boundaries.
+- **How it works**:
+  - Checks if the user has the required action key (e.g., `CREATE_BLOG`, `REVIEW_BLOG`).
+  - Handles special cases for `SUPERADMIN` and `ACCESSMANAGER` roles.
+  - Ensures the user has the corresponding `_VIEW` permission before allowing higher-level actions.
+  - Denies access if the action is restricted by the user's permission boundaries.
+- **Failure**: Returns 403 if the user lacks the required permission.
+
+### `multer.single(field)`
+
+- **Purpose**: Handles file uploads (e.g., `thumbnail`, `image`) in multipart/form-data requests.
+
+---
+
+## Utility Functions
+
+### `uploadImage`
+
+- **Purpose**: Uploads an image to AWS S3 using temporary AWS credentials.
+- **How it works**:
+  - Verifies the provided Cognito `id_token` (from `Authorization` header).
+  - If expired, uses `x-refresh-token` and `x-username` to refresh the token.
+  - Obtains temporary AWS credentials and uploads the image to S3.
+  - Returns the S3 URL and key.
+- **Required headers**:  
+  - `Authorization: Bearer <id_token>`
+  - `x-refresh-token`
+  - `x-username`
+
+### `deleteImageFromS3`
+
+- **Purpose**: Deletes an image from AWS S3 by its key.
+- **How it works**:  
+  - Uses AWS SDK to delete the object from the specified S3 bucket.
+
+---
+
+## Endpoints
+
+### 1. Create Draft Blog
+
+Creates a new draft blog or updates an existing one.
+
+- **Method**: `POST`
+- **URL**: `/save-draft`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_BLOG`
+- **Middleware**: `multer.single('thumbnail')`
+- **Controller**: `adminCreateDraftBlog`
+- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `title`, `category`, `readTime`, `adminId`, `blogHeading`, `tags`, `thumbnailURL`, `thumbnailKey`, `stage`
+  - File: `thumbnail` (image)
+
+---
+
+### 2. Upload Blog Image
+
+Uploads an image file to S3 for a blog.
+
+- **Method**: `POST`
+- **URL**: `/upload-file`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_BLOG`
+- **Middleware**: `multer.single('image')`
+- **Controller**: `uploadFile`
+- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `adminId`, `blogId`
+  - File: `image` (image)
+
+---
+
+### 3. Reviewer Review Blog
+
+Adds reviewer comments and sets blog status to `pending approval`.
+
+- **Method**: `POST`
+- **URL**: `/review-blog`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `REVIEW_BLOG`
+- **Controller**: `reviewerAdminReview`
+- **Headers**: `gentoken`
+
+---
+
+### 4. Version Blog
+
+Creates a new version of a blog.
+
+- **Method**: `POST`
+- **URL**: `/version-blog/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VERSION_BLOG`
+- **Controller**: `versionBlog`
+- **Headers**: `gentoken`
+
+---
+
+### 5. Approver Review Blog
+
+Approves, denies, or retires a blog and adds approver comments.
+
+- **Method**: `PATCH`
+- **URL**: `/approver-review`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `APPROVE_BLOG`
+- **Controller**: `approverAdminReview`
+- **Headers**: `gentoken`
+
+---
+
+### 6. Update Blog Status
+
+Updates the status, comments, and state of a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/publish/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_BLOG`
+- **Controller**: `updateBlogStatus`
+- **Headers**: `gentoken`
+
+---
+
+### 7. Approve Edit Request
+
+Approves edit access to a requested blog.
+
+- **Method**: `PATCH`
+- **URL**: `/edit/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `APPROVE_EDIT`
+- **Controller**: `giveEditRequest`
+- **Headers**: `gentoken`
+
+---
+
+### 8. Update Blog Content
+
+Updates the content of a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/update`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_BLOG`
+- **Controller**: `updateBlog`
+- **Headers**: `gentoken`
+
+---
+
+### 9. Save Blog Post (Send for Review)
+
+Removes deleted images from S3 and sends blog for review.
+
+- **Method**: `PATCH`
+- **URL**: `/save/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_BLOG`
+- **Controller**: `saveBlogPost`
+- **Headers**: `gentoken`
+
+---
+
+### 10. Edit Admin Comment
+
+Edits a reviewer or approver comment.
+
+- **Method**: `PATCH`
+- **URL**: `/edit-comment`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_COMMENT`
+- **Controller**: `editComment`
+- **Headers**: `gentoken`
+
+---
+
+### 11. Assign Reviewer
+
+Assigns a reviewer admin to a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/assign-reviewer`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER`
+- **Controller**: `assignReviewer`
+- **Headers**: `gentoken`
+
+---
+
+### 12. Assign Approver
+
+Assigns an approver admin to a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/assign-approver`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_APPROVER`
+- **Controller**: `assignApprover`
+- **Headers**: `gentoken`
+
+---
+
+### 13. Get All Blogs
+
+Fetches all blogs from the Blog model.
+
+- **Method**: `GET`
+- **URL**: `/get`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_BLOGS`
+- **Controller**: `getAllBlogs`
+- **Headers**: `gentoken`
+
+---
+
+### 14. Get Blog By ID
+
+Fetches a blog by its blogId.
+
+- **Method**: `GET`
+- **URL**: `/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_BLOG`
+- **Controller**: `getBlogByBlogId`
+- **Headers**: `gentoken`
+
+---
+
+### 15. Get Blogs Under Review
+
+Fetches all blogs currently under admin review.
+
+- **Method**: `GET`
+- **URL**: `/get/review`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_BLOGS`
+- **Controller**: `getBlogsUnderReview`
+- **Headers**: `gentoken`
+
+---
+
+### 16. Get Blogs Requested for Edit
+
+Fetches all blog requests for edit after sent for review.
+
+- **Method**: `GET`
+- **URL**: `/get/edit`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_BLOGS`
+- **Controller**: `getEditRequest`
+- **Headers**: `gentoken`
+
+---
+
+### 17. Get Blogs Requested for Deletion
+
+Fetches all blog requests for deletion.
+
+- **Method**: `GET`
+- **URL**: `/get/delete`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_BLOGS`
+- **Controller**: `getDeleteRequestedBlogs`
+- **Headers**: `gentoken`
+
+---
+
+### 18. Get Admin Review Comments
+
+Fetches all admin review comments for a blog.
+
+- **Method**: `GET`
+- **URL**: `/get-comments/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_COMMENTS`
+- **Controller**: `getAdminComments`
+- **Headers**: `gentoken`
+
+---
+
+### 19. Get All Versioned Blogs
+
+Fetches all blogs with versioning information.
+
+- **Method**: `GET`
+- **URL**: `/get-versioned-blogs`
+- **Controller**: `getAllBlogsWithFilter`
+
+---
+
+### 20. Delete Blog
+
+Soft deletes a blog (marks as deleted).
+
+- **Method**: `DELETE`
+- **URL**: `/delete/:blogId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_BLOG`
+- **Controller**: `adminDeleteBlog`
+- **Headers**: `gentoken`
+
+---
+
+### 21. Delete Admin Comment
+
+Deletes a reviewer or approver comment.
+
+- **Method**: `DELETE`
+- **URL**: `/delete-comment`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_COMMENT`
+- **Controller**: `deleteAdminComment`
+- **Headers**: `gentoken`
+
+---
+
+## Notes
+
+- All routes are secured by `authenticateAdminToken` and require a valid `gentoken` header.
+- Each route uses `authorize(permission)` middleware to ensure RBAC.
+- File upload endpoints require additional Cognito tokens for AWS S3 access.
+- Blog versioning and review workflows are supported.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                        | Description                        | Required Headers                |
+|--------|---------------------------------|------------------------------------|---------------------------------|
+| POST   | `/save-draft`                   | Create or update draft blog        | gentoken, Authorization, x-refresh-token, x-username |
+| POST   | `/upload-file`                  | Upload blog image                  | gentoken, Authorization, x-refresh-token, x-username |
+| POST   | `/review-blog`                  | Reviewer review blog               | gentoken                        |
+| POST   | `/version-blog/:blogId`         | Version blog                       | gentoken                        |
+| PATCH  | `/approver-review`              | Approver review blog               | gentoken                        |
+| PATCH  | `/publish/:blogId`              | Update blog status                 | gentoken                        |
+| PATCH  | `/edit/:blogId`                 | Approve edit request               | gentoken                        |
+| PATCH  | `/update`                       | Update blog content                | gentoken                        |
+| PATCH  | `/save/:blogId`                 | Save blog post (send for review)   | gentoken                        |
+| PATCH  | `/edit-comment`                 | Edit admin comment                 | gentoken                        |
+| PATCH  | `/assign-reviewer`              | Assign reviewer                    | gentoken                        |
+| PATCH  | `/assign-approver`              | Assign approver                    | gentoken                        |
+| GET    | `/get`                          | Get all blogs                      | gentoken                        |
+| GET    | `/:blogId`                      | Get blog by ID                     | gentoken                        |
+| GET    | `/get/review`                   | Get blogs under review             | gentoken                        |
+| GET    | `/get/edit`                     | Get blogs requested for edit       | gentoken                        |
+| GET    | `/get/delete`                   | Get blogs requested for deletion   | gentoken                        |
+| GET    | `/get-comments/:blogId`         | Get admin review comments          | gentoken                        |
+| GET    | `/get-versioned-blogs`          | Get all versioned blogs            | gentoken                        |
+| DELETE | `/delete/:blogId`               | Delete blog                        | gentoken                        |
+| DELETE | `/delete-comment`               | Delete admin comment               | gentoken                        |
+
+---

@@ -1,0 +1,173 @@
+***
+
+# Authentication API Documentation
+
+This document outlines the API endpoints for admin authentication, session management, login, and logout for the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/admin/auth
+```
+
+## Endpoints
+
+### 1. Admin Login
+
+Handles admin login using email and password. It verifies credentials against AWS Cognito, establishes a session, and returns a JWT. Supports a "Remember Me" feature for extended session duration.
+
+- **Method**: `POST`
+- **Endpoint**: `/login`
+- **Authentication**: None.
+- **Request Body**:
+  ```json
+  {
+    "email": "admin@example.com",
+    "password": "YourSecurePassword",
+    "fcmToken": "firebase-cloud-messaging-token",
+    "rememberMe": true
+  }
+  ```
+  - `email` (string, required): The admin's email address.
+  - `password` (string, required): The admin's password.
+  - `fcmToken` (string, optional): The Firebase Cloud Messaging token for push notifications.
+  - `rememberMe` (boolean, optional): If `true`, the session will last longer (e.g., 7 days). Defaults to `false` (e.g., 1 day).
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Admin user signed in successfully",
+      "genToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "userData": {
+        "USR_ID": "ADM-001",
+        "name": "Admin User",
+        "email": "admin@example.com",
+        "role": "SUPERADMIN"
+      },
+      "sessionInfo": {
+        "rememberMe": true,
+        "expiresIn": "7 days"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Email and password are required" }
+    ```
+  - **Status**: 401 Unauthorized
+    ```json
+    { "success": false, "message": "Invalid credentials - Cognito verification failed" }
+    ```
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Admin user not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error: [error message]" }
+    ```
+
+### 2. Admin Logout
+
+Logs out an admin by revoking their current session JWT and deleting the session record from the database.
+
+- **Method**: `POST`
+- **Endpoint**: `/logout`
+- **Authentication**: Requires a valid session token (implicitly, to identify the session to be destroyed).
+- **Request Body**:
+  ```json
+  {
+    "email": "admin@example.com"
+  }
+  ```
+  - `email` (string, required): The email of the admin user to log out.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Logout successful"
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 401 Unauthorized
+    ```json
+    { "success": false, "message": "Email not provided" }
+    ```
+    ```json
+    { "success": false, "message": "User not found" }
+    ```
+    ```json
+    { "success": false, "message": "Session not found for this user" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Failed to revoke token" }
+    ```
+    ```json
+    { "success": false, "message": "Failed to delete session" }
+    ```
+
+### 3. Check Session Validity
+
+Validates a provided session JWT. If the session has the "Remember Me" flag and the token is expired (but the overall session is not), it will automatically refresh the token.
+
+- **Method**: `GET`
+- **Endpoint**: `/check-session-validity`
+- **Authentication**: None (the token provided in the query is what's being checked).
+- **Query Parameters**:
+  - `token` (string, required): The JWT from a user's session to be validated.
+- **Response (Valid Session)**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Session is valid",
+      "tokenRefreshed": false,
+      "sessionInfo": {
+        "rememberMe": false,
+        "expiresAt": "2023-10-28T12:00:00.000Z"
+      }
+    }
+    ```
+- **Response (Refreshed Session)**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Session is valid and token refreshed",
+      "newToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new...",
+      "tokenRefreshed": true,
+      "sessionInfo": {
+        "rememberMe": true,
+        "expiresAt": "2023-11-03T12:00:00.000Z"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Token is required and must be a string" }
+    ```
+  - **Status**: 401 Unauthorized
+    ```json
+    { "success": false, "message": "Session is invalid or expired" }
+    ```
+    ```json
+    { "success": false, "message": "Token is revoked or expired" }
+    ```
+    ```json
+    { "success": false, "message": "Token has expired" }
+    ```
+    ```json
+    { "success": false, "message": "Remember me session has expired" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error" }
+    ```

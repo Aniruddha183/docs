@@ -1,0 +1,1327 @@
+---
+title: 'Newsletter API Documentation'
+description: 'End-to-end guide to managing mailing groups in Zoho, creating SES templates, scheduling newsletters, and dispatching e-mail via SNS/SQS/Lambda'
+---
+
+# Newsletter Service Overview
+
+This module lets admins:
+
+1. **Create and manage Zoho Mail groups** (recipients live inside Zoho; metadata is mirrored in MongoDB).
+2. **Design templates** with the **ShootMail SDK + Amazon SES**, store them in MongoDB, and optionally schedule them.
+3. **Send newsletters** automatically through an SNS → SQS → Lambda fan-out.
+
+<Callout emoji="💡">
+All endpoints are protected by the existing JWT middleware (not shown here).  
+See the <Link to="/auth/overview">Auth guide</Link> for details.
+</Callout>
+
+---
+
+## 1 Configuration
+
+```typescript title="src/config/zohoGroupConfig.ts"
+import dotenv from 'dotenv';
+dotenv.config();
+
+/* General */
+export const PORT = 3000;
+
+/* Zoho OAuth */
+export const CLIENT_ID      = process.env.CLIENT_ID      ?? 'ZOHO_CLIENT_ID';
+export const CLIENT_SECRET  = process.env.CLIENT_SECRET  ?? 'ZOHO_CLIENT_SECRET';
+export const ZO_ID          = process.env.ZO_ID          ?? 'ZOHO_ORG_ID';
+export const REDIRECT_URI   = process.env.REDIRECT_URI   ?? 'http://localhost:3000/zoho/callback';
+
+export const ZOHO_OAUTH_AUTH_URL  = 'https://accounts.zoho.in/oauth/v2/auth';
+export const ZOHO_OAUTH_TOKEN_URL = 'https://accounts.zoho.in/oauth/v2/token';
+
+/* Scopes */
+export const scopes = [
+  'ZohoMail.organization.groups.CREATE',
+  'ZohoMail.organization.groups.READ',
+  'ZohoMail.organization.groups.UPDATE',
+  'ZohoMail.organization.groups.DELETE',
+  'ZohoMail.organization.accounts.CREATE',
+  'ZohoMail.organization.accounts.READ',
+  'ZohoMail.organization.accounts.UPDATE',
+  'ZohoMail.organization.accounts.DELETE',
+];
+export const scopeParam = encodeURIComponent(scopes.join(','));
+```
+
+
+## 2 Zoho OAuth token lifecycle
+<AccordionGroup>
+
+  <Accordion title="🔑 Initial bootstrap">
+    <Steps>
+      <Step title="Purpose">
+        Generates the very first pair of credentials
+        (<code>access_token</code> + <code>refresh_token</code>) for your Zoho
+        organisation and stores them in MongoDB.
+      </Step>
+
+      <Step title="Flow">
+        1. Build a Zoho consent URL with the correct scopes.  
+        2. Admin opens the link, approves access, and is redirected with
+           <code>?code=&lt;auth-code&gt;</code>.  
+        3. The CLI script exchanges that code for tokens using the Zoho OAuth
+           <code>/token</code> endpoint.  
+        4. Existing token documents are purged, then the new token set is saved
+           as a single row in <code>ZohoOrgTokenModel</code>.
+      </Step>
+
+      <Step title="When to run">
+        Only once per environment, or when you intentionally revoke the existing
+        refresh token inside the Zoho UI.
+      </Step>
+    </Steps>
+
+</Accordion>
+</AccordionGroup>
+```typescript title="utils/ZohoGroupService/addAccessTokenScript.ts"
+    import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
+import mongoose  from 'mongoose';
+import axios     from 'axios';
+import {
+  CLIENT_ID, CLIENT_SECRET, REDIRECT_URI,
+  ZOHO_OAUTH_AUTH_URL, ZOHO_OAUTH_TOKEN_URL, scopeParam,
+} from '../../src/config/zohoGroupConfig';
+import { ZohoOrgTokenModel } from '@fit-earn-meditate/backend-shared-models';
+
+(async () => {
+  await mongoose.connect(process.env.MONGO_URI!);
+
+  /* 1️⃣ ask user to approve */
+  const consent =
+    `${ZOHO_OAUTH_AUTH_URL}?client_id=${CLIENT_ID}` +
+    `&response_type=code&access_type=offline` +
+    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+    `&scope=${scopeParam}`;
+
+  console.log('\nOpen in browser and approve:\n', consent);
+
+  const rl   = readline.createInterface({ input, output });
+  const code = await rl.question('\nPaste Zoho ?code= here ➜ ');
+  rl.close();
+
+  if (!code) {
+    console.error('No code provided. Abort.');
+    process.exit(1);
+  }
+
+  /* 2️⃣ exchange for tokens */
+  const { data } = await axios.post(ZOHO_OAUTH_TOKEN_URL, null, {
+    params: {
+      code,
+      client_id    : CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      redirect_uri : REDIRECT_URI,
+      grant_type   : 'authorization_code',
+    },
+  });
+
+  /* 3️⃣ persist (replace any old row) */
+  await ZohoOrgTokenModel.deleteMany({});
+  await ZohoOrgTokenModel.create({
+    accessToken : data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt   : new Date(Date.now() + data.expires_in * 1000),
+  });
+
+  console.log('✅  Org token saved');
+  process.exit(0);
+})();
+```
+
+<Steps> 
+    <Step title="Purpose"> Keeps the stored <code>access_token</code> valid forever by refreshing it with the long-lived <code>refresh_token</code>. </Step>
+    <Step title="Logic">
+    * Checks the current document in <code>ZohoOrgTokenModel</code>.  
+    * If <code>expiresAt – now&nbsp;&lt;&nbsp;120 s</code> it calls
+      <code>/token?grant_type=refresh_token</code>.  
+    * Updates <code>accessToken</code> and <code>expiresAt</code> in place.  
+    * Returns the fresh token so callers can attach it to API requests.
+  </Step>
+
+  <Step title="Usage pattern">
+    Every helper that talks to Zoho imports
+    <code>getValidOrgAccessToken()</code>; no controller ever touches the
+    database directly.
+  </Step>
+</Steps>
+    
+## 3 Zoho HTTP helper
+
+`zohoRequest` is a lightweight wrapper around **Axios** that injects a fresh
+organisation access-token into every call and lets callers decide how to handle
+non-2xx status codes. The companion `orgUrl()` helper builds the base URL for
+any Zoho Mail Organisation API path.
+
+```typescript title="utils/ZohoGroupService/zohoService.ts"
+import axios, { AxiosResponse } from 'axios';
+import { getValidOrgAccessToken } from './orgTokenStore';
+import { ZO_ID } from '../../config/zohoGroupConfig';
+
+/**
+ * Generic request helper for the Zoho Organisation Mail API.
+ *
+ * @param method - HTTP verb
+ * @param url    - full URL or `orgUrl('/path')`
+ * @param data   - optional JSON body / query
+ */
+export async function zohoRequest<T>(
+  method: 'get' | 'post' | 'put' | 'delete',
+  url: string,
+  data?: unknown,
+): Promise<AxiosResponse<T>> {
+  const accessToken = await getValidOrgAccessToken();
+
+  return axios<T>({
+    method,
+    url,
+    data,
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    // always resolve; caller inspects status.code
+    validateStatus: () => true,
+  });
+}
+
+/** Convenience builder for any /api/organization endpoint */
+export const orgUrl = (path: string) =>
+  `https://mail.zoho.in/api/organization/${ZO_ID}/${path}`;
+```
+
+
+
+
+
+
+## 4 Group-management endpoints
+<AccordionGroup>
+    ---
+    ## Title: Create Newsletter Group         
+    ## Method: POST
+    ## Endpoint: /api/fitnearn/web/admin/groups/createGroups
+    ---
+
+    Creates (or **upserts**) a newsletter group in **Zoho Mail** and stores a
+    mapping record in the FitnEarn database.
+
+    ---
+
+    ## Request
+
+        ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/createGroups" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "Yoga-Enthusiasts",
+            "emailId": "yoga@fitnearn.com",
+            "mailGroupMemberList": ["alice@example.com", "bob@example.com"],
+            "description": "Daily yoga tips & discussions",
+            "createdBy": "admin_123"
+        }'
+        ```
+    ## Body Parameters
+        | Field               | Type      | Required | Description                                                 |
+        |--------------------|-----------|----------|-------------------------------------------------------------|
+        | `name`             | string    | ✅       | Friendly display name for the group                         |
+        | `emailId`          | string    | ✅       | Unique group email address that Zoho will assign            |
+        | `description`      | string    | ✅        | Longer description shown in the admin UI                    |
+        | `createdBy`        | string    | ✅       | User ID of the admin creating the group (stored for auditing)|
+
+    ## Responses
+
+        | Status | Description                                              |
+        |--------|----------------------------------------------------------|
+        | 200    | Group created / updated successfully                     |
+        | 400    | Validation failed (missing or invalid fields)            |
+        | 401    | Missing or invalid `Authorization` header                |
+        | 409    | A group with the same `emailId` already exists           |
+
+    #### 200 OK
+        ```bash
+            {
+                "zoho": {
+                    "status": {
+                    "code": 201,
+                    "description": "Created"
+                    },
+                    "data": {
+                    "zgid": 543210987,
+                    "name": "Yoga-Enthusiasts",
+                    "emailId": "yoga@fitnearn.com",
+                    "URI": "https://mail.zoho.com/groups/543210987"
+                    }
+                }
+            }
+        ```
+    #### 400 Bad Request
+        ```bash
+            { "error": "The field 'name' is required." }
+        ```
+
+    ---
+    ## Title: Add Group Members        
+    ## Method: PUT
+    ## Endpoint: /api/fitnearn/web/admin/groups/:zgid/addMembers
+    ---
+
+    Adds one or more members to an existing Zoho Mail newsletter group and
+    persists the member list in the FitnEarn database.
+
+    ---
+
+    ## Request
+
+        ```bash
+            curl "https://{your-host}/api/fitnearn/web/admin/groups/543210987/addMembers" \
+            -X PUT \
+            -H "Content-Type: application/json" \
+            -d '{
+                "mailGroupMemberList": [
+                { "memberEmailId": "alice@example.com" },
+                { "memberEmailId": "bob@example.com" }
+                ],
+                "membersNames": ["Alice Doe", "Bob Smith"]
+            }'
+
+        ```
+    ## Body Parameters
+        | Field               | Type      | Required | Description                                                 |
+        |--------------------|-----------|----------|-------------------------------------------------------------|
+        | `mailGroupMemberList`             | object[]    | ✅       | Array of objects, each with a `memberEmailId` key containing the new member’s email address.                         |
+        | `membersNames`                    | string[]    | ✅       | 	Parallel array of display names. If omitted, each name defaults to the part of the email before “@”.           |
+        
+
+    ## Responses
+
+        | Status | Description                                              |
+        |--------|----------------------------------------------------------|
+        | 200    | 	Members added successfully                    |
+        | 400    | Validation failed (missing or invalid fields)            |
+        | 401    | Missing or invalid `Authorization` header                |
+        | 409    | No newsletter group found for given `zgid`           |
+
+    #### 200 OK
+        ```bash
+            {
+                "status": {
+                    "code": 200,
+                    "description": "success"
+                },
+                "data": {
+                    "addedCount": 2,
+                    "groupId": 543210987
+                }
+            }
+
+        ```
+    #### 400 Bad Request
+        ```bash
+            { "error": "mailGroupMemberList must contain at least one member." }
+
+        ```
+
+
+    ---
+    ## Title: Remove Group Members
+    ## Method: PUT
+    ## Endpoint: /api/fitnearn/web/admin/groups/:zgid/removeMembers
+    ---
+    Removes one or more members from an existing Zoho Mail newsletter group and
+    updates the member list in the FitnEarn database.
+    ---
+    ## Request
+    ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/543210987/removeMembers" \
+        -X PUT \
+        -H "Content-Type: application/json" \
+        -d '{
+            "mailGroupMemberList": [
+                { "memberEmailId": "alice@example.com" },
+                { "memberEmailId": "bob@example.com" }
+            ]
+        }'
+    ```
+
+    ## Body Parameters
+    | Field                 | Type      | Required | Description                                                                                           |
+    |-----------------------|-----------|----------|-------------------------------------------------------------------------------------------------------|
+    | `mailGroupMemberList` | object[]  | ✅       | Array of objects, each with a `memberEmailId` key specifying the member email address to be removed.  |
+
+
+    ## Responses
+    | Status | Description                                              |
+    |--------|----------------------------------------------------------|
+    | 200    | Members removed successfully                             |
+    | 400    | Validation failed (missing or invalid fields)            |
+    | 401    | Missing or invalid `Authorization` header                |
+    | 404    | No newsletter group found for given `zgid`               |
+    ---
+    #### 200 OK
+    ```bash
+        {
+            "zoho": {
+                "status": {
+                    "code": 200,
+                    "description": "success"
+                }
+            },
+            "mongo": {
+                "modifiedCount": 2
+            }
+        }
+    ```
+    #### 400 Unauthorized
+    ```bash
+        { "error": "mailGroupMemberList must be a non‑empty array" }
+
+    ```
+
+    
+    ---
+    ## Title: List Groups
+    ## Method: GET
+    ## Endpoint: /api/fitnearn/web/admin/groups/listGroups
+    ---
+    Retrieves all existing Zoho Mail newsletter groups from the organization.
+    ---
+    ## Request
+    ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/listGroups" \
+        -X GET \
+    ```
+    ## Responses
+    | Status | Description                                              |
+    |--------|----------------------------------------------------------|
+    | 200    | Groups retrieved successfully                            |
+    | 401    | Missing or invalid `Authorization` header                |
+    | 500    | Internal server error                                    |
+    ---
+    #### 200 OK
+    ```bash
+        [
+            {
+                "zgid": 543210987,
+                "name": "fitness-newsletter",
+                "emailId": "fitness-newsletter@yourorg.com",
+                "displayName": "Fitness Newsletter Group"
+            },
+            {
+                "zgid": 543210988,
+                "name": "wellness-tips",
+                "emailId": "wellness-tips@yourorg.com",
+                "displayName": "Wellness Tips Group"
+            }
+        ]
+    ```
+    #### 401 Unauthorized
+    ```bash
+        { "error": "Missing or invalid Authorization header" }
+    ```
+
+
+
+    ---
+    ## Title: Get the Email ID of the group
+    ## Method: GET
+    ## Endpoint: /api/fitnearn/web/admin/groups/:zgid/email
+    ---
+    Returns the emailId of a newsletter group from Zoho Mail using its `zgid`.
+    ---
+    ## Request
+    ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/543210987/email" \
+    ```
+
+
+
+    ## Responses
+    | Status | Description                                              |
+    |--------|----------------------------------------------------------|
+    | 200    | Email retrieved successfully                             |
+    | 404    | Group not found or missing emailId                       |
+    | 400    | Missing or invalid `zgid` path parameter                 |
+    | 500    | Zoho API error or server failure                         |
+    ---
+    #### 200 OK
+    ```bash
+        {
+            "emailId": "yoga@fitnearn.com"
+        }
+    ```
+    #### 404 Unauthorized
+    ```bash
+            { "message": "Group not found or missing emailId." }
+        ```
+
+
+
+        ---
+        ## Title: Delete Groups
+        ## Method: DELETE
+        ## Endpoint: /api/fitnearn/web/admin/groups/deleteGroups
+        ---
+        Deletes one or more Zoho Mail newsletter groups by name and removes them from
+        the FitnEarn database.
+        ---
+        ## Request
+        ```bash
+            curl "https://{your-host}/api/fitnearn/web/admin/groups/deleteGroups" \
+            -X DELETE \
+            -H "Content-Type: application/json" \
+            -d '{
+                "groupNames": ["fitness-newsletter", "wellness-tips"]
+            }'
+        ```
+
+        ## Body Parameters
+        | Field       | Type      | Required | Description                                                        |
+        |-------------|-----------|----------|--------------------------------------------------------------------|
+        | `groupNames`| string[]  | ✅       | Array of **group names** to delete. Must contain at least one item.|
+
+
+        ## Responses
+        | Status | Description                                                          |
+        |--------|----------------------------------------------------------------------|
+        | 200    | Groups deleted successfully                                           |
+        | 400    | Validation failed (`groupNames` missing / not an array / empty)      |
+        | 404    | No matching groups were found in Zoho Mail                           |
+        | 500    | Zoho API error or database failure                                   |
+        ---
+        #### 200 OK
+        ```bash
+            {
+                "zoho": {
+                    "status": { "code": 200, "description": "success" },
+                    "data": null
+                },
+                "mongo": { "deletedCount": 2 }
+            }
+        ```
+        #### 400 Bad Request
+        ```bash
+                { "error": "groupNames must be a non‑empty array" }
+        ```
+
+        #### 404 Bad Request
+        ```bash
+        { "message": "No matching groups found in Zoho.", "groupNames": ["Pilates-Pros"] }
+        ```
+
+
+
+
+        ---
+        ## Title: Get Groups By Member
+        ## Method: GET
+        ## Endpoint: /api/fitnearn/web/admin/groups/getGroupsByMember/member/:identifier
+        ---
+        Retrieves all newsletter groups that contain a specific member, searched by
+        email address or member name.
+        ---
+        ## Request
+        ```bash
+           curl "https://{your-host}/api/fitnearn/web/admin/groups/getGroupsByMember/member/alice@example.com" \
+        ```
+
+        ## Path Parameterrs
+        | Param        | Type   | Required | Description                                               |
+        |--------------|--------|----------|-----------------------------------------------------------|
+        | `identifier` | string | ✅       | Member’s **email** or **display name** (case‑insensitive) |
+
+        ## Body Parameters
+        | Param        | Type   | Required | Description                                               |
+        |--------------|--------|----------|-----------------------------------------------------------|
+        | `None`       |        |          |                                                           |
+
+        ## Responses
+        | Status | Description                                                   |
+        |--------|---------------------------------------------------------------|
+        | 200    | Groups retrieved successfully                                 |
+        | 400    | `identifier` param missing                                    |
+        | 404    | No groups found for the given member                          |
+        | 500    | Internal server error (Zoho / database)                       |
+        ---
+        #### 200 OK
+        ```bash
+            [
+                {
+                    "groupName": "Yoga-Enthusiasts",
+                    "groupDescription": "Daily yoga tips & discussions",
+                    "groupEmail": "yoga@fitnearn.com",
+                    "dateJoined": "2025-05-31T18:30:00+05:30"
+                },
+                {
+                    "groupName": "Pilates-Pros",
+                    "groupDescription": "Pilates workouts & resources",
+                    "groupEmail": "pilates@fitnearn.com",
+                    "dateJoined": "2025-06-01T09:15:00+05:30"
+                }
+            ]
+            ```
+        #### 400 Bad Request
+        ```bash
+            { "error": "identifier param is required" }
+        ```
+
+        #### 404 Not Found
+        ```bash
+            { "message": "No groups found for that member", "identifier": "alice@example.com" }
+        ```
+
+
+
+    ---
+        ## Title: Get Zoho Group ID
+        ## Method: GET
+        ## Endpoint: /api/fitnearn/web/admin/groups/getGroupZohoID
+        ---
+        Retrieves the Zoho ID for a newsletter group by searching with group name
+        or group email address.
+        ---
+        ## Request
+        ```bash
+            # By name
+            curl "https://{your-host}/api/fitnearn/web/admin/groups/getGroupZohoID?groupName=Yoga-Enthusiasts" \
+
+            # By email
+            curl "https://{your-host}/api/fitnearn/web/admin/groups/getGroupZohoID?groupEmail=yoga@fitnearn.com" \
+        ```
+
+        ## Query Parameterrs
+        | Param        | Type   | Required | Description                                                                                 |
+        |--------------|--------|----------|---------------------------------------------------------------------------------------------|
+        | `groupName`  | string | ✅       | Exact newsletter group name. *At least one of `groupName` or `groupEmail` must be provided. |
+        | `groupEmail` | string | ✅       | Newsletter group email address.                                                             |
+
+       
+
+        ## Responses
+        | Status | Description                                               |
+        |--------|-----------------------------------------------------------|
+        | 200    | Group found; returns its `zohoID`.                        |
+        | 400    | Neither `groupName` nor `groupEmail` supplied.            |
+        | 404    | No matching group found.                                  |
+        | 500    | Internal server / database error.                         |
+        ---
+        #### 200 OK
+        ```bash
+            { "zohoID": 543210987 }
+        ```
+        #### 400 Bad Request
+        ```bash
+            { "error": "Provide groupName or groupEmail" }
+        ```
+
+        #### 404 Not Found
+        ```bash
+            { "error": "Group not found" }
+        ```
+
+
+    ---
+        ## Title: Get All Group Members
+        ## Method: GET
+        ## Endpoint: /api/fitnearn/web/admin/groups/getAllMembersAllGroups
+        ---
+        Retrieves all members from all newsletter groups with pagination and search
+        functionality. Returns a flattened list of members with their group information.
+        ---
+        ## Request
+        ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/getAllMembersAllGroups?search=alice" \
+        ```
+
+        ## Query Parameterrs
+        | Param   | Type   | Required | Default | Description                                                                                      |
+        |---------|--------|----------|---------|--------------------------------------------------------------------------------------------------|
+        | `search` (Optional)| string | ✅       |  —      | Case‑insensitive filter applied to member name, member email, group name, or group email fields. |
+
+       
+
+        ## Responses
+        | Status | Description                                        |
+        |--------|----------------------------------------------------|
+        | 200    | Returns paginated members array.                   |
+        | 400    | Query parameters invalid (e.g., non‑numeric page). |
+        | 500    | Internal server / database error.                  |
+        ---
+        #### 200 OK
+        ```bash
+                {
+                    "page"   : 1,
+                    "limit"  : 50,
+                    "total"  : 128,
+                    "pages"  : 3,
+                    "entries": [
+                        {
+                        "memberName" : "Alice Doe",
+                        "memberEmail": "alice@example.com",
+                        "groupName"  : "Yoga-Enthusiasts",
+                        "groupEmail" : "yoga@fitnearn.com",
+                        "zohoID"     : 543210987,
+                        "dateJoined" : "2025-05-30T10:45:12+05:30"
+                        }
+                        /* ...up to `limit` entries... */
+                    ]
+                }
+        ```
+        #### 400 Bad Request
+        ```bash
+            ```bash
+            { "error": "page and limit must be positive integers" }
+
+        ```
+
+
+
+
+    ---
+        ## Title: Filter Group Members
+        ## Method: GET
+        ## Endpoint: /api/fitnearn/web/admin/groups/filterAllMembers
+        ---
+        Retrieves filtered members from newsletter groups with advanced filtering options
+        including group names, date ranges, search terms, and pagination.
+        ---
+        ## Request
+       ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/groups/filterAllMembers?groups=Yoga-Enthusiasts,Meditation-Gurus&search=alice&start=2025-05-01&end=2025-05-31" \
+        ```
+
+        ## Query Parameterrs
+        | Param    | Type   | Required | Default | Description                                                                                                                         |
+        |----------|--------|----------|---------|-------------------------------------------------------------------------------------------------------------------------------------|
+        | `search` | string | ✅       |  —      | Case‑insensitive text filter applied to member name/email and group name/email.                                                    |
+        | `groups` | string | ✅       |  —      | Comma‑separated list of **group names**; only members from these groups will be returned.                                           |
+        | `start`  | date   | ✅       |  —      | ISO‑8601 start date (`YYYY‑MM‑DD`). Filters members whose `dateJoined` is **on/after** this date.                                  |
+        | `end`    | date   | ✅       |  —      | ISO‑8601 end date (`YYYY‑MM‑DD`). Filters members whose `dateJoined` is **on/before** this date.                                    |
+       
+
+        ## Responses
+        | Status | Description                                        |
+        |--------|----------------------------------------------------|
+        | 200    | Returns paginated, filtered members array.         |
+        | 400    | Query parameters invalid (e.g., bad date format).  |
+        | 500    | Internal server / database error.                  |
+        ---
+        #### 200 OK
+        ```bash
+            {
+            "page"   : 1,
+            "limit"  : 50,
+            "total"  : 42,
+            "pages"  : 1,
+            "entries": [
+                {
+                "memberName" : "Alice Doe",
+                "memberEmail": "alice@example.com",
+                "groupName"  : "Yoga-Enthusiasts",
+                "groupEmail" : "yoga@fitnearn.com",
+                "zohoID"     : 543210987,
+                "dateJoined" : "2025-05-15T08:20:10+05:30"
+                }
+                /* ...up to `limit` entries... */
+            ]
+            }
+        ```
+        #### 400 Bad Request
+        ```bash
+            ```bash
+            { "error": "start and end must be valid ISO‑8601 dates" }
+
+        ```
+
+
+
+
+</AccordionGroup> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 5. Template Creation & (Optional) Auto-Scheduling
+<AccordionGroup> 
+    ---
+        ## Title: Create Template
+        ## Method: POST
+        ## Endpoint: /api/fitnearn/web/admin/createTemplate
+        ---
+        Creates a new email template in AWS SES and stores template metadata in the
+        FitnEarn database with optional scheduling functionality.
+        ---
+        ## Request
+       ```bash
+            curl "https://{your-host}/api/fitnearn/web/admin/createTemplate" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{
+                "name"           : "Welcome‑2025‑05",
+                "contentHTML"    : "<h1>Welcome!</h1><p>Glad to have you.</p>",
+                "subject"        : "Welcome to FitnEarn!",
+                "createdBy"      : "admin_123",
+                "category"       : "Onboarding",
+                "title"          : "Welcome Email",
+                "type"           : "HTML",
+                "groupOfUserSend": "Yoga-Enthusiasts",
+                "scheduledDate"  : "2025-06-01",           // YYYY-MM-DD (IST)
+                "scheduledTime"  : "09:00",                // HH:mm   (IST)
+                "state"          : "draft",
+                "userGroup"      : "new-users"
+            }'
+            ```
+
+        ## Body Parameterrs
+        | Field               | Type      | Required | Description                                                                                                  |
+        |---------------------|-----------|----------|--------------------------------------------------------------------------------------------------------------|
+        | `name`              | string    | ✅       | Unique template name (also used as SES `TemplateName`).                                                      |
+        | `contentHTML`       | string    | ✅       | Full HTML body of the email.                                                                                 |
+        | `subject`           | string    | ✅       | Email subject line (defaults to **"Default Subject"** if omitted).                                          |
+        | `createdBy`         | string    | ✅       | User ID of the admin creating the template.                                                                  |
+        | `category`          | string    | ✅       | Business‑level category (e.g., *Onboarding*, *Promotions*).                                                  |
+        | `title`             | string    | ✅       | Human‑friendly title shown in the admin UI.                                                                  |
+        | `type`              | string    | ✅       | Template type (e.g., `HTML`, `Text`).                                                                        |
+        | `groupOfUserSend`   | string    | ✅       | Name of the newsletter group the template will target.                                                       |
+        | `scheduledDate`     | date      | ✅       | **IST** date (`YYYY‑MM‑DD`) for scheduled send.                                                              |
+        | `scheduledTime`     | time      | ✅       | **IST** time (`HH:mm`) for scheduled send.                                                                   |
+        | `state`             | string    | ✅       | Initial state: `draft`, `scheduled`, etc.                                                                    |
+        | `userGroup`         | string    | ✅       | Custom tag grouping (for analytics/audience segmentation).                                                   |
+       
+
+        ## Responses
+        | Status | Description                                                                                     |
+        |--------|-------------------------------------------------------------------------------------------------|
+        | 201    | Template created (and scheduled, if applicable).                                                |
+        | 400    | Missing required fields or scheduled time is in the past.                                       |
+        | 404    | `groupOfUserSend` not found in Newsletter Groups collection.                                     |
+        | 409    | Template with the same `name` already exists in SES.                                            |
+        | 500    | AWS SES error or database failure.                                                               |
+        ---
+        #### 201 Created
+        ```bash
+            {
+                "success": true,
+                "message": "Template created in SES and MongoDB.",
+                "template": {
+                    "_id"             : "6651e8fcd2bf421c9f5d1c3e",
+                    "name"            : "Welcome‑2025‑05",
+                    "category"        : "Onboarding",
+                    "title"           : "Welcome Email",
+                    "type"            : "HTML",
+                    "groupOfUserSend" : "Yoga-Enthusiasts",
+                    "scheduledDate"   : "2025-06-01T03:30:00.000Z",   // UTC
+                    "state"           : "scheduled",
+                    "newsLetterID"    : "TMP‑000142"                  // generatedId middleware
+                }
+            }
+            ```
+        #### 400 Bad Request
+        ```bash
+            
+            { "error": "Fields \"name\", \"contentHTML\", \"createdBy\", \"category\", \"title\", \"type\", \"groupOfUserSend\" are required." }
+
+        ```
+
+        #### 409 Conflict
+        ```bash
+            { "error": "Template 'Welcome‑2025‑05' already exists in SES." }
+        ```
+
+
+
+
+        ---
+        ## Title: Get Template
+        ## Method: GET
+        ## Endpoint: /api/fitnearn/web/admin/getTemplate
+        ---
+        Retrieves an email template from AWS SES along with its metadata stored in
+        the FitnEarn database.
+        ---
+        ## Request
+       ```bash
+        curl "https://{your-host}/api/fitnearn/web/admin/getTemplate?templateName=Welcome‑2025‑05" \
+        ```
+
+        ## Query Parameterrs
+        | Field          | Type   | Required | Description                                 |
+        |----------------|--------|----------|---------------------------------------------|
+        | `templateName` | string | ✅       | Exact name of the template to be retrieved. |
+
+        ## Responses
+        | Status | Description                                                    |
+        |--------|----------------------------------------------------------------|
+        | 200    | Template found; returns metadata and SES content.              |
+        | 400    | Missing `templateName` query parameter.                        |
+        | 404    | Template not found in database (or SES).                       |
+        | 500    | AWS SES error or internal server failure.                      |
+        ---
+        #### 200 OK
+        ```bash
+            {
+                "templateName": "Welcome‑2025‑05",
+                "meta": {
+                    "_id"         : "6651e8fcd2bf421c9f5d1c3e",
+                    "category"    : "Onboarding",
+                    "title"       : "Welcome Email",
+                    "type"        : "HTML",
+                    "createdBy"   : "admin_123",
+                    "createdAt"   : "2025-05-31T12:00:00.000Z"
+                },
+                "sesContent": {
+                    "SubjectPart": "Welcome to FitnEarn!",
+                    "TextPart"   : "Plain text fallback",
+                    "HtmlPart"   : "<h1>Welcome!</h1><p>Glad to have you.</p>"
+                }
+            }
+            ```
+        #### 400 Bad Request
+        ```bash
+        { "error": "Missing \"templateName\" query param" }
+        ```
+
+        #### 404 Not Found
+        ```bash
+            { "error": "Template 'Welcome‑2025‑05' not found in DB" }
+        ```
+
+
+
+            ---
+        ## Title: Delete Template
+        ## Method: DELETE
+        ## Endpoint: /api/fitnearn/web/admin/deleteTemplate/:name
+        ---
+            Deletes an email template from both AWS SES and the FitnEarn database.
+            The operation attempts to delete from both locations even if one fails.
+        ---
+        ## Request
+       ```bash
+            curl "https://{your-host}/api/fitnearn/web/admin/deleteTemplate/Welcome‑2025‑05" \
+            -X DELETE \
+        ```
+
+        ## Path Parameterrs
+        | Field | Type   | Required | Description                                    |
+        |-------|--------|----------|------------------------------------------------|
+        | `name`| string | ✅       | Exact template name to delete.                 |
+
+        ## Responses
+        |--------|---------------------------------------------------------------------|
+        | 200    | Template deleted from SES and MongoDB.                              |
+        | 404    | Template not found in MongoDB (SES deletion attempted).             |
+        | 500    | AWS SES error or internal server failure.                           |
+        ---
+        #### 200 OK
+        ```bash
+            {
+                "success"      : true,
+                "message"      : "Template 'Welcome‑2025‑05' deleted from SES and MongoDB.",
+                "removedMongoDoc": {
+                    "_id"      : "6651ea35e2f2ba1c3c509046",
+                    "name"     : "Welcome‑2025‑05",
+                    "category" : "Onboarding",
+                    "title"    : "Welcome Email",
+                    "type"     : "HTML",
+                    "createdBy": "admin_123",
+                    "createdAt": "2025-05-31T12:00:00.000Z"
+                }
+            }
+            ```
+
+        #### 404 Not Found
+        ```bash
+            {
+                "error": "Template 'Welcome‑2025‑05' not found in MongoDB (SES deletion attempted)."
+            }
+        ```
+
+
+
+
+
+                ---
+                ## Title: Get All Templates
+                ## Method: GET
+                ## Endpoint: /api/fitnearn/web/admin/getAllTemplates
+                ---
+                    Retrieves a paginated list of email templates from the FitnEarn database with optional search functionality. Supports filtering by template title or name.
+                ---
+                ## Request
+                ```bash
+                curl "https://{your-host}/api/fitnearn/web/admin/getAllTemplates" \
+                ```
+
+                ## Query Parameters
+                | Field   | Type   | Required | Description                                                  |
+                |---------|--------|----------|--------------------------------------------------------------|
+                | `page`  | number | ✅       | Page number (1‑based). Defaults to **1**.                    |
+                | `limit` | number | ✅       | Items per page. Defaults to **50**.                          |
+                | `search`| string | ✅       | Filters by substring match on template `title` or `name`.    |
+
+                ## Responses
+                | Status | Description                                   |
+                |--------|-----------------------------------------------|
+                | 200    | Templates retrieved successfully              |
+                | 500    | Internal server error                         |
+                ---
+                #### 200 OK
+                ```bash
+                    {
+                        "page"     : 1,
+                        "limit"    : 50,
+                        "total"    : 2,
+                        "pages"    : 1,
+                        "templates": [
+                            {
+                                "_id"      : "6651ea35e2f2ba1c3c509046",
+                                "name"     : "Welcome‑2025‑05",
+                                "title"    : "Welcome Email",
+                                "category" : "Onboarding",
+                                "type"     : "HTML",
+                                "createdBy": "admin_123",
+                                "createdAt": "2025-05-31T12:00:00.000Z"
+                            },
+                            {
+                                "_id"      : "6651eb47e2f2ba1c3c509047",
+                                "name"     : "Reminder‑2025‑06",
+                                "title"    : "Session Reminder",
+                                "category" : "Notification",
+                                "type"     : "HTML",
+                                "createdBy": "admin_123",
+                                "createdAt": "2025-06-01T08:30:00.000Z"
+                            }
+                        ]
+                    }
+                    ```
+
+                #### 500 Internal Server Error
+                ```bash
+                    { "error": "Unable to retrieve templates." }
+                ```
+
+
+
+
+                ---
+                ## Title: Update Template
+                ## Method: PUT
+                ## Endpoint: /api/fitnearn/web/admin/editTemplate/:name
+                ---
+                    Updates an existing email template in both AWS SES and the FitnEarn database. Requires at least one of `subject` or `contentHTML` to update SES template content.
+                ---
+                ## Request
+                ```bash
+                    curl "https://{your-host}/api/fitnearn/web/admin/editTemplate/Welcome‑2025‑05" \
+                    -X PUT \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "subject"        : "Updated Welcome Subject",
+                        "contentHTML"    : "<h1>Updated HTML</h1>",
+                        "category"       : "Onboarding",
+                        "title"          : "Welcome Email (v2)",
+                        "type"           : "HTML",
+                        "groupOfUserSend": "Yoga-Enthusiasts",
+                        "scheduledDate"  : "2025-06-10",   
+                        "scheduledTime"  : "10:00",        
+                        "state"          : "draft",
+                        "userGroup"      : "premium"
+                    }'
+                ```
+
+                ## Path Parameters
+                | Field | Type   | Required | Description                                   |
+                |-------|--------|----------|-----------------------------------------------|
+                | `name`| string | ✅       | Name of the template to update (SES key).     |
+
+                ## Body parameters
+                | Field               | Type   | Required | Description                                                          |
+                |---------------------|--------|----------|----------------------------------------------------------------------|
+                | `subject`           | string | ✅       | New subject line. If omitted, subject remains unchanged.             |
+                | `contentHTML`       | string | ✅       | New HTML content. If omitted, HTML remains unchanged.                |
+                | `category`          | string | ✅       | Metadata category (e.g., Onboarding, Notification).                  |
+                | `title`             | string | ✅       | Display title for the template card/list.                            |
+                | `type`              | string | ✅       | Template type (e.g., HTML, Text).                                    |
+                | `groupOfUserSend`   | string | ✅       | Newsletter group name to send to when scheduled.                     |
+                | `scheduledDate`     | date   | ✅       | YYYY‑MM‑DD date for scheduled send (IST).                            |
+                | `scheduledTime`     | string | ✅       | HH:mm time for scheduled send (IST).                                 |
+                | `state`             | string | ✅       | Draft / scheduled / sent.                                            |
+                | `userGroup`         | string | ✅       | App‑specific user group filter (optional).                           |
+
+                ## Responses
+                | Status | Description                                             |
+                |--------|---------------------------------------------------------|
+                | 200    | Template updated successfully                           |
+                | 400    | Validation failed (e.g., neither `subject` nor `contentHTML` provided) |
+                | 404    | Template not found                                      |
+                | 500    | Internal server error                                   |
+                #### 200 OK
+                ```bash
+                    {
+                        "success" : true,
+                        "message" : "Template 'Welcome‑2025‑05' updated in SES and MongoDB.",
+                        "template": {
+                            "_id"           : "6651ea35e2f2ba1c3c509046",
+                            "name"          : "Welcome‑2025‑05",
+                            "subject"       : "Updated Welcome Subject",
+                            "contentHTML"   : "<h1>Updated HTML</h1>",
+                            "category"      : "Onboarding",
+                            "title"         : "Welcome Email (v2)",
+                            "type"          : "HTML",
+                            "groupOfUserSend": "Yoga-Enthusiasts",
+                            "state"         : "draft",
+                            "updatedAt"     : "2025-05-31T13:20:00.000Z"
+                        }
+                    }
+                ```
+
+                #### 400 Bad Request
+                ```bash
+                    { "error": "Provide at least one of 'subject' or 'contentHTML' to update SES." }
+                ```
+                #### 400 Not Found
+                ```bash
+                { "error": "Template 'Welcome‑2025‑05' not found." }
+                ```
+                #### 500 Internal Server Error
+                ```bash
+                    { "error": "Unable to update template." }
+                ```
+
+
+               ---
+                ## Title: Schedule Newsletter
+                ## Method: POST
+                ## Endpoint: /api/fitnearn/web/admin/scheduleNewsletter
+                ---
+                ##     Schedules a newsletter to be sent to a specific user group at a specified date and time. Creates a scheduled job and updates the template state to 'scheduled'.
+                ---
+                ## Request
+                ```bash
+                    curl "https://{your-host}/api/fitnearn/web/admin/scheduleNewsletter" \
+                    -X POST \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "templateName": "Welcome‑2025‑05",
+                        "groupName"   : "Yoga-Enthusiasts",
+                        "date"        : "2025-06-10",   
+                        "time"        : "10:00"          
+                    }'
+                ```
+
+                ## Body Parameters
+                | Field          | Type   | Required | Description                                      |
+                |----------------|--------|----------|--------------------------------------------------|
+                | `templateName` | string | ✅       | Name of the SES template to schedule             |
+                | `groupName`    | string | ✅       | Newsletter group name to receive the send        |
+                | `date`         | date   | ✅       | YYYY‑MM‑DD date for scheduled send (IST)         |
+                | `time`         | string | ✅       | HH:mm time for scheduled send (IST)              |
+
+                
+                ## Responses
+                | Status | Description                                    |
+                |--------|------------------------------------------------|
+                | 201    | Newsletter scheduled successfully              |
+                | 400    | Validation failed (missing fields or past time)|
+                | 404    | Template or group not found                    |
+                | 500    | Internal server error                          |
+                #### 201 Created
+                ```bash
+                    {
+                        "success": true,
+                        "message": "Newsletter scheduled.",
+                        "sendAt" : "2025-06-10T04:30:00Z"   
+                    }
+                ```
+
+                #### 400 Bad Request
+                ```bash
+                    { "error": "\"templateName\", \"groupName\", \"date\", \"time\" are required." }
+                ```
+                #### 404 Not Found
+                ```bash
+                    { "error": "Template not found." }
+                ```
+                #### 500 Internal Server Error
+                ```bash
+                    { "error": "Unable to schedule newsletter." }
+                ```
+
+    
+</AccordionGroup>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 6 Dispatch Pipeline (SNS → SQS → Lambda)
+
+<Callout emoji="🚀">
+This section documents the production notification stack:
+<strong>Lambda function</strong> <code>notificationPOC-dev-be</code>,  
+<strong>SQS queues</strong> <code>EmailNotificationQueue</code> / <code>EmailNotificationDLQ</code>,  
+and <strong>SNS topic</strong> <code>EmailNotificationSNS</code>.
+</Callout>
+
+### 6.1 High-level architecture
+<Accordion title="📬 Email Notification Flow: SNS → SQS → Lambda → SES with DLQ">
+  <Steps>
+    <Step title="Overview">
+      This flow outlines a resilient architecture for handling email notifications using AWS services:
+      - **SNS**: Receives JSON payloads from the application.
+      - **SQS**: Acts as a buffer, decoupling the application from downstream processing.
+      - **Lambda**: Processes messages from SQS, logs them to MongoDB, and sends emails via SES.
+      - **DLQ**: Captures messages that fail processing after a specified number of attempts.
+    </Step>
+
+    <Step title="Flow Details">
+      1. **Application** publishes a JSON payload to an **SNS** topic.
+      2. **SNS** delivers the message to an **SQS** queue subscribed to the topic.
+      3. **Lambda** function is triggered by messages in the SQS queue:
+         - Parses the JSON payload.
+         - Logs the message to **MongoDB**.
+         - Sends an email using **SES**.
+      4. If the Lambda function fails to process a message after a defined number of retries (configured via `maxReceiveCount`), the message is moved to a **Dead Letter Queue (DLQ)** for further analysis.
+    </Step>
+
+    <Step title="Dead Letter Queue (DLQ) Configuration">
+      - **Purpose**: Stores messages that couldn't be processed successfully after multiple attempts.
+      - **Setup**:
+        - Create an SQS queue to serve as the DLQ.
+        - Configure the main SQS queue with a redrive policy specifying the DLQ and `maxReceiveCount`.
+      - **Monitoring**:
+        - Use **Amazon CloudWatch** to monitor the DLQ for incoming messages.
+        - Set up alarms to notify when messages are moved to the DLQ.
+      - **Processing DLQ Messages**:
+        - Analyze and reprocess messages manually or set up another Lambda function to handle DLQ messages.
+    </Step>
+
+    <Step title="Benefits">
+      - **Scalability**: Decouples components, allowing each to scale independently.
+      - **Reliability**: Ensures messages are not lost and can be retried or analyzed if failures occur.
+      - **Observability**: Facilitates monitoring and debugging through DLQ and CloudWatch integration.
+    </Step>
+  </Steps>
+</Accordion>
+
+
+### 6.2 Lambda handler (partial-batch, idempotent)
+```typescript title="handler".ts"
+    import { SQSEvent, Context }      from 'aws-lambda';
+    import * as AWS                   from 'aws-sdk';
+    import { MongoClient, MongoError } from 'mongodb';
+
+    const ses = new AWS.SES({ region: 'ap-south-1' });
+    const DB_URI = process.env.DB_CONNECTION_STRING!;
+    let cachedClient: MongoClient | null = null;
+
+    interface FailList { batchItemFailures: { itemIdentifier: string }[]; }
+
+    export const handler = async (
+    event: SQSEvent,
+    _ctx : Context
+    ): Promise<FailList> => {
+    const failures: FailList['batchItemFailures'] = [];
+    const db = await getDb();
+
+    for (const rec of event.Records) {
+        const dedupId = rec.messageId;
+        try {
+        const msg = JSON.parse(JSON.parse(rec.body).Message);
+        await insertIfNew(db, dedupId, msg);
+
+        if (msg.typeOfMail === 'customBulkMail')
+            await sendCustomBulk(msg);
+        else if (msg.typeOfMail === 'bulkMail')
+            await sendGroupMail(msg);
+        else
+            throw new Error(`Unknown typeOfMail ${msg.typeOfMail}`);
+
+        } catch (err) {
+        console.error('record error', dedupId, err);
+        failures.push({ itemIdentifier: dedupId });
+        }
+    }
+    return { batchItemFailures: failures };
+    };
+
+    /* -------------- helpers --------------------- */
+    async function getDb() {
+    if (!cachedClient) {
+        cachedClient = await new MongoClient(DB_URI).connect();
+    }
+    return cachedClient.db('myDatabase');
+    }
+
+    async function insertIfNew(db, dedupId, doc) {
+    try {
+        await db.collection('emailNotifications').insertOne({ dedupId, ...doc, ts: new Date() });
+    } catch (e) {
+        if ((e as MongoError).code === 11000) return; // duplicate
+        throw e;
+    }
+    }
+
+    async function sendCustomBulk(msg) {
+    const dest = msg.recipients.map((e, i) => ({
+        Destination: { ToAddresses: [e] },
+        ReplacementTemplateData: JSON.stringify(msg.templateData[i] || {})
+    }));
+    await ses.sendBulkTemplatedEmail({
+        Source: 'no-reply@yourdomain.com',
+        Template: msg.templateName,
+        Destinations: dest,
+        DefaultTemplateData: '{}'
+    }).promise();
+    }
+
+    async function sendGroupMail(msg) {
+    await ses.sendTemplatedEmail({
+        Source: 'no-reply@yourdomain.com',
+        Destination: { ToAddresses: [msg.groupEmail] },
+        Template: msg.templateName,
+        TemplateData: '{}'
+    }).promise();
+    }
+```
+
+

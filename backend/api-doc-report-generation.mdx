@@ -1,0 +1,441 @@
+***
+
+# Report Generation API Documentation
+
+This document outlines the API endpoints for creating, managing, and generating custom reports from various data sources within the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web/admin/Report-Generation
+```
+
+## Report Management
+
+These endpoints are for creating and managing the report definitions themselves.
+
+### 1. Create a New Report
+
+Defines a new report, linking it to a data source (module) and specifying its type and columns.
+
+- **Method**: `POST`
+- **Endpoint**: `/create`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Request Body**:
+  ```json
+  {
+    "moduleId": "MODULE-5",
+    "reportName": "Weekly Workout Performance",
+    "reportType": "Data-Table",
+    "sourceName": "WorkoutVideoModel",
+    "filterColumns": ["status", "category", "level", "publisherId"]
+  }
+  ```
+  - `moduleId` (string, required): The ID of the data source module (e.g., "MODULE-5" for workouts).
+  - `reportName` (string, required): The display name for the report.
+  - `reportType` (string, required): The type of report (e.g., "Data-Table", "Chart").
+  - `sourceName` (string, required): The name of the Mongoose model.
+  - `filterColumns` (array of strings, required): The fields that will be available for filtering.
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report created successfully",
+      "statusCode": 201,
+      "data": {
+        "reportId": "REPORT-12345",
+        "moduleId": "MODULE-5",
+        "reportName": "Weekly Workout Performance",
+        "status": "Active"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Report name and Report Type are required" }
+    ```
+
+### 2. Edit a Report
+
+Updates the details of an existing report definition.
+
+- **Method**: `PUT`
+- **Endpoint**: `/edit/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `id` (string, required): The `reportId` of the report to edit.
+- **Request Body**:
+  ```json
+  {
+    "reportName": "Weekly & Monthly Workout Performance",
+    "status": "Inactive"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report updated successfully",
+      "statusCode": 200,
+      "data": {
+        "reportId": "REPORT-12345",
+        "reportName": "Weekly & Monthly Workout Performance",
+        "status": "Inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Report not found" }
+    ```
+
+### 3. Get All Reports
+
+Retrieves a list of all defined reports, with optional filtering.
+
+- **Method**: `GET`
+- **Endpoint**: `/reports`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Query Parameters**:
+  - `moduleId` (string, optional): Filter reports by their data source module.
+  - `status` (string, optional): Filter by status ("Active" or "Inactive").
+  - `reportType` (string, optional): Filter by the report type.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Reports fetched successfully",
+      "statusCode": 200,
+      "data": [
+        {
+          "reportId": "REPORT-12345",
+          "reportName": "Weekly Workout Performance",
+          "moduleId": { "moduleName": "Workout Management" }
+        }
+      ]
+    }
+    ```
+
+### 4. Get Report by ID
+
+Fetches the complete details of a single report definition.
+
+- **Method**: `GET`
+- **Endpoint**: `/reports/:id`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `id` (string, required): The `reportId` of the report.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report fetched successfully",
+      "statusCode": 200,
+      "data": {
+        // Full report object
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Report not found" }
+    ```
+
+---
+
+## Filter Management
+
+These endpoints are for creating, saving, and managing reusable filters that can be applied to reports.
+
+### 1. Create a Saved Filter
+
+Creates and saves a new filter configuration.
+
+- **Method**: `POST`
+- **Endpoint**: `/filter/create`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Request Body**:
+  ```json
+  {
+    "moduleId": "MODULE-5",
+    "filterName": "Published HIIT Workouts",
+    "filterColumns": {
+      "status": "published",
+      "category": "HIIT"
+    },
+    "numOfEntries": 100,
+    "startDate": "2023-01-01T00:00:00Z",
+    "endDate": "2023-12-31T23:59:59Z",
+    "repeatable": true,
+    "repeatFrequency": "weekly"
+  }
+  ```
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report filter created successfully",
+      "statusCode": 201,
+      "data": {
+        "filterId": "FILTER-54321",
+        "filterName": "Published HIIT Workouts",
+        "repeatable": true
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "filterColumns is required and cannot be empty" }
+    ```
+    ```json
+    { "success": false, "message": "repeatFrequency is required... when repeatable is true." }
+    ```
+
+### 2. Get Saved Filter by ID
+
+Retrieves the details of a single saved filter.
+
+- **Method**: `GET`
+- **Endpoint**: `/filter/:filterId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `filterId` (string, required): The `filterId` of the filter.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report filter fetched successfully",
+      "statusCode": 200,
+      "data": {
+        // Full filter object
+      }
+    }
+    ```
+
+### 3. Get All Filters for a Module
+
+Retrieves all saved filters associated with a specific data module.
+
+- **Method**: `GET`
+- **Endpoint**: `/filter/module/:moduleId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `moduleId` (string, required): The ID of the module.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Report filters fetched successfully",
+      "data": {
+        "filters": [
+          // Array of filter objects
+        ]
+      }
+    }
+    ```
+
+### 4. Update a Saved Filter
+
+Updates the configuration of an existing saved filter.
+
+- **Method**: `PUT`
+- **Endpoint**: `/filter/edit/:filterId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `filterId` (string, required): The ID of the filter to update.
+- **Request Body**:
+  ```json
+  {
+    "filterName": "Published HIIT & Cardio Workouts",
+    "filterColumns": {
+      "status": "published",
+      "category": ["HIIT", "Cardio"]
+    }
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Report filter updated successfully" }
+    ```
+
+### 5. Delete a Saved Filter
+
+Deletes a filter. By default, this is a soft delete (sets `isActive` to false).
+
+- **Method**: `DELETE`
+- **Endpoint**: `/filter/:filterId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `filterId` (string, required): The ID of the filter to delete.
+- **Query Parameters**:
+  - `hardDelete` (boolean, optional): If `true`, the filter is permanently deleted from the database.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Report filter deactivated successfully" }
+    ```
+
+### 6. Update Filter Chart Colors
+
+Assigns specific colors to filter values for chart visualization.
+
+- **Method**: `POST`
+- **Endpoint**: `/report-filter/colors/:filterId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `filterId` (string, required): The ID of the filter.
+- **Request Body**:
+  ```json
+  {
+    "filterColors": {
+      "status": {
+        "published": "#28a745",
+        "draft": "#ffc107"
+      }
+    }
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "success": true, "message": "Filter colors updated successfully" }
+    ```
+
+---
+
+## Report Data Generation
+
+### 1. Generate Filtered Data and Chart
+
+The main endpoint to generate a report. It applies a saved filter to its data source and returns the filtered data along with data structured for chart rendering.
+
+- **Method**: `GET`
+- **Endpoint**: `/filter/filtered-data/:filterId`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Path Parameters**:
+  - `filterId` (string, required): The ID of the saved filter to apply.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Data filtered successfully",
+      "data": {
+        "chartData": {
+          "labels": ["Published", "Draft"],
+          "datasets": [
+            {
+              "label": "Status",
+              "data": [50, 15],
+              "backgroundColor": ["#28a745", "#ffc107"]
+            }
+          ]
+        },
+        "filteredData": [
+          // Array of filtered records from the data source
+        ],
+        "totalRecords": 65,
+        "filterInfo": {
+          "filterId": "FILTER-54321",
+          "filterName": "Published HIIT & Cardio Workouts",
+          "dateRange": {
+            "startDate": "2023-01-01T00:00:00.000Z",
+            "endDate": "2023-12-31T23:59:59.999Z"
+          }
+        },
+        "refreshMessage": "Report will be refreshed on dashboard weekly on Monday at 9AM"
+      }
+    }
+    ```
+
+### 2. Get Available Fields for a Module
+
+Retrieves a list of all available fields from a specific data source (module) that can be used for reporting and filtering.
+
+- **Method**: `GET`
+- **Endpoint**: `/source-name/get`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Query Parameters**:
+  - `moduleName` (string, required): The name of the module (e.g., "Workout Management").
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Fields fetched successfully",
+      "data": {
+        "moduleID": "MODULE-5",
+        "fields": [
+          "title", "description", "status", "category", "level", "publisherId"
+        ]
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Module not found for the given name" }
+    ```
+
+### 3. Get UI Data for Filter Columns
+
+For a given set of columns from a module, this endpoint returns the appropriate UI element type (`dropdown`, `textfield`, `calendar`) and potential options or hints for the frontend to render.
+
+- **Method**: `GET`
+- **Endpoint**: `/getFilterColumnsData`
+- **Authentication**: `authenticateAdminToken`, `authorize('...')` (Implied)
+- **Query Parameters**:
+  - `moduleName` (string, required): The name of the module.
+  - `columns` (string, required): A comma-separated list of column names (e.g., "status,category,level").
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Filter columns data fetched successfully",
+      "data": {
+        "moduleID": "MODULE-5",
+        "moduleName": "Workout Management",
+        "filterData": {
+          "status": {
+            "uiElement": "dropdown",
+            "options": ["draft", "under review", "published", "retired"],
+            "dataType": "string"
+          },
+          "createdAt": {
+            "uiElement": "calendar",
+            "dataType": "date"
+          },
+          "title": {
+            "uiElement": "textfield",
+            "hints": ["Sample Morning Yoga", "Sample HIIT Session"],
+            "dataType": "string"
+          }
+        }
+      }
+    }
+    ```

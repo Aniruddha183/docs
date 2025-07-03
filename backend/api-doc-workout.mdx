@@ -1,0 +1,540 @@
+***
+
+# Workout Management API Documentation
+
+This document outlines the API endpoints for managing workouts and their associated data (e.g., calories, equipment, focus areas) in the FitEarn application's admin panel.
+
+## Base URL
+```
+/api/fitnearn/web/admin
+```
+
+## Workout Data Management
+
+These endpoints manage the metadata used to categorize and describe workouts.
+
+### 1. Calorie Routes
+
+- **Create Calorie Record**
+  - **Method**: `POST`
+  - **Endpoint**: `/calories/create`
+  - **Authentication**: Currently disabled in the router.
+  - **Request Body**:
+    ```json
+    {
+      "description": "High Burn",
+      "Calories": "400-500 kcal"
+    }
+    ```
+    - `description` (string, required): A descriptive name for the calorie range.
+    - `Calories` (string, required): The calorie range value.
+  - **Response**:
+    - **Status**: 201 Created
+    - **Body**:
+      ```json
+      {
+        "success": true,
+        "message": "Calorie entry created successfully",
+        "data": {
+          "Calories_ID": "CALORIE-12345",
+          "description": "High Burn",
+          "Calories": "400-500 kcal"
+        }
+      }
+      ```
+  - **Error Responses**:
+    - **Status**: 400 Bad Request
+      ```json
+      { "success": false, "message": "All fields are required" }
+      ```
+    - **Status**: 500 Internal Server Error
+      ```json
+      { "success": false, "message": "Internal server error" }
+      ```
+
+- **Get All Calorie Records**
+  - **Method**: `GET`
+  - **Endpoint**: `/calories/get`
+  - **Authentication**: Currently disabled in the router.
+  - **Response**:
+    - **Status**: 200 OK
+    - **Body**:
+      ```json
+      {
+        "success": true,
+        "message": "Calorie entries retrieved successfully",
+        "data": [
+          {
+            "Calories_ID": "CALORIE-12345",
+            "description": "High Burn",
+            "Calories": "400-500 kcal"
+          }
+        ]
+      }
+      ```
+
+- **Edit Calorie Record**
+  - **Method**: `PUT`
+  - **Endpoint**: `/calories/edit/:Calories_ID`
+  - **Authentication**: Currently disabled in the router.
+  - **Path Parameters**:
+    - `Calories_ID` (string, required): The ID of the calorie record to update.
+  - **Request Body**:
+    ```json
+    {
+      "Calories": "450-550 kcal"
+    }
+    ```
+  - **Response**:
+    - **Status**: 200 OK
+    - **Body**:
+      ```json
+      {
+        "success": true,
+        "message": "Calorie entry updated successfully",
+        "data": {
+          "Calories_ID": "CALORIE-12345",
+          "description": "High Burn",
+          "Calories": "450-550 kcal"
+        }
+      }
+      ```
+  - **Error Responses**:
+    - **Status**: 404 Not Found
+      ```json
+      { "message": "Calorie entry not found" }
+      ```
+
+*(Note: The following data routes for Duration, Intensity, Exercise Level, Focus Area, and Equipment follow an identical structure and have been omitted for brevity. They should be documented in the same detailed manner as the Calorie routes.)*
+
+---
+
+## Main Workout Management
+
+### 1. Create Workout
+
+Submits a new workout for the administrative review process.
+
+- **Method**: `POST`
+- **Endpoint**: `/workout/create`
+- **Authentication**: `authenticateAdminToken`, `authorize('WORKOUT_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "publisherId": "ADM-001",
+    "title": "Full Body HIIT",
+    "description": "A high-intensity interval training session.",
+    "category": "HIIT",
+    "level": "Intermediate",
+    "videoUrl": "s3://bucket/video.mp4",
+    "thumbnailUrl": "s3://bucket/thumb.jpg",
+    "focusArea": ["Full Body"],
+    "equipment": ["Dumbbells"],
+    "intensityLevel": "High",
+    "durationRange": "20-30 mins",
+    "calories": "300-400 kcal"
+  }
+  ```
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "message": "Workout video created successfully",
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345",
+        "title": "Full Body HIIT",
+        "status": "under review",
+        "state": "Inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Missing required fields" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "message": "Error creating workout video" }
+    ```
+
+### 2. Save Workout as Draft
+
+Saves a workout as a `draft` without submitting it for review.
+
+- **Method**: `POST`
+- **Endpoint**: `/workout/save-as-draft`
+- **Authentication**: `authenticateAdminToken`, `authorize('WORKOUT_CREATE')`
+- **Request Body**: Same as "Create Workout".
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "message": "Workout video created successfully",
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12346",
+        "title": "Draft HIIT",
+        "status": "draft"
+      }
+    }
+    ```
+
+### 3. Edit Workout
+
+Edits a workout. If the workout is `published`, this creates a new version for review. Otherwise, it updates the existing record.
+
+- **Method**: `PUT`
+- **Endpoint**: `/workout/edit/:WORKOUT_ID`
+- **Authentication**: `authenticateAdminToken`, `authorize('WORKOUT_EDIT')`
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The ID of the workout to edit.
+- **Request Body**:
+  ```json
+  {
+    "title": "Advanced Full Body HIIT",
+    "description": "An even more intense session.",
+    "reviewerId": "ADM-002",
+    "approverId": "ADM-003"
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Workout updated successfully",
+      "data": {
+        // The updated or newly created workout version object
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Workout not found" }
+    ```
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "Invalid or inactive reviewer IDs" }
+    ```
+
+### 4. Get All Workouts with Filters
+
+Retrieves a list of all workouts with powerful filtering and versioning options.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/get-all`
+- **Authentication**: `authenticateAdminToken`, `authorize('VIEW_WORKOUT')`
+- **Query Parameters**:
+  - `categories` (string, optional): Comma-separated list of categories.
+  - `stages` (string, optional): Comma-separated list of statuses (e.g., "published,draft").
+  - `publisherId` (string, optional): Filter by a specific publisher's ID.
+  - `showVersions` (boolean, optional): If `true`, groups workouts by base ID and shows all versions.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body** (Example with `showVersions=true`):
+    ```json
+    {
+      "success": true,
+      "count": 1,
+      "data": [
+        {
+          "WORKOUT_ID": "WORKOUT-12345",
+          "activeVersion": { "WORKOUT_ID": "WORKOUT-12345", "status": "published" },
+          "inactiveVersions": [ { "WORKOUT_ID": "WORKOUT-12345:V2.0", "status": "under review" } ]
+        }
+      ]
+    }
+    ```
+
+### 5. Get Workout Details
+
+Fetches comprehensive details for a single workout, including pre-signed URLs.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/get/:WORKOUT_ID`
+- **Authentication**: `authenticateAdminToken`, `authorize('VIEW_WORKOUT')`, `authenticateCognitoUser`
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The ID of the workout.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "WORKOUT_ID": "WORKOUT-12345",
+        "title": "Full Body HIIT",
+        "presignVideoUrl": "https://<cloudfront-signed-url>",
+        "presignImageUrl": "https://<s3-presigned-url>",
+        "publisherName": "Admin Coach",
+        "reviewerId": [{ "name": "Reviewer Admin", "USR_ID": "ADM-002" }],
+        "approverId": [{ "name": "Approver Admin", "USR_ID": "ADM-003" }]
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "Workout not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "error": "Internal server error" }
+    ```
+
+### 6. Get Workout with All Versions
+
+Fetches the active version of a workout along with a list of all its other historical and in-progress versions.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/get/versions/:WORKOUT_ID`
+- **Authentication**: `authenticateCognitoUser`
+- **Path Parameters**:
+  - `WORKOUT_ID` (string, required): The base ID of the workout.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "activeWorkout": {
+          "WORKOUT_ID": "WORKOUT-12345",
+          "version": "1.0"
+        },
+        "allVersions": [
+          { "WORKOUT_ID": "WORKOUT-12345", "version": "1.0" },
+          { "WORKOUT_ID": "WORKOUT-12345:V2.0", "version": "2.0" }
+        ]
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Workout not found" }
+    ```
+
+### 7. Reviewer Action (Stage 1)
+
+Allows a reviewer to add comments to a workout, moving it to the `pending approval` stage.
+
+- **Method**: `POST`
+- **Endpoint**: `/workout/review/stage1`
+- **Authentication**: `authenticateAdminToken`, `authorize('REVIEW_WORKOUT')`
+- **Request Body**:
+  ```json
+  {
+    "WorkoutId": "WORKOUT-12345",
+    "adminId": "ADM-002",
+    "comment": "Video quality is good, but description needs more detail.",
+    "visibility": true
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "message": "Comment added successfully", "success": true }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Workout review not found" }
+    ```
+  - **Status**: 403 Forbidden
+    ```json
+    { "success": false, "message": "User is not a SUPERADMIN or a member of the Reviewer group" }
+    ```
+
+### 8. Approver Action (Stage 2)
+
+Allows an approver to `publish`, `approve`, or `reject` a workout. This is the final stage.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/workout/review/stage2`
+- **Authentication**: `authenticateAdminToken`, `authorize('APPROVE_WORKOUT')`
+- **Request Body**:
+  ```json
+  {
+    "WorkoutId": "WORKOUT-12345",
+    "adminId": "ADM-003",
+    "status": "published",
+    "comment": "Looks good. Publishing."
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "message": "Workout status updated to published", "success": true }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "New version workout not found" }
+    ```
+  - **Status**: 403 Forbidden
+    ```json
+    { "success": false, "message": "User is not authorized" }
+    ```
+
+### 9. Get Workouts by Status
+
+Fetches a list of all workouts matching a specific status.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/status/:status`
+- **Authentication**: `authenticateAdminToken`, `authorize('VIEW_WORKOUT')`
+- **Path Parameters**:
+  - `status` (string, required): The status to filter by (e.g., `under-review`, `retired`, `published`).
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "data": [
+        {
+          "WORKOUT_ID": "WORKOUT-98765",
+          "title": "Retired Workout",
+          "status": "retired",
+          "publisherName": "Old Coach"
+        }
+      ],
+      "success": true
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "message": "No workouts found with status: retired", "success": false }
+    ```
+
+### 10. Retire Workout
+
+Changes a workout's status to `retired`, effectively taking it offline.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/workout/retire/:workoutId`
+- **Authentication**: `authenticateAdminToken`, `authorize('RETIRE_WORKOUT')`
+- **Path Parameters**:
+  - `workoutId` (string, required): The ID of the workout to retire.
+- **Request Body**:
+  ```json
+  {
+    "adminId": "ADM-001",
+    "comment": "This workout is outdated and has been replaced."
+  }
+  ```
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Workout status updated to retired"
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Workout not found" }
+    ```
+
+### 11. Delete Workout
+
+Permanently deletes a workout video.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/workout/delete/:workoutId`
+- **Authentication**: `authenticateAdminToken`, `authorize('DELETE_WORKOUT')`
+- **Path Parameters**:
+  - `workoutId` (string, required): The ID of the workout to delete.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    { "message": "Workout deleted successfully", "success": true }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "message": "Workout not found", "success": false }
+    ```
+
+### 12. Get Workout Analytics
+
+Retrieves key performance metrics for a specific workout.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/analytics/:workoutId`
+- **Authentication**: `authenticateAdminToken`, `authorize('VIEW_WORKOUT_ANALYTICS')`
+- **Path Parameters**:
+  - `workoutId` (string, required): The ID of the workout.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "data": {
+        "views": 10520,
+        "likes": 1200,
+        "shares": 350,
+        "reports": 5
+      },
+      "success": true
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "message": "Workout not found", "success": false }
+    ```
+
+### 13. Get Workout Viewers
+
+Retrieves a list of users who have viewed a specific workout.
+
+- **Method**: `GET`
+- **Endpoint**: `/workout/viewers/:workoutId`
+- **Authentication**: `authenticateAdminToken`, `authorize('VIEW_WORKOUT_ANALYTICS')`
+- **Path Parameters**:
+  - `workoutId` (string, required): The ID of the workout.
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Viewers fetched successfully",
+      "totalViewers": 2,
+      "viewerDetails": [
+        {
+          "USR_ID": "USR-111",
+          "name": "Jane Doe",
+          "email": "jane@example.com",
+          "viewedAt": ["2023-10-27T10:00:00.000Z"]
+        },
+        {
+          "USR_ID": "USR-222",
+          "name": "Peter Jones",
+          "email": "peter@example.com",
+          "viewedAt": ["2023-10-28T11:00:00.000Z"]
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "message": "Workout not found", "success": false }
+    ```
+
+## Notes
+- Many routes have authentication middleware commented out. These should be enabled for production.
+- The system supports workout versioning. Editing a `published` workout creates a new version (e.g., `:V2.0`) which goes through the review process again.
+- Pre-signed URLs for media assets are generated on-the-fly and have a limited expiry time.

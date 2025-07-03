@@ -1,0 +1,192 @@
+---
+title: "Single Select Dropdown"
+description: "A customizable single select dropdown with optional search, placeholder, and disabled states."
+---
+
+### Single Select Dropdown
+
+<Frame>
+  <img src="/images/SingleSelectDropDown.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+#### Overview
+
+The `SingleSelectDropdown` component is a flexible and styled dropdown UI element designed for single-option selection. It supports dynamic option lists, search filtering, and optional placeholder and disabled states.
+
+#### Features
+
+- **Single Selection**: Select one option from a list.
+- **Search Support**: Filter options using a built-in search input.
+- **Flexible Input Types**: Accepts both simple string arrays and label/value pairs.
+- **Disabled State**: Optionally disable the entire dropdown.
+- **Customizable UI**: Support for placeholder, styles, and background colors.
+
+#### Usage
+
+```tsx
+import { SingleSelectDropdown } from "./SingleSelectDropdown";
+import { useState } from "react";
+
+const Example = () => {
+  const [selected, setSelected] = useState("");
+
+  const options = [
+    { label: "Option One", value: "one" },
+    { label: "Option Two", value: "two" },
+    "Plain Text Option"
+  ];
+
+  return (
+    <SingleSelectDropdown
+      options={options}
+      selectedOption={selected}
+      onSelectionChange={setSelected}
+      placeholder="Choose one..."
+    />
+  );
+};
+```
+
+#### Props
+
+| Prop                 | Type                                                                  | Default              | Description                                                       |
+|----------------------|-----------------------------------------------------------------------|----------------------|-------------------------------------------------------------------|
+| `options`            | `({ label: string; value: string } \| string)[]`                     | `[]`                 | The list of selectable options. Supports strings or label/value.  |
+| `selectedOption`     | `string`                                                              | `""`                | The currently selected option's value.                            |
+| `onSelectionChange`  | `(selected: string) => void`                                          | `undefined`          | Callback triggered when a new option is selected.                |
+| `placeholder`        | `string`                                                              | `"Select an option..."` | Placeholder shown when nothing is selected.                        |
+| `className`          | `string`                                                              | `""`                 | Optional custom class names for the root wrapper.                |
+| `placeholderBgColor` | `string`                                                              | `"bg-neutral-900"`   | Tailwind class for dropdown header background.                   |
+| `disabled`           | `boolean`                                                             | `false`              | If true, disables interaction with the dropdown.                 |
+
+#### Anatomy
+
+1. **Trigger Button**: Styled clickable area to open the dropdown.
+2. **Search Input**: Filter options by label text.
+3. **Option List**: Displays matching options, click to select.
+4. **Disabled State**: Prevents interaction and closes open dropdowns.
+
+#### Component Code
+
+```tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { ChevronDown, Search } from "lucide-react";
+
+interface SingleSelectDropdownProps {
+  options: ({ label: string; value: string } | string)[];
+  selectedOption: string; // Single selection
+  onSelectionChange: (selected: string) => void;
+  placeholder?: string;
+  className?: string;
+  placeholderBgColor?: string;
+  disabled?: boolean; // For disabling the dropdown
+}
+
+export function SingleSelectDropdown({
+  options,
+  selectedOption,
+  onSelectionChange,
+  placeholder = "Select an option...",
+  className = "",
+  placeholderBgColor = "bg-neutral-900",
+  disabled = false, // Default to enabled
+}: SingleSelectDropdownProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [query, setQuery] = useState<string>("");
+
+  const normalizedOptions = options.map((option) =>
+    typeof option === "string" ? { label: option, value: option } : option
+  );
+
+  const filteredOptions = query
+    ? normalizedOptions.filter((option) =>
+        option.label.toLowerCase().includes(query.toLowerCase())
+      )
+    : normalizedOptions;
+
+  // Close dropdown if disabled state changes to true
+  useEffect(() => {
+    if (disabled && isOpen) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
+  const handleDropdownToggle = () => {
+    if (!disabled) {
+      setIsOpen((prev) => !prev);
+    }
+  };
+
+  const selectOption = (option: string) => {
+    if (!disabled) {
+      onSelectionChange(option);
+      setIsOpen(false); // Close dropdown after selection
+    }
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      {/* Dropdown button */}
+      <div
+        className={`flex items-center justify-between p-1.5 
+          ${placeholderBgColor} 
+          ${disabled ? "cursor-not-allowed" : "cursor-pointer"} 
+          text-gray-400 border border-neutral-600 rounded-md`}
+        onClick={handleDropdownToggle}
+      >
+        <span className={`text-[15px]`}>
+          {normalizedOptions.find((o) => o.value === selectedOption)?.label ||
+            placeholder}
+        </span>
+        <ChevronDown className={`w-5 h-5 text-gray-400`} />
+      </div>
+
+      {/* Dropdown content */}
+      {isOpen && !disabled && (
+        <div className="absolute z-10 mt-2 w-full max-h-60 overflow-auto rounded-md bg-[#262626] text-white shadow-lg ring-1 ring-black ring-opacity-5">
+          {/* Search Input */}
+          <div className="flex items-center px-4 py-2 bg-[#171717]">
+            <Search className="w-5 h-5 text-gray-400 mr-2" />
+            <Input
+              placeholder={placeholder}
+              className="w-full text-gray-400 bg-transparent border-none focus:ring-0"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Options list */}
+          <ul className="divide-y divide-gray-600">
+            {filteredOptions.map((option) => (
+              <li
+                key={option.value}
+                className="px-4 py-2 cursor-pointer hover:bg-neutral-700"
+                onClick={() => selectOption(option.value)}
+              >
+                {option.label}
+              </li>
+            ))}
+          </ul>
+
+          {/* No options message */}
+          {filteredOptions.length === 0 && (
+            <div className="px-4 py-2 text-center text-gray-500">
+              No options found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+```
+
+### Customization
+
+- Adjust padding, colors, and icon sizes via Tailwind classes.
+- Extend to support icons, groups, or multiple selection.
+- Easily integrate with form libraries like React Hook Form.

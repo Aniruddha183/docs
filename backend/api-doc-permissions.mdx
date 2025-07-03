@@ -1,0 +1,513 @@
+
+***
+
+# Access Control Management API Documentation
+
+This document outlines the API endpoints for managing access control, including modules, permissions, access levels, and action keys for the FitEarn application's admin panel.
+
+## Base URL
+```
+/api/fitnearn/web/admin
+```
+
+## Module Management
+
+Endpoints for creating and listing access control modules.
+
+### 1. Add a New Module
+
+Creates a new module to which permissions can be assigned.
+
+- **Method**: `POST`
+- **Endpoint**: `/access/modules/add`
+- **Authentication**: *Currently disabled in the router.*
+- **Request Body**:
+  ```json
+  {
+    "moduleName": "User Management",
+    "moduleDescription": "Module for managing user profiles and roles."
+  }
+  ```
+  - `moduleName` (string, required): The unique name of the module.
+  - `moduleDescription` (string, optional): A description of the module.
+
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Module created successfully",
+      "data": {
+        "moduleID": "MOD-1716369019230",
+        "moduleName": "User Management",
+        "moduleDescription": "Module for managing user profiles and roles.",
+        "_id": "664da67b370e4f323a789a7f",
+        "createdAt": "2024-05-22T09:10:19.236Z",
+        "updatedAt": "2024-05-22T09:10:19.236Z"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Module name is required" }
+    ```
+  - **Status**: 409 Conflict
+    ```json
+    { "success": false, "error": "Module name already exists" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "error": "Internal server error" }
+    ```
+
+### 2. Get All Modules
+
+Retrieves a list of all available modules.
+
+- **Method**: `GET`
+- **Endpoint**: `/access/modules/list`
+- **Authentication**: *Currently disabled in the router.*
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    [
+      {
+        "_id": "664da67b370e4f323a789a7f",
+        "moduleID": "MOD-1716369019230",
+        "moduleName": "User Management",
+        "moduleDescription": "Module for managing user profiles and roles.",
+        "createdAt": "2024-05-22T09:10:19.236Z",
+        "updatedAt": "2024-05-22T09:10:19.236Z"
+      }
+    ]
+    ```
+- **Error Response**:
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "message": "Server error", "error": {} }
+    ```
+
+---
+
+## Permission Management
+
+Endpoints for creating, reading, updating, and deleting specific permissions.
+
+### 1. Add a New Permission
+
+Creates a new permission, linking it to a module, access levels, and a unique action key.
+
+- **Method**: `POST`
+- **Endpoint**: `/access/permissions/add`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "permissionName": "Create User",
+    "moduleID": "MOD-1716369019230",
+    "description": "Allows creating a new user.",
+    "status": "Active",
+    "access": ["ACCESS-123", "ACCESS-456"],
+    "actionKey": "USER_CREATE"
+  }
+  ```
+  - `permissionName` (string, required): The human-readable name of the permission.
+  - `moduleID` (string, required): The ID of the module this permission belongs to.
+  - `access` (array of strings, required): An array of `accessId`s that this permission applies to.
+  - `actionKey` (string, required): A unique, system-wide key for this permission. Must exist in the `ActionKeyModel`.
+  - `description` (string, optional): A detailed description of the permission.
+  - `status` (string, optional): The status of the permission (e.g., "Active", "Inactive"). Defaults to "Active".
+
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permission created successfully",
+      "data": {
+        "permissionName": "Create User",
+        "permissionID": "PERM-1716369019230",
+        "moduleID": "MOD-1716369019230",
+        "description": "Allows creating a new user.",
+        "status": "Active",
+        "access": ["ACCESS-123", "ACCESS-456"],
+        "actionKey": "USER_CREATE"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "error": "Missing required fields..." }
+    ```
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "error": "Invalid moduleID" }
+    ```
+  - **Status**: 409 Conflict
+    ```json
+    { "success": false, "error": "A permission with this actionKey already exists" }
+    ```
+
+### 2. Get All Permissions
+
+Retrieves a list of all permissions, with options for filtering and sorting.
+
+- **Method**: `GET`
+- **Endpoint**: `/access/permissions/get-all`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_VIEW')`
+- **Query Parameters**:
+  - `search` (string, optional): Search term to filter by `permissionName` (case-insensitive).
+  - `status` (string, optional): Filter by status (e.g., "Active", "Inactive").
+  - `moduleName` (string, optional): Filter by the name of the module.
+  - `sort` (string, optional): Sort by creation date. Accepts `asc` or `desc` (default).
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/access/permissions/get-all?status=Active&moduleName=User%20Management
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "permissionID": "PERM-1716369019230",
+          "permissionName": "Create User",
+          "moduleID": "MOD-1716369019230",
+          "status": "Active",
+          "access": ["ACCESS-123"],
+          "actionKey": "USER_CREATE",
+          "moduleName": "User Management"
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Module not found: [moduleName]" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Server Error", "error": "[error message]" }
+    ```
+
+### 3. Get a Single Permission
+
+Fetches details of a specific permission by its ID.
+
+- **Method**: `GET`
+- **Endpoint**: `/access/permissions/get/:permissionID`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_VIEW')`
+- **Path Parameters**:
+  - `permissionID` (string, required): The unique identifier for the permission.
+
+- **Request Example**:
+  ```
+  GET /api/fitnearn/web/admin/access/permissions/get/PERM-1716369019230
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "permissionID": "PERM-1716369019230",
+        "permissionName": "Create User",
+        "moduleID": "MOD-1716369019230",
+        "status": "Active",
+        "access": ["ACCESS-123"],
+        "actionKey": "USER_CREATE"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Permission not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Server Error", "error": "[error message]" }
+    ```
+
+### 4. Update a Permission
+
+Updates the details of an existing permission.
+
+- **Method**: `PUT`
+- **Endpoint**: `/access/permissions/update/:permissionID`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_EDIT')`
+- **Path Parameters**:
+  - `permissionID` (string, required): The ID of the permission to update.
+- **Request Body**:
+  ```json
+  {
+    "permissionName": "Create New System User",
+    "status": "Inactive"
+  }
+  ```
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permission updated successfully",
+      "data": {
+        "permissionID": "PERM-1716369019230",
+        "permissionName": "Create New System User",
+        "status": "Inactive"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Permission not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Server Error", "error": "[error message]" }
+    ```
+
+### 5. Delete a Permission
+
+Deletes a specific permission by its ID.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/permission/delete/:permissionID`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_DELETE')`
+- **Path Parameters**:
+  - `permissionID` (string, required): The ID of the permission to delete.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Permission deleted successfully",
+      "data": {
+        "permissionID": "PERM-1716369019230",
+        "permissionName": "Create User"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Permission not found" }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Server Error", "error": "[error message]" }
+    ```
+
+---
+
+## Access Level Management
+
+Endpoints for managing user access levels or roles.
+
+### 1. Add a New Access Level
+
+Creates a new access level (e.g., "Super Admin", "Admin", "User").
+
+- **Method**: `POST`
+- **Endpoint**: `/access/add-access`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_ACCESS_CREATE')`
+- **Request Body**:
+  ```json
+  {
+    "access": "Editor",
+    "order": 3
+  }
+  ```
+  - `access` (string, required): The name of the access level.
+  - `order` (number, required): A numeric value to determine the display order.
+
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "message": "Access added successfully",
+      "role": {
+        "access": "Editor",
+        "order": 3,
+        "accessId": "ACCESS-1716369019230"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "message": "access and order are required" }
+    ```
+    ```json
+    { "message": "access already exists" }
+    ```
+
+### 2. Get All Access Levels
+
+Retrieves a list of all access levels, sorted by their `order`.
+
+- **Method**: `GET`
+- **Endpoint**: `/access/list`
+- **Authentication**: *Currently disabled in the router.*
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    [
+      {
+        "_id": "664da67b370e4f323a789a70",
+        "access": "Super Admin",
+        "order": 1,
+        "accessId": "ACCESS-1716369019200"
+      },
+      {
+        "_id": "664da67b370e4f323a789a71",
+        "access": "Admin",
+        "order": 2,
+        "accessId": "ACCESS-1716369019210"
+      }
+    ]
+    ```
+- **Error Response**:
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "message": "Server error", "error": {} }
+    ```
+
+---
+
+## Action Key Management
+
+Endpoints for managing the unique action keys used in permissions.
+
+### 1. Add a New Action Key
+
+Creates a new, reusable action key that can be assigned to a permission.
+
+- **Method**: `POST`
+- **Endpoint**: `/access/permissions/add-actionKey`
+- **Authentication**: *Currently disabled in the router.*
+- **Request Body**:
+  ```json
+  {
+    "actionKey": "POST_VIEW"
+  }
+  ```
+  - `actionKey` (string, required): The unique key (e.g., `MODULE_ACTION`).
+
+- **Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Action key created successfully.",
+      "data": {
+        "actionKeyId": "ACTIONKEY-1716369019230",
+        "actionKey": "POST_VIEW"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 400 Bad Request
+    ```json
+    { "success": false, "message": "actionKey are required." }
+    ```
+  - **Status**: 409 Conflict
+    ```json
+    { "success": false, "message": "Action key already exists." }
+    ```
+
+### 2. Delete an Action Key
+
+Deletes a specific action key by its ID.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/permission/actionKey/delete/:actionKeyID`
+- **Authentication**: `authenticateAdminToken`, `authorize('ACCESS_PERMISSION_DELETE')`
+- **Path Parameters**:
+  - `actionKeyID` (string, required): The ID of the action key to delete.
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Action key deleted successfully.",
+      "data": {
+        "actionKeyId": "ACTIONKEY-1716369019230",
+        "actionKey": "POST_VIEW"
+      }
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "Action key not found." }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error." }
+    ```
+
+### 3. Get All Action Keys
+
+Retrieves a list of all available action keys.
+
+- **Method**: `GET`
+- **Endpoint**: `/permission/actionKeys/getAll`
+- **Authentication**: *Currently disabled in the router.*
+
+- **Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "success": true,
+      "message": "Action keys retrieved successfully.",
+      "data": [
+        {
+          "actionKeyId": "ACTIONKEY-1716369019230",
+          "actionKey": "POST_VIEW"
+        },
+        {
+          "actionKeyId": "ACTIONKEY-1716369019231",
+          "actionKey": "POST_CREATE"
+        }
+      ]
+    }
+    ```
+- **Error Responses**:
+  - **Status**: 404 Not Found
+    ```json
+    { "success": false, "message": "No action keys found." }
+    ```
+  - **Status**: 500 Internal Server Error
+    ```json
+    { "success": false, "message": "Internal server error." }
+    ```
+
+## Notes
+- All endpoints require appropriate authentication and authorization for administrative access unless otherwise noted.
+- The `idGenerationMiddleware` is used to create unique, prefixed IDs for new records (e.g., `PERM-`, `ACTIONKEY-`).
