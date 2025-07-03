@@ -1,0 +1,154 @@
+---
+title: Coach App File Type Selector Button
+description: Select image or video files via button with async preview loader
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation of the **File Type Selector Button**, a UI component used to upload and preview image or video files, most commonly used in post creation and media uploads.
+
+---
+
+## 1. File Type Selector Button
+
+The file type selector provides buttons to allow the user to choose either an **image** or **video** file. Once selected, the file is passed to a loader screen (e.g., `ImageLoader`) for further processing and preview.
+
+---
+
+### Functional Behavior
+
+- Presents two buttons: one for **Image**, one for **Video**.
+- When a button is pressed:
+  - The bottom sheet closes.
+  - The file picker opens with allowed extensions.
+  - Selected file is passed to the `ImageLoader` screen.
+  - After confirmation, the file path is stored in the `PostProvider`.
+  - Video files are initialized using `VideoPlayerController`.
+- If the user cancels selection, local and provider states are reset.
+
+---
+
+### UI/UX Notes
+
+- Active (selected) button is filled with `buttonColor1`.
+- Unselected buttons are transparent.
+- Both buttons use rounded corners and equal height/width (`Size(80, 40)`).
+- Supports `.png`, `.jpg`, `.jpeg` for image; `.mp4`, `.mov`, `.avi` for video.
+- The text uses `fontColor3` for readability.
+
+---
+
+## 2. Code Snippet: File Type Button
+
+```dart
+Widget _fileTypeButton(
+  String label,
+  List<String> extensions,
+  PostProvider postProvider,
+  bool isVideo,
+) {
+  return Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: (label == "Image")
+            ? buttonColor1
+            : const Color.fromRGBO(0, 0, 0, 0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        minimumSize: const Size(80, 40),
+      ),
+      onPressed: () async {
+        final navigator = Navigator.of(context);
+        navigator.pop(); // Close the bottom sheet
+
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: extensions,
+        );
+
+        if (result != null && result.files.single.path != null) {
+          final pickedFile = File(result.files.single.path!);
+          final File? uploadedFile = await navigator.push<File>(
+            MaterialPageRoute(
+              builder: (context) => ImageLoader(
+                file: pickedFile,
+                sourceScreen: 'PostTextImage',
+              ),
+            ),
+          );
+
+          if (uploadedFile != null && mounted) {
+            postProvider.setUploadedFile(uploadedFile.path);
+            postProvider.setMediaType(isVideo: isVideo);
+
+            setState(() {
+              _isPostUploaded = true;
+              _uploadedFileName = uploadedFile.path;
+              _fileUploadError = null;
+              _videoController?.dispose();
+              _videoController = null;
+            });
+
+            // Initialize video controller if file is a video
+            String extension =
+                uploadedFile.path.split('.').last.toLowerCase();
+            if (['mp4', 'mov', 'avi'].contains(extension)) {
+              _videoController = VideoPlayerController.file(uploadedFile)
+                ..initialize().then((_) {
+                  if (mounted) setState(() {});
+                });
+            }
+          } else if (mounted) {
+            // Reset state if no file returned
+            postProvider.setUploadedFile(null);
+            setState(() {
+              _isPostUploaded = false;
+              _uploadedFileName = null;
+              _videoController?.dispose();
+              _videoController = null;
+            });
+          }
+        } else if (mounted) {
+          // User cancelled file selection
+          setState(() {
+            _isPostUploaded = false;
+            _uploadedFileName = null;
+            _videoController?.dispose();
+            _videoController = null;
+          });
+          postProvider.setUploadedFile(null);
+        }
+      },
+      child: Text(
+        label,
+        style: GoogleFonts.lato(
+          color: fontColor3,
+          fontSize: 18,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ),
+  );
+}
+```
+
+### Usage example:
+
+- Call the file type buttons using:-
+
+```dart
+Row(
+  children: [
+    _fileTypeButton('Image', ['png', 'jpg', 'jpeg'], postProvider, false),
+    const SizedBox(width: 10),
+    _fileTypeButton('Video', ['mp4', 'mov', 'avi'], postProvider, true),
+  ],
+)
+
+```

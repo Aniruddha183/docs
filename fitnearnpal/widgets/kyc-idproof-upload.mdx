@@ -1,0 +1,75 @@
+---
+title: Image Upload Container for KYC
+description: Upload front or back side images of ID proofs from gallery using FilePicker
+---
+
+# 🖼️ Image Upload Container for KYC Verification
+
+This component allows coaches to upload images of their ID proofs or other documents for KYC verification by selecting files from their device gallery.
+
+---
+
+## ✨ Purpose
+
+- Enable uploading of front and back images of documents.
+- Preview the uploaded image inside a bordered container.
+- Allow tapping to trigger image selection from gallery.
+- Restrict file types to common image formats (PNG, JPG, JPEG).
+
+---
+
+## 🧱 Code Snippet: File Picker & Image Container
+
+```dart
+void _pickFile(String side) async {
+  FilePickerResult? result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['png', 'jpg', 'jpeg'],
+  );
+
+  if (result != null) {
+    setState(() {
+      if (side == 'front') {
+        _frontSideFile = File(result.files.single.path!);
+      } else if (side == 'back') {
+        _backSideFile = File(result.files.single.path!);
+      }
+    });
+  }
+}
+GestureDetector(
+  onTap: () => _pickFile('front'),
+  child: Container(
+    height: 200,
+    width: double.infinity,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.grey),
+      image: _frontSideFile != null
+          ? DecorationImage(
+              image: FileImage(_frontSideFile!),
+              fit: BoxFit.fill,
+            )
+          : null,
+    ),
+    child: _frontSideFile == null
+        ? Center(
+            child: Text(
+              'Tap to upload Back Side as\n       PNG,JPEG, or JPG',
+              style: GoogleFonts.lato(
+                color: fontColor5,
+                fontSize: 16,
+              ),
+            ),
+          )
+        : null,
+  ),
+),
+```
+
+| Feature          | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| File Picker      | Opens gallery to pick images with allowed extensions |
+| Preview          | Shows selected image as background in container      |
+| Tap Interaction  | Tapping container triggers file picker               |
+| File Type Filter | Restricts selection to png, jpg, jpeg files          |

@@ -1,0 +1,173 @@
+---
+title: Coach App Category List Selector
+description: Searchable category selector screen for sessions and videos
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation of the searchable **Category List Selector** used in various parts of the Coach App (e.g., Live Session creation, Workout Video upload).
+
+---
+
+## 1. Category List Selector
+
+This screen allows the coach to select a session or content **category** from a predefined list such as Yoga, Strength, Dance, HIIT, etc.
+
+---
+
+### Functional Behavior
+
+- A search field filters the category list in real time.
+- Tapping a category visually selects it and returns it to the parent screen.
+- The selected category is shown with a highlighted trailing icon.
+- A cancel button allows the user to dismiss the screen without selecting.
+
+---
+
+### UI/UX Notes
+
+- The UI features a modern pill-shaped search bar with a suffix search icon.
+- List items are rendered with spacing and a subtle divider.
+- The selected category icon uses a distinct color (`selectoptionColor`) for visual feedback.
+- Screen uses dark background to match the Coach App aesthetic.
+
+---
+
+## 2. Code Snippet: CategoryListScreen
+
+```dart
+class CategoryListScreen extends StatefulWidget {
+  const CategoryListScreen({super.key});
+
+  @override
+  State<CategoryListScreen> createState() => _CategoryListScreenState();
+}
+
+class _CategoryListScreenState extends State<CategoryListScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _filteredCategories = [];
+  CategoryModel? selectedCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    // _filteredCategories = categories;
+  }
+
+  void _filterCategories(String query) {
+    setState(() {
+      // _filteredCategories = categories
+      //   .where((category) =>
+      //     category['label'].toLowerCase().contains(query.toLowerCase()))
+      //   .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: Selector<GetProvider, List<CategoryModel>>(
+          selector: (p0, p1) => p1.categories,
+          builder: (context, categoryModel, _) {
+            return Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: _filterCategories,
+                            style: GoogleFonts.lato(
+                              color: fontColor1,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: InputDecoration(
+                              contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 18),
+                              suffixIcon: const Icon(Icons.search, color: fontColor4),
+                              hintText: 'Search by Category Name',
+                              hintStyle: const TextStyle(color: fontColor5),
+                              filled: true,
+                              fillColor: Colors.grey[900],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(50.0),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Text(
+                          "Cancel",
+                          style: GoogleFonts.lato(
+                            color: fontColor1,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Category List
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: categoryModel.length,
+                    itemBuilder: (context, index) {
+                      final category = categoryModel[index];
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: Icon(Icons.alarm, color: Colors.white),
+                            title: Text(
+                              category.categoryName,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: Icon(
+                              Icons.circle_rounded,
+                              color: selectedCategory == category
+                                ? selectoptionColor
+                                : Colors.grey,
+                            ),
+                            onTap: () {
+                              setState(() {
+                                selectedCategory = category;
+                              });
+                              Future.delayed(const Duration(milliseconds: 600), () {
+                                Navigator.pop(context, category);
+                              });
+                            },
+                          ),
+                          const Divider(
+                            color: Color.fromRGBO(64, 64, 64, 1),
+                            thickness: 0.5,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          }
+        ),
+      ),
+    );
+  }
+}
+```

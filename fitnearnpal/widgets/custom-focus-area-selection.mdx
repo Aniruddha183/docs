@@ -1,0 +1,268 @@
+---
+title: Coach App Focus Area Selector
+description: Reusable focus area chip selection component with enforced min-max logic
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation and design logic of the **Focus Area Selector**, a reusable input pattern used in multiple workflows like live session creation, video tagging, etc.
+
+---
+
+## 1. Focus Area Selector (Chip-Based Multi-Select)
+
+A visual chip selector that allows coaches to select **2 to 4 focus areas** from a pre-defined list (e.g., Arms, Core, Chest, Back).
+
+### Functional Behavior
+
+- **Min Selection:** 2 chips must be selected.
+- **Max Selection:** 4 chips can be selected.
+- **Invalid Selection:** Warning appears if the selection is below 2 or above 4.
+- **Persistence:** Selected chips are returned when saving the screen.
+
+---
+
+### States
+
+1. **Unselected State:**
+
+   - Chip appears with neutral background (e.g., dark grey or default).
+   - No trailing icon.
+   - Tap to select.
+
+2. **Selected State:**
+
+   - Chip color changes to accent (`buttonColor1`).
+   - A selected icon appears (e.g., filled circle).
+   - Tap again to unselect.
+
+3. **Validation Warning State:**
+
+   - A `WarningText` widget appears with message: `"Please select between 2 and 4 options."`
+   - Triggered on save attempt or real-time selection change.
+
+---
+
+### UI/UX Notes
+
+- Chips use padding and spacing for wrapping in 2-column layout.
+- Each chip includes an icon + label (e.g., Arms with arm icon).
+- Responsive design ensures it fits in both narrow and wide layouts.
+- Animated selection toggle adds visual feedback.
+- Disabled “Save” button if selection is invalid (optional UX enhancement).
+
+---
+
+### Code Snippet: Chip Selection Screen
+
+```dart
+class _FocusAreaOptionsState extends State<FocusAreaOptions> {
+  // final List<Map<String, dynamic>> focusAreas = [
+  //   {'icon': 'assets/icons/arms filled.png', 'label': 'Arms'},
+  //   {'icon': 'assets/icons/Group (2).png', 'label': 'Abs'},
+  //   {'icon': 'assets/icons/chest filled.png', 'label': 'Chest'},
+  //   {'icon': 'assets/icons/Group (3).png', 'label': 'Upper Body'},
+  //   {'icon': 'assets/icons/Back.png', 'label': 'Back'},
+  //   {'icon': 'assets/icons/leg.png', 'label': 'Legs'},
+  //   {'icon': 'assets/icons/Group (4).png', 'label': 'Stretching'},
+  //   {'icon': 'assets/icons/shoulder filled.png', 'label': 'Shoulders'},
+  //   {'icon': 'assets/icons/Group (5).png', 'label': 'Brain'},
+  //   {'icon': 'assets/icons/Group (6).png', 'label': 'Full Body'},
+  //   {'icon': 'assets/icons/Group (7).png', 'label': 'Core'},
+  // ];
+
+  final List<FocusAreaModel> selectedFocusAreas = [];
+  bool showWarning = false;
+  TextEditingController searchController = TextEditingController();
+  List<Map<String, dynamic>> filteredFocusAreas = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // filteredFocusAreas = focusAreas;
+  }
+
+  void _toggleSelection(FocusAreaModel label) {
+    setState(() {
+      if (selectedFocusAreas.contains(label)) {
+        selectedFocusAreas.remove(label);
+      } else if (selectedFocusAreas.length < 4) {
+        selectedFocusAreas.add(label);
+      }
+      showWarning =
+          selectedFocusAreas.length < 2 || selectedFocusAreas.length > 4;
+    });
+  }
+
+  void _validateAndSubmit() {
+    if (selectedFocusAreas.length < 2 || selectedFocusAreas.length > 4) {
+      setState(() {
+        showWarning = true;
+      });
+      return;
+    }
+    Navigator.pop(context, selectedFocusAreas);
+  }
+
+  void _filterFocusAreas(String query) {
+    setState(() {
+      // filteredFocusAreas = focusAreas
+      //     .where((area) =>
+      //         area['label'].toLowerCase().contains(query.toLowerCase()))
+      //     .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      resizeToAvoidBottomInset: false,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child:
+              Selector<GetProvider, List<FocusAreaModel>>(selector: (p0, p1) {
+            return p1.focusArea;
+          }, builder: (context, focusAreaModel, _) {
+            return Column(
+              children: [
+                // Search Bar
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        onChanged: _filterFocusAreas,
+                        style: GoogleFonts.lato(
+                          color: fontColor1,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          suffixIcon:
+                              const Icon(Icons.search, color: fontColor4),
+                          hintText: 'Search by Category Name',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          filled: true,
+                          fillColor: Colors.grey[900],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(50.0),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          color: fontColor1,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (showWarning)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: WarningText(
+                      text: "Please select between 2 and 4 options.",
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                // Focus Area List
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: focusAreaModel.length,
+                    itemBuilder: (context, index) {
+                      final category = focusAreaModel[index];
+                      final isSelected =
+                          selectedFocusAreas.contains(focusAreaModel[index]);
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: Image.asset(
+                              'assets/icons/arms filled.png',
+                              color: isSelected
+                                  ? const Color.fromRGBO(205, 91, 82, 1)
+                                  : Colors.white,
+                            ),
+                            title: Text(
+                              focusAreaModel[index].focusArea,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: Icon(
+                              isSelected ? Icons.circle : Icons.circle_outlined,
+                              color: isSelected
+                                  ? const Color.fromRGBO(205, 91, 82, 1)
+                                  : Colors.grey,
+                            ),
+                            onTap: () =>
+                                _toggleSelection(focusAreaModel[index]),
+                          ),
+                          const Divider(
+                            color: Color.fromRGBO(64, 64, 64, 1),
+                            thickness: 0.5,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                PinkButton(buttontext: "Save", onPressed: _validateAndSubmit),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+```
+
+### Code Snippet: Chips
+
+```dart
+Wrap(
+                        spacing: 10, // Horizontal space between items
+                        runSpacing: 8, // Vertical space between rows
+                        children: sessionProvider.focusAreas
+                            .map(
+                              (area) => SizedBox(
+                                width: (size.width - 48) / 2,
+                                child: Chip(
+                                  backgroundColor: buttonColor2,
+                                  label: Row(
+                                    children: [
+                                      _getFocusAreaIcon(area
+                                          .focusArea), // Add icon for each focus area
+                                      const SizedBox(width: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: Text(
+                                          area.focusArea,
+                                          style: GoogleFonts.lato(
+                                            fontSize: 16,
+                                            color: fontColor1,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      )
+```

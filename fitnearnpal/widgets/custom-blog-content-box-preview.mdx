@@ -1,0 +1,155 @@
+---
+title: Blog Content Preview Box
+description: Read-only preview of user-generated blog content including text and embedded media using Flutter Quill
+---
+
+# 📄 Blog Content Preview Box
+
+The **BlogContentPreviewBox** is a read-only UI widget that renders rich blog content created by the user using `flutter_quill`. It supports embedded images and displays the article as it would appear post-publication.
+
+---
+
+## ✨ Purpose
+
+- Provides a **preview view** of the blog article after creation or during review.
+- Ensures consistent display of formatted content and embedded images.
+- Supports reuse of blog content by serializing it to JSON for backend storage.
+
+---
+
+## ✅ Key Features
+
+| Feature            | Description                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| Read-only Preview  | Prevents editing while showing rich text and media              |
+| JSON Serialization | Converts blog content into JSON for storage or network transfer |
+| Embedded Images    | Supports custom image embedding using `ImageEmbedBuilder`       |
+| Responsive Layout  | Adapts preview size to screen height                            |
+
+---
+
+## 🧱 Code Snippet: BlogContentPreviewBox
+
+```dart
+class BlogContentPreviewBox extends StatefulWidget {
+  final Document? document;
+
+  const BlogContentPreviewBox({super.key, this.document});
+
+  @override
+  State<BlogContentPreviewBox> createState() => _BlogContentPreviewBoxState();
+}
+
+class _BlogContentPreviewBoxState extends State<BlogContentPreviewBox> {
+  late QuillController quillController;
+
+  @override
+  void initState() {
+    quillController = QuillController(
+      document: widget.document ?? Document(),
+      selection: const TextSelection.collapsed(offset: 0),
+    )..readOnly = true;
+    super.initState();
+  }
+
+  void saveBlogContent() {
+    final contentJson = quillController.document.toDelta().toJson();
+    final contentString = jsonEncode(contentJson);
+    print("Blog content JSON: $contentString");
+
+    final document = Document.fromJson(jsonDecode(contentString));
+    final controller = QuillController(
+      document: document,
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+
+    debugPrint("Document: ${widget.document}");
+
+    List<dynamic> blogContentJson = quillController.document.toDelta().toJson();
+    String blogContentString = jsonEncode(blogContentJson);
+
+    saveBlogContent();
+
+    return Column(
+      children: [
+        // Header
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: containerColor,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
+          ),
+          padding: const EdgeInsets.all(12.0),
+          child: Text(
+            "", // Optional title
+            style: GoogleFonts.lato(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: fontColor1,
+            ),
+          ),
+        ),
+
+        // Preview Body
+        Container(
+          height: size.height * 0.5,
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: const BoxDecoration(
+            color: buttonColor2,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(10),
+              bottomRight: Radius.circular(10),
+            ),
+          ),
+          child: DefaultTextStyle(
+            style: GoogleFonts.lato(
+              color: fontColor1,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            child: QuillEditor(
+              controller: quillController,
+              focusNode: FocusNode(),
+              scrollController: ScrollController(),
+              config: quill.QuillEditorConfig(
+                embedBuilders: [
+                  ImageEmbedBuilder(),
+                ],
+                contentInsertionConfiguration: ContentInsertionConfiguration(
+                  onContentInserted: (content) {
+                    debugPrint('Content inserted: $content');
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+### Behavior details:
+
+- The QuillController is initialized using the provided Document, defaulting to empty if none is passed.
+
+- The document is serialized to JSON using:
+
+```dart
+final contentJson = quillController.document.toDelta().toJson();
+final contentString = jsonEncode(contentJson);
+```
+
+- The editor is strictly read-only to prevent user modifications during preview.
+
+- Images embedded using ImageEmbedBuilder are rendered appropriately.

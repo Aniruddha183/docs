@@ -1,0 +1,94 @@
+---
+title: LevelofPlan Dropdown
+description: A reusable widget that visually represents selectable workout plan levels (e.g., Beginner, Intermediate, Advanced) with icons and selection highlighting.
+---
+
+# 🏋️ LevelofPlan
+
+The `LevelofPlan` widget is a stylized component used in fitness or workout plan UIs to display and select different training levels (e.g., Beginner, Intermediate, Advanced). It includes an image icon, label text, and selection state visual feedback with a colored border.
+
+---
+
+## ✅ Features
+
+- Displays a plan level with a label and corresponding image.
+- Highlights the selected level with a visible border.
+- Minimal and responsive design for grid or list usage.
+
+---
+
+## 📦 Props
+
+| Prop         | Type     | Description                                      |
+| ------------ | -------- | ------------------------------------------------ |
+| `level`      | `String` | The label representing the workout level         |
+| `image`      | `String` | Path to the asset image displayed above the text |
+| `isSelected` | `bool`   | Whether this level is currently selected         |
+
+---
+
+## 🧱 UI Structure
+
+- A padded icon/image container with border highlighting if selected.
+- Level label text below the image.
+- Useful in a horizontal/vertical selector layout for plan configuration.
+
+---
+
+## 💻 Code
+
+```dart
+class LevelofPlan extends StatelessWidget {
+  final String level;
+  final String image;
+  final bool isSelected;
+
+  const LevelofPlan({
+    super.key,
+    required this.level,
+    required this.image,
+    required this.isSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: buttonColor2,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? buttonColor1 : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24),
+            child: Image.asset(image),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          level,
+          style: GoogleFonts.lato(
+            color: fontColor6,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+### Example usage
+
+```dart
+LevelofPlan(
+  level: "Beginner",
+  image: "assets/images/beginner_icon.png",
+  isSelected: selectedLevel == "Beginner",
+)
+```

@@ -1,0 +1,156 @@
+---
+title: Coach App Session Level Selector
+description: UI and logic for selecting beginner, intermediate, or advanced level for a session
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document describes the **Session Level Selector**, a reusable component that allows coaches to specify the difficulty level of a workout or live session after choosing a category.
+
+---
+
+## 1. Session Level Selector
+
+The session level selector allows the coach to define the **target audience difficulty level** for their session (e.g., Beginner, Intermediate, Advanced).
+
+---
+
+### Functional Behavior
+
+- The selector becomes **visible only after** a session/workout category is selected.
+- The coach can select **one** of the available levels.
+- Visual feedback indicates the current selection.
+- Each level option includes a title, description, and an illustrative image.
+
+---
+
+### UI/UX Notes
+
+- Uses `ListTile` UI with consistent styling, padding, and visual separators.
+- Selected tile is highlighted with a **pink border** (`buttonColor1`).
+- Subtitle provides helpful guidance on the level’s suitability.
+- Trailing icon/image enhances visual understanding.
+- Tiles are tappable with animated selection feedback.
+- List is non-scrollable (wrapped in `ListView(shrinkWrap: true)`).
+
+---
+
+## 2. Code Snippet: Level Display with Conditional Rendering
+
+```dart
+if (sessionProvider.category?.categoryName != null)
+  Selector<GetProvider, List<ExerciseLevelModel>>(
+    selector: (p0, p1) => p1.exerciseLevel,
+    builder: (context, exerciseLevelModel, _) {
+      return ListView(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        children: [
+          Text(
+            'Select session level',
+            style: GoogleFonts.lato(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: fontColor1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...exerciseLevelModel.map((item) => ListTileOfAreaOfExpertise(
+            levelText: item.exerciseLevel,
+            subtitle: item.subtitle,
+            image: Image.asset(item.icon),
+            isSelected: sessionProvider.level == item.exerciseLevel,
+            onSelect: () => sessionProvider.setLevel(item.exerciseLevel),
+          )),
+        ],
+      );
+    },
+  )
+```
+
+## UI Component: ListTileOfAreaOfExpertise
+
+- This reusable widget represents each selectable level option.
+
+### 2. Code Snippet of the Tile:
+
+```dart
+class ListTileOfAreaOfExpertise extends StatefulWidget {
+  final String levelText;
+  final String subtitle;
+  final Image image;
+  final bool isSelected;
+  final bool isEditable;
+  final VoidCallback onSelect;
+
+  const ListTileOfAreaOfExpertise({
+    super.key,
+    required this.levelText,
+    this.subtitle = '',
+    required this.image,
+    required this.isSelected,
+    required this.onSelect,
+    this.isEditable = false,
+  });
+
+  @override
+  State<ListTileOfAreaOfExpertise> createState() =>
+      _ListTileOfAreaOfExpertiseState();
+}
+```
+
+### Internal Build Logic
+
+```dart
+@override
+Widget build(BuildContext context) {
+  return Selector<GetProvider, List<ExerciseLevelModel>>(
+    selector: (p0, p1) => p1.exerciseLevel,
+    builder: (context, exerciseLevelModel, _) {
+      return Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: ListTile(
+              tileColor: buttonColor2,
+              title: Text(
+                widget.levelText,
+                style: GoogleFonts.lato(
+                  color: fontColor1,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                widget.subtitle,
+                style: GoogleFonts.lato(
+                  color: const Color.fromRGBO(163, 163, 163, 1),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              trailing: widget.image,
+              onTap: widget.onSelect,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(
+                  color: (widget.isSelected || widget.isEditable)
+                      ? buttonColor1
+                      : Colors.transparent,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      );
+    },
+  );
+}
+
+```

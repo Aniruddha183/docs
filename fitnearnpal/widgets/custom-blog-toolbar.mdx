@@ -1,0 +1,159 @@
+---
+title: Coach App Blog Toolbar & Editor
+description: Rich text editor for blogs using Flutter Quill with custom toolbar and embed support
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation of the **Blog Toolbar and Rich Text Editor**, used for composing blog content in the Coach App using the [`flutter_quill`](https://pub.dev/packages/flutter_quill) package.
+
+---
+
+## 1. Blog Toolbar (Flutter Quill)
+
+The blog writing interface is built using the `QuillSimpleToolbar` and `QuillEditor`, providing coaches with a rich and intuitive way to compose and format content.
+
+---
+
+### ✅ Functional Behavior
+
+- Users can write and format blog content with:
+  - **Text styling**: bold, italic, underline
+  - **Lists**: numbered and bulleted
+  - **Undo/Redo**
+  - **Hyperlinking**
+  - **Image upload** via a custom button
+- Supports:
+  - Multi-line editing
+  - Word count
+  - Image embeds
+
+---
+
+### 🎨 UI/UX Notes
+
+- Toolbar displays all options on **multiple rows** to avoid horizontal scrolling.
+- Each formatting control uses standard Flutter icons and consistent theming.
+- Editor area is wrapped inside a **bordered, padded container**.
+- Keyboard focus is handled gracefully to ensure cursor retention.
+- **Word count** appears in the bottom-right corner for live writing feedback.
+
+---
+
+## 2. Code Snippet: Quill Toolbar and Editor
+
+```dart
+Stack(
+  children: [
+    Padding(
+      padding: const EdgeInsets.all(18.0),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            quill.QuillSimpleToolbar(
+              controller: _quillController,
+              config: quill.QuillSimpleToolbarConfig(
+                showUndo: true,
+                showRedo: true,
+                showBoldButton: true,
+                showItalicButton: true,
+                showUnderLineButton: true,
+                showListNumbers: true,
+                showListBullets: true,
+                showClearFormat: true,
+                showLink: true,
+                multiRowsDisplay: true,
+                customButtons: [
+                  quill.QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.image, color: Colors.pink),
+                    onPressed: () => showImageSourceDialog(context, _quillController),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () {
+                if (!_editorFocusNode.hasFocus) {
+                  FocusScope.of(context).requestFocus(_editorFocusNode);
+                }
+              },
+              child: Container(
+                height: 800,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: DefaultTextStyle(
+                    style: GoogleFonts.lato(
+                      color: fontColor1,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    child: quill.QuillEditor(
+                      controller: _quillController,
+                      focusNode: _editorFocusNode,
+                      scrollController: ScrollController(),
+                      config: quill.QuillEditorConfig(
+                        embedBuilders: [
+                          ImageEmbedBuilder(),
+                        ],
+                        contentInsertionConfiguration: ContentInsertionConfiguration(
+                          onContentInserted: (content) {
+                            debugPrint('Content inserted: $content');
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (_showWarnings && warningMessage.isNotEmpty)
+                  Expanded(
+                    child: WarningText(
+                      text: warningMessage,
+                    ),
+                  )
+                else
+                  const Spacer(),
+                Text(
+                  'Words: $wordCount / 1000',
+                  style: GoogleFonts.lato(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+            const SizedBox(height: 120),
+          ],
+        ),
+      ),
+    ),
+  ],
+)
+```
+
+### Custom Image Embed Handler
+
+- The toolbar integrates a custom image embed button, enabling the coach to upload an image directly from the device and insert it at the current cursor position.
+
+```dart
+quill.QuillToolbarCustomButtonOptions(
+  icon: const Icon(Icons.image, color: Colors.pink),
+  onPressed: () => showImageSourceDialog(context, _quillController),
+)
+```
+
+- This opens a dialog allowing image selection and handles insertion into the editor seamlessly.

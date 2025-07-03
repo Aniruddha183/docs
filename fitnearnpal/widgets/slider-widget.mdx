@@ -1,0 +1,95 @@
+---
+title: Slider Widget
+description: A customizable horizontal slider widget with min, max, and current value indicators for selecting integer values in a defined range.
+---
+
+# 🎚️ Custom Slider Widget
+
+This widget builds a responsive horizontal slider that allows users to select values between a specified minimum and maximum. It also displays the minimum, current, and maximum values below the slider for clarity.
+
+---
+
+## ✅ Features
+
+- Customizable value range using `min` and `max`.
+- Shows current value dynamically.
+- Uses whole number increments (via `divisions`).
+- Custom styling with `activeColor` and `inactiveColor`.
+- Integrates with the app's theme via `GoogleFonts.lato`.
+
+---
+
+## 🧱 Parameters
+
+| Parameter   | Type               | Description                               |
+| ----------- | ------------------ | ----------------------------------------- |
+| `min`       | `double`           | Minimum value of the slider               |
+| `max`       | `double`           | Maximum value of the slider               |
+| `value`     | `double`           | Current slider value                      |
+| `onChanged` | `Function(double)` | Callback triggered on slider value change |
+
+---
+
+## 💻 Code
+
+```dart
+Widget _buildSlider(
+  double min,
+  double max,
+  double value,
+  Function(double) onChanged,
+) {
+  final size = MediaQuery.sizeOf(context);
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: size.width * 0.9,
+        child: Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: (max - min).toInt(), // Ensures whole number increments
+          activeColor: selectoptionColor,
+          inactiveColor: Colors.grey,
+          onChanged: onChanged,
+        ),
+      ),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "${min.toInt()}",
+            style: GoogleFonts.lato(color: fontColor1),
+          ),
+          Text(
+            "${value.toInt()}",
+            style: GoogleFonts.lato(
+              color: fontColor1,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            "${max.toInt()}",
+            style: GoogleFonts.lato(color: fontColor1),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+```
+
+### Example usage
+
+```dart
+_buildSlider(
+  1,
+  10,
+  selectedValue,
+  (newValue) => setState(() {
+    selectedValue = newValue;
+  }),
+)
+```

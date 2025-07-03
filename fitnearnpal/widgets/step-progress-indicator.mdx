@@ -1,0 +1,164 @@
+---
+title: Step Progress Indicator
+description: A visually rich horizontal progress indicator with step label, radial gradient buttons, and custom-shaped progress bar for step-based navigation.
+---
+
+# 🚥 StepProgressIndicator
+
+The `StepProgressIndicator` widget is a step-based progress tracker often used during onboarding or multi-step forms. It includes both backward/forward navigation icons and a dynamically updating horizontal progress bar.
+
+---
+
+## 🎯 Features
+
+- Displays the current step in `"Step X of Y"` format.
+- Gradient-based circular back and forward buttons.
+- Custom horizontal progress bar using `ShaderMask` and `CustomClipper`.
+- Animated appearance with clipped corners for a polished visual.
+
+---
+
+## 🧱 Code Snippet
+
+```dart
+class StepProgressIndicator extends StatelessWidget {
+  final double progress;
+  final String step;
+
+  const StepProgressIndicator({
+    super.key,
+    required this.progress,
+    required this.step,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Gradient? containerGradient = step == 'Step 1 of 8'
+        ? RadialGradient(
+            center: const Alignment(0.99, 0.00),
+            radius: 121.59,
+            colors: [Colors.grey[500]!, Colors.grey[500]!, Colors.grey[500]!],
+          )
+        : const RadialGradient(
+            center: Alignment(0.99, 0.00),
+            radius: 121.59,
+            colors: [Color(0xFFEB4C60), Color(0xFFEB4C60), Color(0xFFEB4C60)],
+          );
+
+    return Column(
+      children: [
+        Text(
+          step,
+          style: GoogleFonts.lato(
+            color: fontColor1,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Back Button
+            Container(
+              width: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: containerGradient,
+              ),
+              child: Center(
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Progress Indicator
+            Expanded(
+              child: Column(
+                children: [
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    height: 10,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        children: [
+                          Container(color: Colors.grey[800]),
+                          FractionallySizedBox(
+                            widthFactor: progress,
+                            child: ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [
+                                  progressIndicatorColor1,
+                                  progressIndicatorColor2,
+                                ],
+                                stops: [0.0, 0.5],
+                              ).createShader(bounds),
+                              child: ClipPath(
+                                clipper: RoundedEdgeClipper(),
+                                child: Container(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Forward Button
+            Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: Alignment(0.99, 0.00),
+                  radius: 121.59,
+                  colors: [
+                    Color(0xFFEB4C60),
+                    Color(0xFFEB4C60),
+                    Color(0xFFEB4C60),
+                  ],
+                ),
+              ),
+              child: Image.asset("assets/icons/chevron-double-right-outline.png"),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+```
+
+### ✂️ Custom Clipper
+
+- The custom clipper gives the progress fill bar a unique rounded right edge.
+
+```dart
+class RoundedEdgeClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path()
+      ..lineTo(size.width - 10, 0)
+      ..arcToPoint(
+        Offset(size.width, size.height / 2),
+        radius: const Radius.circular(10),
+      )
+      ..arcToPoint(
+        Offset(size.width - 10, size.height),
+        radius: const Radius.circular(10),
+      )
+      ..lineTo(0, size.height)
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+```

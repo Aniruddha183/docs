@@ -1,0 +1,116 @@
+---
+title: Video Upload & Preview
+description: Coach video upload from gallery with playback support using VideoPlayerController and Provider
+---
+
+# 📹 Video Upload & Preview
+
+This component allows coaches to select a video from their device gallery, upload it, and preview it inside a container with playback support.
+
+---
+
+## ✨ Purpose
+
+- Enable coaches to pick a video file from their device gallery.
+- Display the selected video within a styled container.
+- Automatically initialize and play the video after selection.
+- Manage video state globally using Provider.
+
+---
+
+## 🧱 UI Code Snippet: Video Selection Container
+
+```dart
+VideoPlayerController? _videoPlayerController;
+bool _isVideoSelected = false;
+
+GestureDetector(
+  onTap: () async {
+    await _showVideoPicker();
+  },
+  child: Container(
+    height: size.height * 0.22,
+    width: double.infinity,
+    padding: const EdgeInsets.all(3.0),
+    decoration: BoxDecoration(
+      color: buttonColor2,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.transparent),
+    ),
+    child: _isVideoSelected && _videoPlayerController != null
+        ? AspectRatio(
+            aspectRatio: _videoPlayerController!.value.aspectRatio,
+            child: VideoPlayer(_videoPlayerController!),
+          )
+        : Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36.0),
+              child: Column(
+                children: [
+                  Image.asset('assets/images/upload.png'),
+                  Text(
+                    "Tap to select video",
+                    style: GoogleFonts.lato(
+                      fontSize: 16,
+                      color: fontColor5,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+  ),
+),
+```
+
+- The container reacts to taps to open the video picker.
+
+- Shows a placeholder with an upload icon and prompt if no video is selected.
+
+- Plays the video within an AspectRatio widget to maintain dimensions.
+
+```dart
+Future<void> _showVideoPicker() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.video,
+    allowMultiple: false,
+  );
+
+  if (result != null && result.files.isNotEmpty) {
+    final file = File(result.files.single.path!);
+    final videoProvider = Provider.of<VideoProvider>(context, listen: false);
+    videoProvider.setUploadedVideo(file); // Save video to provider
+
+    _videoPlayerController = VideoPlayerController.file(file)
+      ..initialize().then((_) {
+        setState(() {
+          _isVideoSelected = true;
+        });
+        _videoPlayerController!.play();
+      });
+  }
+}
+```
+
+- Uses file_picker package to select a single video file.
+
+- Stores the selected video in a VideoProvider for global state management.
+
+- Initializes and starts playback of the selected video.
+
+### VideoProvider State Management
+
+```dart
+File? _uploadedVideo;
+File? get uploadedVideo => _uploadedVideo;
+
+void setUploadedVideo(File video) {
+  if (video.existsSync()) {
+    _uploadedVideo = video;
+    notifyListeners();
+  } else {
+    debugPrint("Invalid video file: ${video.path}");
+  }
+}
+```

@@ -1,0 +1,210 @@
+---
+title: WorkoutNumberofWeeks Dropdown
+description: A custom UI component for selecting the number of weeks for a workout plan using a bottom sheet selector and state management via Provider.
+---
+
+# 🗓️ WorkoutNumberofWeeks
+
+The `WorkoutNumberofWeeks` widget is a user-friendly form component designed to let users select the number of weeks for a workout plan. It mimics a dropdown field but utilizes a modal bottom sheet for better UX on mobile screens. It integrates with `WorkoutPlanProvider` for state persistence.
+
+---
+
+## ✅ Features
+
+- Tappable container to trigger week selection.
+- Opens a modal bottom sheet listing options from 1 to 12 weeks.
+- Shows radio-style indicators for selected week.
+- Stores selection in a Provider (`WorkoutPlanProvider`).
+- Dynamic visual feedback with border on focus.
+
+---
+
+## 📦 Props
+
+| Prop                | Type                  | Description                                       |
+| ------------------- | --------------------- | ------------------------------------------------- |
+| `hintText`          | `String`              | Placeholder text when no week is selected         |
+| `expertiseProvider` | `WorkoutPlanProvider` | Provider for storing the selected number of weeks |
+
+---
+
+## 🧱 UI Behavior
+
+- Shows the current selected week or placeholder hint.
+- On tap, opens a full-screen bottom sheet with week options.
+- Options range from `1 Week` to `12 Weeks`.
+- Selected week is visually indicated and returned on tap.
+
+---
+
+## 💻 Code
+
+```dart
+class WorkoutNumberofWeeks extends StatefulWidget {
+  final String hintText;
+  final WorkoutPlanProvider expertiseProvider;
+
+  const WorkoutNumberofWeeks({
+    super.key,
+    required this.hintText,
+    required this.expertiseProvider,
+  });
+
+  @override
+  State<WorkoutNumberofWeeks> createState() => _WorkoutNumberofWeeksState();
+}
+
+class _WorkoutNumberofWeeksState extends State<WorkoutNumberofWeeks> {
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusManager.instance.primaryFocus?.addListener(_updateFocus);
+    });
+  }
+
+  void _updateFocus() {
+    if (mounted) {
+      setState(() {
+        _isFocused = FocusManager.instance.primaryFocus?.context == context;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.primaryFocus?.removeListener(_updateFocus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        setState(() => _isFocused = false);
+        showWeekSelectionModal(context);
+      },
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: buttonColor2,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _isFocused ? buttonColor1 : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              widget.expertiseProvider.selectedNumberOfWeeks ?? widget.hintText,
+              style: GoogleFonts.lato(
+                color: widget.expertiseProvider.selectedNumberOfWeeks
+                            ?.isNotEmpty ==
+                        true
+                    ? fontColor1
+                    : fontColor5,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            Image.asset('assets/images/angle-down.png'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void showWeekSelectionModal(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: backgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          height: size.height,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: GoogleFonts.lato(
+                      decoration: TextDecoration.underline,
+                      color: fontColor18,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: 12,
+                  separatorBuilder: (context, index) => Divider(
+                    color: Colors.grey[700],
+                    thickness: 0.5,
+                  ),
+                  itemBuilder: (context, index) {
+                    String week = index == 0
+                        ? "1 Week"
+                        : "${index + 1} Weeks";
+                    return ListTile(
+                      leading: Image.asset(
+                        'assets/images/calendar-month-outline (1).png',
+                      ),
+                      title: Text(
+                        week,
+                        style: GoogleFonts.lato(
+                          color: fontColor1,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      trailing: widget.expertiseProvider
+                                  .selectedNumberOfWeeks ==
+                              week
+                          ? const Icon(Icons.radio_button_checked,
+                              color: selectoptionColor)
+                          : const Icon(Icons.radio_button_unchecked,
+                              color: Colors.grey),
+                      onTap: () {
+                        widget.expertiseProvider.setNumberOfWeeks(week);
+                        Provider.of<WorkoutPlanProvider>(context,
+                                listen: false)
+                            .setNumberOfWeeks(week);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+### Example usage
+
+```dart
+WorkoutNumberofWeeks(
+  hintText: "Select Number of Weeks",
+  expertiseProvider: workoutPlanProviderInstance,
+)
+
+```

@@ -1,0 +1,235 @@
+---
+title: Coach App Post Card
+description: Swipeable card displaying post text, thumbnail, and status with delete confirmation dialogs
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation and behavior of the **Post Card**, a UI component used for displaying posts created by coaches — including their thumbnail, content, post status, and deletion logic.
+
+---
+
+## 1. Post Card
+
+The Post Card displays a post’s:
+
+- 📝 Message content (text)
+- 🖼 Thumbnail image
+- 🟠 Current status (e.g., **Pending**, **Approved**)
+- 📆 Date of creation
+- 🕒 Estimated reading time (fixed: 10 min)
+
+It also supports swipe-to-delete with a two-step confirmation dialog, including a required cancel reason.
+
+---
+
+### Functional Behavior
+
+- The card is **swipeable** (right to left) to trigger deletion.
+- On swipe, a **DeleteDialog** confirmation appears.
+- If the user confirms, a **Cancel Reason Dialog** appears.
+- Only after a valid reason is entered is the card dismissed and `onDismissed` called.
+- Tapping on the card triggers `onTap` for navigation/viewing.
+
+---
+
+### UI/UX Notes
+
+- Background is styled with `buttonColor2` for dark theme consistency.
+- Left thumbnail is displayed using `ClipRRect`.
+- Title is constrained to one line and ellipsed.
+- Icons for calendar and clock use `SvgPicture.asset`.
+- Responsive spacing with padding and `Expanded` layout ensures the card adapts well.
+
+---
+
+## 2. Code Snippet: Post Card Widget
+
+```dart
+class PostCard extends StatelessWidget {
+  final String postId;
+  final Function(String) onDismissed;
+  final String postState;
+  final Color postColor;
+  final VoidCallback onTap;
+  PostModel postModel;
+
+  PostCard({
+    super.key,
+    required this.postId,
+    required this.onDismissed,
+    required this.postState,
+    required this.postColor,
+    required this.onTap,
+    required this.postModel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(postId),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white, size: 30),
+      ),
+      confirmDismiss: (direction) async {
+        bool? shouldDelete = await showDialog(...); // DeleteDialog
+        if (shouldDelete ?? false) {
+          String? rejectReason = await showDialog<String>(...); // Cancel Reason
+          if (rejectReason != null && rejectReason.trim().isNotEmpty) {
+            onDismissed(postId);
+            return true;
+          }
+        }
+        return false;
+      },
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: buttonColor2,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thumbnail Image
+              ClipRRect(
+                child: Image.asset(
+                  'assets/images/Rectangle 111.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Text Section
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 5),
+                    Text(
+                      postState.toUpperCase(),
+                      style: GoogleFonts.lato(
+                        color: postColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      postModel.data?.message ?? '',
+                      style: AppTextTheme.darkTextTheme.headlineMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              SvgPicture.asset(
+                                'assets/images/calendar-month-outline (1).svg',
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                Jiffy.parse(postModel.data?.createdAt ?? '').yMMMd,
+                                style: AppTextTheme.darkTextTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              SvgPicture.asset(
+                                'assets/images/clock-outline (1).svg',
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '10 Min',
+                                style: AppTextTheme.darkTextTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### We can implement this Post Card like this:
+
+```dart
+ListView.builder(
+            itemCount: postModel.length,
+            itemBuilder: (context, index) {
+              final post = postModel[index];
+              final postData = post.data;
+              if (postData == null) return const SizedBox();
+              return Column(
+                children: [
+                  PostCard(
+                    postModel: post,
+                    postId: postData.postId ?? "",
+                    onDismissed: _removeSession,
+                    postState: postData.status ?? '',
+                    postColor:
+                        statusColor(postData.status?.toUpperCase() ?? ''),
+                    onTap: () {
+                      switch (postData.status?.toUpperCase()) {
+                        case 'PUBLISHED':
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    PublishedPostDetails(postModel: post),
+                              ));
+                          break;
+                        case 'DENIED':
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DeniedPostDetail(postModel: post),
+                              ));
+                          break;
+                        case 'UNDER REVIEW':
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    UnderReviewPostDetails(postModel: post),
+                              ));
+                          break;
+                        case 'DRAFT':
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DraftPostDetail(postModel: post),
+                              ));
+                          break;
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              );
+            },
+          );
+```

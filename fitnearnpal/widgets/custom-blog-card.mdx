@@ -1,0 +1,153 @@
+---
+title: Blog Card UI
+description: UI component to display blog details including title, category, state, and date
+---
+
+# 🧾 Blog Card UI Component
+
+The **Blog Card** displays details of a blog post created by the user. It provides a quick overview including the blog title, category, status, creation date, estimated read time, and thumbnail image.
+
+---
+
+## 📌 Purpose
+
+- Display summary of a blog post in a card layout
+- Support interaction with tap gestures
+- Show blog state (e.g., **Under Review**, **Published**) with color-coded labels
+
+---
+
+## ✅ Features
+
+| Feature          | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| Title & Category | Shows the blog's main heading and topic              |
+| Blog Status      | Indicates review or publication status               |
+| Thumbnail Image  | Shows a representative image for the blog            |
+| Created Date     | Displays when the blog was created using `Jiffy`     |
+| Read Time        | Displays estimated reading time                      |
+| Gesture Support  | Supports `onTap` and `onDismissed` for interactivity |
+
+---
+
+## 🧱 Code Snippet: BlogCard Widget
+
+```dart
+class BlogCard extends StatelessWidget {
+  final String blogId;
+  final Function(String blogState) onDismissed;
+  final String blogState;
+  final Color blogColor;
+  final VoidCallback onTap;
+  BlogModel blogModel;
+
+  BlogCard({
+    super.key,
+    required this.blogId,
+    required this.onDismissed,
+    required this.blogState,
+    required this.blogColor,
+    required this.onTap,
+    required this.blogModel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: buttonColor2,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Section
+            ClipRRect(
+              child: Image.asset(
+                'assets/images/Rectangle 111.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Text Section
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 5),
+                  // Blog Status Label
+                  Text(
+                    blogState.toUpperCase(),
+                    style: GoogleFonts.lato(
+                      color: blogColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Blog Title
+                  Text(
+                    blogModel.title,
+                    style: AppTextTheme.darkTextTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  // Blog Category
+                  Text(
+                    blogModel.category,
+                    style: GoogleFonts.lato(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: fontColor1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Date & Time Row
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            SvgPicture.asset(
+                              'assets/images/calendar-month-outline (1).svg',
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              Jiffy.parse(blogModel.createdAt).yMMMd,
+                              style: AppTextTheme.darkTextTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 15),
+                        Row(
+                          children: [
+                            SvgPicture.asset(
+                              'assets/images/clock-outline (1).svg',
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              blogModel.readTime,
+                              style: GoogleFonts.lato(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: fontColor1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
