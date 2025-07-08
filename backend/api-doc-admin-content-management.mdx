@@ -211,23 +211,91 @@ DELETE /api/fitnearn/web/admin/content/delete/CNT00001
 
 ---
 
+### 6. Get Public Content By ID (Unauthenticated)
+
+Retrieves content publicly using `contentId`, typically for website rendering.
+
+- **Method**: `GET`
+- **URL**: `/contentPublic/get/:id`
+- **Authentication**: None
+
+#### Example Request
+
+```
+GET /api/fitnearn/web/admin/contentPublic/get/CNT00001
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website",
+    ...
+  }
+}
+```
+
+#### Error Response
+
+- `404 Not Found`: Content not found
+- `500 Internal Server Error`
+
+---
+
+### 7. Get All Public Contents (Unauthenticated)
+
+Retrieves all content records publicly (optional use-case for open APIs).
+
+- **Method**: `GET`
+- **URL**: `/contentPublic/get`
+- **Authentication**: None
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "contentId": "CNT00001",
+      "title": "Contact Us",
+      "type": "ContactFooter",
+      "applicationType": "FitnEarn Website"
+    },
+    ...
+  ]
+}
+```
+
+#### Error Response
+
+- `500 Internal Server Error`
+
+---
+
 ## Notes
 
-- All routes are secured by `authenticateAdminToken`.
-- Each route uses `authorize(permission)` middleware to ensure RBAC.
-- Content types include:
-  - `ContactFooter` for footer and contact tab data
-  - `GeneralContent` for other CMS content blocks (e.g. About Us)
-- When using `description`, ensure it's passed as `EditorJS OutputData` and converted to JSON if needed.
+- All protected routes use `authenticateAdminToken` and `authorize(<PERMISSION>)` middleware.
+- Content types:
+  - `ContactFooter`: structured content for contact/footer.
+  - `GeneralContent`: free-form content (e.g., About Us) stored as JSON.
+- The `description` field is stored as a stringified EditorJS JSON.
 
 ---
 
 ## Summary Table
 
-| Method | Endpoint      | Description          |
-| ------ | ------------- | -------------------- |
-| POST   | `/create`     | Create new content   |
-| GET    | `/get`        | Get all contents     |
-| GET    | `/get/:id`    | Get content by ID    |
-| PATCH  | `/update/:id` | Update content by ID |
-| DELETE | `/delete/:id` | Delete content by ID |
+| Method | Endpoint                 | Description              |
+| ------ | ------------------------ | ------------------------ |
+| POST   | `/create`                | Create new content       |
+| GET    | `/get`                   | Get all contents         |
+| GET    | `/get/:id`               | Get content by ID        |
+| PATCH  | `/update/:id`            | Update content by ID     |
+| DELETE | `/delete/:id`            | Delete content by ID     |
+| GET    | `/contentPublic/get/:id` | Public get content by ID |
+| GET    | `/contentPublic/get`     | Public get all contents  |

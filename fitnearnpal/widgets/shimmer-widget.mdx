@@ -1,0 +1,84 @@
+---
+title: Shimmer Widget
+description: A customizable loading placeholder widget using the `shimmer` package to indicate content loading state.
+---
+
+# ✨ ShimmerWidget
+
+The `ShimmerWidget` is a visual loading placeholder used while the actual data (e.g., blog cards, list items) is being fetched. It uses the `shimmer` package to create an animated skeleton screen effect, enhancing perceived performance and user experience.
+
+---
+
+## 🌟 Features
+
+- Animated shimmer effect to simulate loading.
+- Placeholder layout mimics a content card with:
+  - Thumbnail area.
+  - Three lines of text of varying sizes.
+- Customizable via color constants and layout structure.
+- Useful in blog cards, user lists, or other content previews.
+
+---
+
+## 🧱 Code Snippet
+
+```dart
+class ShimmerWidget extends StatelessWidget {
+  const ShimmerWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: buttonColor2,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: shimmer.Shimmer.fromColors(
+        baseColor: containerColor,
+        highlightColor: buttonColor2,
+        child: Row(
+          children: [
+            // Thumbnail placeholder
+            Container(
+              height: 100,
+              width: 100,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+                color: buttonColor2,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Text placeholders
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 10,
+                  width: 100,
+                  color: Colors.red,
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 25,
+                  width: 200,
+                  color: Colors.red,
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 15,
+                  width: 150,
+                  color: Colors.red,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```

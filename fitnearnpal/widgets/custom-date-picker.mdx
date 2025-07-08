@@ -1,0 +1,117 @@
+---
+title: Coach App Custom Date Picker
+description: A themed date selector for scheduling live sessions with a 48-hour restriction
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation of the **Custom Date Picker**, a reusable function and input field combo that allows coaches to select future session dates with a minimum 48-hour buffer.
+
+---
+
+## 1. Custom Date Picker
+
+This feature allows coaches to select a **live session date** through a modal calendar dialog. The picker enforces a rule that the session date must be at least **48 hours ahead** of the current time.
+
+---
+
+### Functional Behavior
+
+- Tapping on the input field opens a `showDatePicker` modal.
+- The user selects a date starting from **48 hours in the future**.
+- The selected date is stored using `SessionProvider.setSessionDate`.
+- The UI updates the date field in `dd-mm-yyyy` format.
+- Warning message is displayed if no date is selected.
+
+---
+
+### UI/UX Notes
+
+- The date picker uses a **dark color theme** consistent with the Coach App.
+- A custom calendar icon is shown as a suffix inside the input field.
+- The input field is non-editable (`keyboardType: TextInputType.none`).
+- Selected date visually confirms to the user before they submit.
+- Error state is handled by showing a warning message using `WarningText`.
+
+---
+
+## 2. Code Snippet: Date Picker Function
+
+```dart
+Future<void> _showCustomDatePicker(TextEditingController controller) async {
+  final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+
+  // Minimum selectable date = now + 48 hours
+  DateTime now = DateTime.now();
+  DateTime minSelectableDate = now.add(const Duration(hours: 48));
+
+  DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: minSelectableDate,
+    initialDatePickerMode: DatePickerMode.day,
+    firstDate: minSelectableDate,
+    lastDate: DateTime(2100),
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          dialogTheme: DialogThemeData(backgroundColor: backgroundColor),
+          colorScheme: const ColorScheme.dark(
+            primary: selectoptionColor,
+            onPrimary: fontColor1,
+            onSurface: fontColor1,
+          ),
+          textTheme: AppTextTheme.darkTextTheme,
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: fontColor1,
+              backgroundColor: selectoptionColor,
+            ),
+          ),
+        ),
+        child: child!,
+      );
+    },
+  );
+
+  if (selectedDate != null) {
+    setState(() {
+      controller.text =
+          "${selectedDate.day.toString().padLeft(2, '0')}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.year}";
+      _issessionDateSelected = true;
+    });
+    sessionProvider.setSessionDate(controller.text);
+  }
+}
+```
+
+### Code Snippet: Input Field UI
+
+- The input field is integrated using a reusable InputField widget. It opens the custom date picker on tap.
+
+```dart
+Expanded(
+  child: Column(
+    children: [
+      InputField(
+        label: "From",
+        hintText: "Select your date",
+        suffixIcon: const Icon(
+          Icons.calendar_month,
+          color: fontColor5,
+        ),
+        isCompact: true,
+        controller: _sessiondateController,
+        keyboardType: TextInputType.none, // Prevents manual typing
+        onTap: () async {
+          await _showCustomDatePicker(_sessiondateController);
+        },
+      ),
+      if (_showWarnings && !_issessionDateSelected)
+        const WarningText(text: "Please choose a session date."),
+    ],
+  ),
+)
+
+```

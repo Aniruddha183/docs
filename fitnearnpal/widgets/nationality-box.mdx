@@ -1,0 +1,94 @@
+---
+title: NationalityBox
+description: A selectable container widget used to display a nationality option with a title and a supporting subtitle. Commonly used in onboarding or KYC flows.
+---
+
+# 🌍 NationalityBox
+
+`NationalityBox` is a reusable tappable container used to display the nationality or citizenship option along with a subtext (e.g., KYC requirement, verification hint). It supports an `onPressed` callback that triggers any desired action such as navigating to the next screen or displaying a dialog.
+
+---
+
+## 🧩 Features
+
+- Full-width tap area using `GestureDetector`
+- Clean layout with a title (`nationality`) and a subtitle (`subText`)
+- Consistent with app theme using `buttonColor2` and custom text styles
+- Rounded corners for a smooth visual appearance
+
+---
+
+## 📦 Use Case
+
+Used in KYC or profile setup flows where the user selects their nationality (e.g., Indian, Foreigner).
+
+---
+
+## 📄 Code Snippet
+
+```dart
+class NationalityBox extends StatefulWidget {
+  final String nationality;
+  final String subText;
+  final VoidCallback onPressed;
+
+  const NationalityBox({
+    super.key,
+    required this.nationality,
+    required this.subText,
+    required this.onPressed,
+  });
+
+  @override
+  State<NationalityBox> createState() => _NationalityBoxState();
+}
+
+class _NationalityBoxState extends State<NationalityBox> {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onPressed,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: buttonColor2,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.nationality,
+                style: AppTextTheme.darkTextTheme.bodyLarge,
+              ),
+              const SizedBox(height: 5),
+              Text(
+                widget.subText,
+                style: GoogleFonts.lato(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: fontColor5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Usage Example
+
+```dart
+NationalityBox(
+  nationality: 'Indian',
+  subText: 'Select this if you hold an Indian nationality.',
+  onPressed: () {
+    // Navigate to Indian KYC verification page
+  },
+)
+```

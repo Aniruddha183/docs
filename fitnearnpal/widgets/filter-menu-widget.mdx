@@ -1,0 +1,64 @@
+---
+title: FilterMenuWidget
+description: A reusable utility to display a styled dropdown filter menu using `showMenu` in Flutter.
+---
+
+# 🧰 FilterMenuWidget
+
+`FilterMenuWidget` is a utility class that presents a dropdown-style popup menu using Flutter’s `showMenu()` function. It enables you to show a customized filter menu with a list of options and handles user selection via a callback.
+
+---
+
+## ✅ Features
+
+- Presents a popup menu with customizable options.
+- Executes a callback when an option is selected.
+- Uses custom theming (`buttonColor2`, `fontColor1`) and `GoogleFonts.lato` for a consistent UI.
+- Simple static method for ease of use anywhere in the app.
+
+---
+
+## 📦 Use Case
+
+Used when filtering data in a list or grid (e.g., blog categories, session types, sort by options).
+
+---
+
+## 🧩 Code Snippet
+
+```dart
+class FilterMenuWidget {
+  static Future<void> showFilterMenu({
+    required BuildContext context,
+    required List<String> options,
+    required void Function(String) onSelected,
+  }) async {
+    final selectedOption = await showMenu<String>(
+      color: buttonColor2,
+      context: context,
+      position: const RelativeRect.fromLTRB(
+          100, 150, 50, 100), // Adjust position as needed
+      items: options
+          .map(
+            (option) => PopupMenuItem<String>(
+              value: option,
+              child: Text(
+                option,
+                style: GoogleFonts.lato(
+                  color: fontColor1,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+      elevation: 8.0,
+    );
+
+    if (selectedOption != null) {
+      onSelected(selectedOption);
+    }
+  }
+}
+```

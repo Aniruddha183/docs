@@ -172,7 +172,6 @@
             "backend/architecture/workout-architecture",
             "backend/architecture/subscription-architecture",
             "backend/architecture/bulk-upload-architecture"
-         
           ]
         },
         {
@@ -228,6 +227,8 @@
                 "backend/api-doc-coach-workout-video-management",
                 "backend/api-doc-report-generation",
                 "backend/report-abuse-api",
+                "backend/api-doc-Product-Management",
+                "backend/api-doc-Studio-Management",
                 "backend/api-doc-admin-coach-booking-management",
                 "backend/api-doc-admin-live-session-management",
                 "backend/api-doc-admin-blog-management",
@@ -407,7 +408,34 @@
             "fitnearnpal/widgets/delete-dialog-box",
             "fitnearnpal/widgets/level-dropdown",
             "fitnearnpal/widgets/send-for-review-popup",
-            "fitnearnpal/widgets/custom-time-picker"
+            "fitnearnpal/widgets/custom-time-picker",
+            "fitnearnpal/widgets/custom-focus-area-selection",
+            "fitnearnpal/widgets/custom-calorie-equipment-intensity-selector",
+            "fitnearnpal/widgets/custom-category-list-selector",
+            "fitnearnpal/widgets/custom-level-selection-tile",
+            "fitnearnpal/widgets/thumbnail-image-upload-container",
+            "fitnearnpal/widgets/custom-date-picker",
+            "fitnearnpal/widgets/custom-duration-dropdown",
+            "fitnearnpal/widgets/custom-file-type-button",
+            "fitnearnpal/widgets/custom-post-card",
+            "fitnearnpal/widgets/custom-blog-toolbar",
+            "fitnearnpal/widgets/image-picker-blog-toolbar",
+            "fitnearnpal/widgets/custom-blog-card",
+            "fitnearnpal/widgets/custom-blog-content-box-preview",
+            "fitnearnpal/widgets/video-upload",
+            "fitnearnpal/widgets/kyc-idproof-upload",
+            "fitnearnpal/widgets/kyc-cards-for-payment",
+            "fitnearnpal/widgets/image-loader",
+            "fitnearnpal/widgets/multi-color-circular-progress-indicator",
+            "fitnearnpal/widgets/shimmer-widget",
+            "fitnearnpal/widgets/step-progress-indicator",
+            "fitnearnpal/widgets/nationality-box",
+            "fitnearnpal/widgets/filter-menu-widget",
+            "fitnearnpal/widgets/app-text-theme",
+            "fitnearnpal/widgets/workout-category",
+            "fitnearnpal/widgets/workout-numberofweeks-dropdown",
+            "fitnearnpal/widgets/workout-plan-level-of-plan-dropwdown",
+            "fitnearnpal/widgets/slider-widget"
           ]
         }
       ]

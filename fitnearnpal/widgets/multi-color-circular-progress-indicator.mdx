@@ -1,0 +1,89 @@
+---
+title: Multi-Color Circular Progress Indicator
+description: A custom Flutter circular progress indicator with a gradient stroke that visually represents progress.
+---
+
+# 🎨 Multi-Color Circular Progress Indicator
+
+This widget draws a circular progress indicator with a smooth multi-color gradient stroke. The progress is visually represented as an arc filled proportionally to the given progress value between 0.0 and 1.0.
+
+---
+
+## ✨ Features
+
+- CustomPainter-based drawing for fine control over visuals.
+- Circular background stroke in grey.
+- Foreground stroke uses a gradient from pinkish to orangish hues.
+- Rounded stroke caps for smooth arc ends.
+- Scales well inside a fixed-size square canvas.
+
+---
+
+## 🧱 Code Snippet: `MultiColorCircularProgressIndicator`
+
+```dart
+class MultiColorCircularProgressIndicator extends StatelessWidget {
+  final double progress; // Progress value between 0.0 and 1.0
+
+  const MultiColorCircularProgressIndicator({super.key, required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(250, 250),
+      painter: _MultiColorProgressPainter(progress),
+    );
+  }
+}
+
+class _MultiColorProgressPainter extends CustomPainter {
+  final double progress;
+
+  _MultiColorProgressPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double strokeWidth = 20.0;
+    final double radius = (size.width * 0.9 - strokeWidth) / 3;
+
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Background Circle
+    final backgroundPaint = Paint()
+      ..color = Colors.grey[800]!
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(center, radius, backgroundPaint);
+
+    // Multi-Color Gradient for Progress Arc
+    const gradient = LinearGradient(
+      colors: [
+        Color.fromRGBO(219, 39, 119, 1),
+        Color.fromRGBO(249, 115, 22, 1),
+      ],
+      stops: [0.0, 1.0],
+    );
+
+    final progressPaint = Paint()
+      ..shader = gradient.createShader(Rect.fromCircle(center: center, radius: radius))
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final progressAngle = 2 * 3.14159 * progress; // Convert progress to radians
+
+    // Draw progress arc starting from top (-90 degrees)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -3.14159 / 2,
+      progressAngle,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+```

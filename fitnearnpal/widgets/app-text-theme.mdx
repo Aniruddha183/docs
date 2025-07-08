@@ -1,0 +1,70 @@
+---
+title: AppTextTheme
+description: Centralized text theme configuration using GoogleFonts for consistent typography across the app.
+---
+
+# 🎨 AppTextTheme
+
+`AppTextTheme` is a static utility class used to define and centralize text styles for the application using `GoogleFonts.lato`. It ensures consistency in typography throughout the app UI, especially when working in a dark-themed environment.
+
+---
+
+## ✅ Features
+
+- Uses `GoogleFonts.lato` across all text styles for consistent font usage.
+- Defines commonly used `TextTheme` entries like `headlineLarge`, `bodyMedium`, `displayMedium`, etc.
+- Easy to maintain and update styles from a single location.
+- Designed specifically for dark-themed UIs using `fontColor1`, `fontColor4`, and white variants.
+
+---
+
+## 🌑 Dark Theme Configuration
+
+```dart
+static TextTheme darkTextTheme = TextTheme(
+  headlineLarge: GoogleFonts.lato(
+    fontSize: 32,
+    fontWeight: FontWeight.w800,
+    color: fontColor1,
+  ),
+  headlineMedium: GoogleFonts.lato(
+    fontSize: 24,
+    fontWeight: FontWeight.w800,
+    color: fontColor1,
+  ),
+  bodyLarge: GoogleFonts.lato(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: Colors.white70,
+  ),
+  bodyMedium: GoogleFonts.lato(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: fontColor1,
+  ),
+  bodySmall: GoogleFonts.lato(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: fontColor1,
+  ),
+  displayMedium: GoogleFonts.lato(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: fontColor4,
+  ),
+);
+```
+
+### Usage
+
+```dart
+Text(
+  'Welcome to Coach App',
+  style: AppTextTheme.darkTextTheme.headlineLarge,
+);
+
+Text(
+  'Tap to select a category',
+  style: AppTextTheme.darkTextTheme.bodyMedium,
+);
+```

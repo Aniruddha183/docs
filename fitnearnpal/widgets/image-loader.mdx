@@ -1,0 +1,205 @@
+---
+title: Image Upload Progress Loader
+description: A Flutter widget that shows image upload progress with animated spinner and success checkmark, then navigates based on the source screen.
+---
+
+# 🖼️ Image Upload Progress Loader
+
+This component displays an image being uploaded with a circular progress indicator, an animated spinner while uploading, and a success checkmark once complete. After finishing the upload simulation, it automatically navigates to different screens depending on the origin of the upload request.
+
+---
+
+## ✨ Features
+
+- Shows image preview in a circular avatar.
+- Animated rotation icon indicating ongoing upload.
+- Progress bar with gradient filling reflecting upload progress.
+- Success checkmark on upload completion.
+- Conditional navigation after upload completes based on the `sourceScreen` parameter.
+- Smooth UI transitions and proper resource disposal.
+
+---
+
+## 🧱 Code Snippet: `ImageLoader` Widget
+
+```dart
+class ImageLoader extends StatefulWidget {
+  final File file;
+  final String sourceScreen;
+
+  const ImageLoader({
+    super.key,
+    required this.file,
+    required this.sourceScreen,
+  });
+
+  @override
+  State<ImageLoader> createState() => _ImageLoaderState();
+}
+
+class _ImageLoaderState extends State<ImageLoader>
+    with SingleTickerProviderStateMixin {
+  double uploadProgress = 0.0;
+  bool isUploading = true;
+  late AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+
+    _startUploading();
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  void _startUploading() {
+    // Simulate upload progress incrementally
+    Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      setState(() {
+        uploadProgress += 0.1;
+        if (uploadProgress >= 1.0) {
+          uploadProgress = 1.0;
+          isUploading = false;
+          timer.cancel();
+
+          // Navigate after a short delay based on sourceScreen
+          Future.delayed(const Duration(seconds: 1), () {
+            if (widget.sourceScreen == 'AddProfile') {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const AddProfile()),
+                (route) => false,
+              );
+            } else if (widget.sourceScreen == 'ProfilePage') {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+                (route) => false,
+              );
+            } else if (widget.sourceScreen == 'BlogTitleHeading' ||
+                widget.sourceScreen == 'LiveSessionThumbnail' ||
+                widget.sourceScreen == 'PostTextImage' ||
+                widget.sourceScreen == 'CreateFood') {
+              Navigator.pop(context, widget.file);
+            } else {
+              Navigator.pop(context);
+            }
+          });
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 80,
+                    backgroundImage: FileImage(widget.file),
+                  ),
+                  if (isUploading)
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: RotationTransition(
+                        turns: _rotationController,
+                        child: Material(
+                          color: backgroundColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(50),
+                            side: const BorderSide(color: tabColor3),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(5.0),
+                            child: SvgPicture.asset('assets/images/rotate-outline.svg'),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: Material(
+                        color: backgroundColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(50),
+                          side: const BorderSide(color: tabColor3),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(5.0),
+                          child: SvgPicture.asset(
+                            'assets/images/check-outline.svg',
+                            height: 30,
+                            width: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 50),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 48,
+            color: buttonColor2,
+            child: Stack(
+              children: [
+                FractionallySizedBox(
+                  widthFactor: uploadProgress,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          tabColor3,
+                          tabColor4,
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Text(
+                    isUploading ? 'Uploading' : 'Upload Complete',
+                    style: GoogleFonts.lato(
+                      color: fontColor18,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```

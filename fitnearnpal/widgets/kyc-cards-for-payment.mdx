@@ -1,0 +1,204 @@
+---
+title: Payment Request Cards for Bookings
+description: Cards for managing booking payment states including raise request, pending, and received payments with KYC validation.
+---
+
+# 💳 Payment Cards for Bookings
+
+The payment cards display booking details and payment status, allowing coaches to raise payment requests or view pending and received payments.
+
+---
+
+## 🔹 Card Types
+
+| Card Type             | Description                                                        |
+| --------------------- | ------------------------------------------------------------------ |
+| Raise Request Card    | Session completed, KYC verified, coach can raise a payment request |
+| Pending Request Card  | Payment request made but payment not received yet                  |
+| Received Payment Card | Payment completed after request                                    |
+
+---
+
+## 🧱 Code Snippet: Raise Request Card
+
+```dart
+class RequestPaymentCard extends StatelessWidget {
+  BookingModel? bookingModel;
+
+  RequestPaymentCard({super.key, this.bookingModel});
+
+  @override
+  Widget build(BuildContext context) {
+    final kycProvider = Provider.of<KycProvider>(context, listen: false);
+
+    void showKycPopup() {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return PopupWidgetwithOneOption(
+            text: "KYC Pending",
+            subText:
+                "You need to complete your KYC before initiating payment request",
+            onPressed: () {
+              Navigator.pushNamed(
+                  context, AppRoutes.kycnationalityverification);
+            },
+            image: "assets/images/mdi_alert.png",
+            buttonText: "Complete KYC",
+          );
+        },
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: buttonColor2,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding:
+            const EdgeInsets.only(left: 8.0, right: 8, top: 8, bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              bookingModel?.category ?? '',
+              style: GoogleFonts.lato(
+                color: fontColor6,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                            'assets/images/calendar-month-outline (1).svg'),
+                        const SizedBox(width: 4),
+                        Text(
+                          bookingModel?.date ?? '',
+                          style: GoogleFonts.lato(
+                            color: fontColor5,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Booking Id : ${bookingModel?.sessionId}',
+                      style: GoogleFonts.lato(
+                        color: fontColor1,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 60),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        SvgPicture.asset('assets/images/clock-outline (1).svg'),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${bookingModel?.startTime}-${bookingModel?.endTime}',
+                          style: GoogleFonts.lato(
+                            color: fontColor5,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SvgPicture.asset('assets/images/Group (2).svg'),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Group',
+                          style: GoogleFonts.lato(
+                            color: fontColor1,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
+            Container(
+              width: double.infinity,
+              height: 35,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    tabColor3,
+                    tabColor4,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                ),
+                onPressed: () {
+                  if (!kycProvider.isKycSubmitted) {
+                    showKycPopup(); // Show KYC popup if KYC is not completed
+                  } else {
+                    // Proceed with navigation to transaction details
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TransactionDetails(
+                          showButton: true,
+                          buttonText: 'Request for Payment',
+                          onPressed: () {},
+                          state: 'Raise Request',
+                          stateColor: fontColor14,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Text(
+                  'Raise Request',
+                  style: GoogleFonts.lato(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: fontColor3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+- The card displays booking details: category, date, session ID, time, and session type.
+
+- The "Raise Request" button checks if KYC is completed before allowing payment request.
+
+- If KYC is incomplete, a popup prompts the coach to complete it, redirecting to the KYC page.
+
+- On successful KYC, the button navigates to the transaction details screen with payment options.

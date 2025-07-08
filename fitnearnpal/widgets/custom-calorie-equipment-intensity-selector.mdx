@@ -1,0 +1,219 @@
+---
+title: Coach App Calorie & Equipment Selector
+description: Modal-based selectors for calorie level, intensity, and equipment in session/video creation
+---
+
+import { Callout } from "nextra-theme-docs";
+
+# Coach App Reusable Components
+
+This document outlines the implementation and usage of modal-based selectors for session configuration — including calorie range, intensity level, and required equipment.
+
+---
+
+## 1. Calorie / Intensity / Equipment Selector Modal
+
+These selectors allow the coach to specify session attributes using a modal bottom sheet UI pattern.
+
+- 💡 **Modular Use:** Same pattern is used for Calories, Intensity, and Equipment.
+- 📥 **Value Source:** Values are pre-defined in a `Provider` (e.g., `GetProvider`).
+- 🧩 **Integration:** Used in live session and workout video creation flows.
+
+---
+
+### Functional Behavior
+
+1. A tapable container acts as a trigger for a modal sheet.
+2. The modal displays a scrollable list of available options.
+3. Upon selection, the chosen value is stored via `Provider` (e.g., `VideoProvider.setCalories()`).
+4. The value is reflected back in the parent screen.
+
+---
+
+### UI/UX Notes
+
+- Modal sheets maintain visual consistency with rounded corners.
+- Selected values persist visually on the trigger widget after closing the modal.
+- Each modal includes a cancel option (`TextButton` top-right).
+- List items are separated with a thin divider for visual clarity.
+- Optional: A checkmark/radio icon can be used to show current selection.
+
+---
+
+## 2. Trigger Widget: `CalorieAmountModalBottomsheetWorkoutVid`
+
+This is the container that shows the currently selected value and triggers the modal when tapped.
+
+```dart
+class CalorieAmountModalsheet extends StatefulWidget {
+  final String hintText;
+  final SessionProvider mealProvider;
+  const CalorieAmountModalsheet(
+      {super.key, required this.hintText, required this.mealProvider});
+
+  @override
+  State<CalorieAmountModalsheet> createState() =>
+      _CalorieAmountModalsheetState();
+}
+
+class _CalorieAmountModalsheetState extends State<CalorieAmountModalsheet> {
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusManager.instance.primaryFocus?.addListener(_updateFocus);
+    });
+  }
+
+  void _updateFocus() {
+    if (mounted) {
+      setState(() {
+        _isFocused = FocusManager.instance.primaryFocus?.context == context;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.primaryFocus?.removeListener(_updateFocus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus(); // Unfocus other fields
+        setState(() {
+          _isFocused = false;
+        });
+        showDietTypeModal(context);
+      },
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: buttonColor2,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _isFocused ? buttonColor1 : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              widget.mealProvider.calories?.calories ?? widget.hintText,
+              style: GoogleFonts.lato(
+                color: widget.mealProvider.calories?.calories.isNotEmpty == true
+                    ? fontColor1
+                    : fontColor5,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            SvgPicture.asset('assets/images/add-circle.svg'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void showDietTypeModal(BuildContext context) {
+    showModalBottomSheet(
+      isScrollControlled: true,
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return CalorieSelector();
+      },
+    );
+  }
+}
+```
+
+## Code snippet for CalorieSelector:
+
+```dart
+class CalorieSelector extends StatelessWidget {
+  // final List<String> categories = [
+  //   ">20",
+  //   ">50",
+  //   ">100",
+  //   ">150",
+  //   ">200",
+  //   ">500",
+  // ];
+
+  CalorieSelector({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        child: Selector<GetProvider, List<CalorieModel>>(selector: (p0, p1) {
+          return p1.calories;
+        }, builder: (context, calorieModel, _) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: GoogleFonts.lato(
+                      decoration: TextDecoration.underline,
+                      color: fontColor18,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+              ListView.separated(
+                shrinkWrap: true,
+                itemCount: calorieModel.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: Colors.grey[700],
+                  thickness: 0.5,
+                ),
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(
+                      calorieModel[index].calories,
+                      style: GoogleFonts.lato(
+                        color: fontColor1,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.radio_button_unchecked),
+                    onTap: () {
+                      Provider.of<SessionProvider>(context, listen: false)
+                          .setCalories(calorieModel[index]);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+}
+
+```
