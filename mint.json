@@ -206,29 +206,46 @@
         {
           "group": "API Documentations",
           "pages": [
-            "backend/api-documentation-access",
-            "backend/api-doc-admin-content-management",
-            "backend/report-abuse-api",
-            "backend/api-doc-adminAuthAndSession",
-            "backend/api-doc-user_management",
-            "backend/api-doc-permissions",
-            "backend/api-doc-query",
-            "backend/api-doc-workout",
-            "backend/api-doc-subscriptions",
-            "backend/api-doc-adminAuthAndSession",
-            "backend/api-doc-media-management",
-            "backend/api-doc-category-management",
-            "backend/api-doc-coach-workout-video-management",
-            "backend/api-doc-report-generation",
-            "backend/api-doc-media-management",
-            "backend/api-doc-category-management",
-            "backend/api-doc-coach-workout-video-management",
-            "backend/api-doc-report-generation",
-            "backend/report-abuse-api",
-            "backend/api-doc-admin-coach-booking-management",
-            "backend/api-doc-admin-live-session-management",
-            "backend/api-doc-admin-blog-management",
-            "backend/api-doc-admin-refund-management"
+            {
+              "group": "Admin",
+              "pages": [
+                "backend/api-documentation-access",
+                "backend/api-doc-admin-content-management",
+                "backend/report-abuse-api",
+                "backend/api-doc-adminAuthAndSession",
+                "backend/api-doc-user_management",
+                "backend/api-doc-permissions",
+                "backend/api-doc-query",
+                "backend/api-doc-workout",
+                "backend/api-doc-subscriptions",
+                "backend/api-doc-adminAuthAndSession",
+                "backend/api-doc-media-management",
+                "backend/api-doc-category-management",
+                "backend/api-doc-coach-workout-video-management",
+                "backend/api-doc-report-generation",
+                "backend/api-doc-media-management",
+                "backend/api-doc-category-management",
+                "backend/api-doc-coach-workout-video-management",
+                "backend/api-doc-report-generation",
+                "backend/report-abuse-api",
+                "backend/api-doc-admin-coach-booking-management",
+                "backend/api-doc-admin-live-session-management",
+                "backend/api-doc-admin-blog-management",
+                "backend/api-doc-admin-refund-management"
+              ]
+            },
+            {
+              "group": "Coach",
+              "pages": [
+                "backend/Coach/api-doc-coach-auth-routes",
+                "backend/Coach/coach-live-session-api-doc",
+                "backend/Coach/coach-blog-api-routes"
+              ]
+            },
+            {
+              "group": "User",
+              "pages": ["placeholder-user-doc"]
+            }
           ]
         }
       ]

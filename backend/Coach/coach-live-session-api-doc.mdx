@@ -1,0 +1,251 @@
+---
+title: "Coach Live Session Api Documentation"
+description: "REST API reference for Coach Live Session."
+---
+
+# Coach Live Session API
+
+This document outlines the API endpoints available to **Coaches** in Live Session feature
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/coach
+```
+
+---
+
+
+---
+
+## Authentication & Token Requirements
+
+Most endpoints do **not** require explicit authentication middleware in the route file, but you should ensure that only the correct coach can access or modify their own sessions/bookings (typically handled in the controller or via session).
+
+Some endpoints (notably file/image upload and session creation) require additional tokens/headers for AWS S3 upload:
+- `Authorization` (Bearer token): Cognito Identity/Access token for AWS S3 upload.
+- `x-refresh-token`: Cognito refresh token (for auto-refreshing AWS credentials).
+- `x-username`: Username for Cognito token refresh.
+
+**Example headers for file/image upload:**
+
+
+---
+
+## Middleware
+
+### `multer.single(field)`
+
+- **Purpose**: Handles file uploads (e.g., `thumbnail`) in multipart/form-data requests.
+
+### `idGenerationMiddleware('LIV')`
+
+- **Purpose**: Generates a unique Live Session ID (`LIVxxxxx`) for new live sessions.
+- **Usage**: Applied to the public live session creation endpoint.
+
+---
+
+## Endpoints
+
+### 1. Create Public Live Session
+
+Creates a new public live session for the coach.
+
+- **Method**: `POST`
+- **URL**: `/public/create`
+- **Middleware**: `multer.single('thumbnail')`, `idGenerationMiddleware('LIV')`
+- **Controller**: `createPublicLiveSession`
+- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `coachId`, `title`, `date`, `startTime`, `duration`, `description`, `category`, `level`, `focusArea`, `thumbnailURL`, `thumbnailKey`, `equipment`, `intensityLevel`, `calories`, etc.
+  - File: `thumbnail` (image)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing required fields or time slot unavailable.
+  - `500 Internal Server Error`
+
+---
+
+### 2. Cancel Public Live Session
+
+Cancels a public live session.
+
+- **Method**: `PATCH`
+- **URL**: `/cancel/public`
+- **Controller**: `cancelPublicSession`
+- **Request Body**:  
+  - `sessionId`, `coachId`, `reason`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Session cancelled successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 3. Coach Request Payment
+
+Coach requests payout for a completed session.
+
+- **Method**: `PATCH`
+- **URL**: `/coach/request-payment`
+- **Controller**: `coachRequestPayment`
+- **Request Body**:  
+  - `sessionId`, `coachId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Payment request submitted"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found or not eligible.
+  - `500 Internal Server Error`
+
+---
+
+### 4. Get Session Details
+
+Fetches details of a specific session.
+
+- **Method**: `GET`
+- **URL**: `/get/session-details/:sessionId`
+- **Controller**: `getSessionById`
+- **Params**:  
+  - `sessionId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...sessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 5. Get Coach Bookings
+
+Fetches all bookings for a specific coach.
+
+- **Method**: `GET`
+- **URL**: `/get/bookings/:coachId`
+- **Controller**: `getCoachBookings`
+- **Params**:  
+  - `coachId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [ ...bookingObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: No bookings found.
+  - `500 Internal Server Error`
+
+---
+
+## 📦 Models
+
+### `PublicSession` (Live Session)
+- **Description**: Stores all public live session details created by coaches.
+- **Key Fields**:
+  - `sessionId` (String): Unique identifier for the session (e.g., `LIV00001`)
+  - `coachId` (String): Reference to the coach who owns the session
+  - `title` (String): Title of the session
+  - `date` (String): Date of the session (format: `DD-MM-YYYY`)
+  - `startTime` (String): Start time (format: `hh:mmA`)
+  - `endTime` (String): End time (format: `hh:mmA`)
+  - `duration` (String): Duration label (e.g., `30-35 MIN`)
+  - `description` (String): Session description
+  - `category` (String): Category of the session
+  - `level` (String): Difficulty level
+  - `focusArea` (Array[String]): Focus areas (e.g., `["Cardio"]`)
+  - `thumbnailURL` (String): S3 URL for the session thumbnail
+  - `thumbnailKey` (String): S3 key for the thumbnail
+  - `equipment` (String): Equipment required
+  - `intensityLevel` (String): Intensity level
+  - `calories` (Number): Estimated calories burned
+  - `meetLink` (String): Meeting link for the session
+  - `status` (String): Status (`draft`, `under review`, `approved`, `cancelled`, etc.)
+  - `state` (String): State (`Active`, `Inactive`)
+  - `participants` (Array[String]): User IDs of participants
+  - `attendance` (Number): Number of attendees
+  - `likes` (Number): Number of likes
+  - `seats` (Number): Total seats
+  - `bookedSeats` (Number): Booked seats
+  - `cancelReason` (String): Reason for cancellation
+
+---
+
+### `BookedSlot`
+- **Description**: Tracks all booked time slots for a coach.
+- **Key Fields**:
+  - `coachId` (String): Reference to the coach
+  - `slots` (Array[Object]):
+    - `date` (Date): Date of the slot
+    - `startTime` (Date): Start time
+    - `endTime` (Date): End time
+    - `sessionId` (String): Reference to the session
+
+---
+
+### `Booking`
+- **Description**: Stores booking and payment information for sessions, including payment details from Razorpay.
+- **Key Fields**:
+  - `userId` (String): Reference to the user
+  - `bookingId` (String): Unique booking identifier
+  - `orderId` (String): Order identifier from payment gateway
+  - `paymentId` (String): Payment identifier from payment gateway
+  - `transactionId` (String): Transaction identifier
+  - `currency` (String): Currency code (e.g., 'INR')
+  - `status` (String): Booking/payment status (`success`, `failed`, `refunded`, `pending`, `declined`)
+  - `sessionId` (String): Reference to the session
+  - `sessionType` (String): Type of session (`Live Session`, `Booking Individual`, `Booking Group`)
+  - `grandTotal` (Number): Total amount after discounts
+  - `actualAmount` (Number): Original amount before discounts
+  - `discountAmount` (Number): Discount amount applied
+  - `discountPercent` (Number): Discount percentage applied
+  - `payment_mode` (String): Mode of payment (e.g., 'UPI', 'Card')
+  - `payment_date` (String): Date of payment
+  - `seats` (Number): Number of seats booked
+  - `note` (String): Additional notes for the booking
+  - `requestRaised` (Date, optional): Date when a request was raised (if applicable)
+
+---
+
+## Notes
+
+- File upload endpoints require Cognito tokens for AWS S3 access.
+- Ensure that only the correct coach can access or modify their own sessions/bookings.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                        | Description                        | Required Headers                |
+|--------|---------------------------------|------------------------------------|---------------------------------|
+| POST   | `/public/create`                | Create public live session         | Authorization, x-refresh-token, x-username |
+| PATCH  | `/cancel/public`                | Cancel public live session         |                                 |
+| PATCH  | `/coach/request-payment`        | Coach requests session payout      |                                 |
+| GET    | `/get/session-details/:sessionId` | Get session details               |                                 |
+| GET    | `/get/bookings/:coachId`        | Get coach bookings                 |                                 |
+
+---

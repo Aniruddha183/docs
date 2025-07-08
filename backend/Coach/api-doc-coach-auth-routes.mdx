@@ -1,0 +1,295 @@
+---
+title: "Coach App Authentication Api Documentation"
+description: "REST API reference for Coach App Authentication."
+---
+
+# Coach App Authentication API
+
+This document outlines the API endpoints available to **Coaches** for authenticating in Coach App.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/coach
+```
+---
+
+## Middleware
+
+### `idGenerationMiddleware('COH')`
+
+- **Purpose**: Generates a unique Coach ID (`COHxxxxx`) for new coach registrations.
+- **Usage**: Required in Coach registration endpoints.
+
+---
+
+## Endpoints
+
+### 1. Google Registration (Signup)
+
+Registers a new coach using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/register`
+- **Middleware**: `idGenerationMiddleware('COH')`
+- **Controller**: `coachGoogleRegistrationSignup`
+- **Request Body**:
+  - `email` (string): Coach's email (required)
+  - `awsUserName` (string): AWS username (required)
+  - `accessToken`, `authToken`, `refreshToken` (string, optional): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Coach registered successfully",
+    "user": { ...coachObject },
+    "genToken": { ...tokenObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing or duplicate email
+  - `500 Internal Server Error`: Registration failure
+
+---
+
+### 2. Google Login
+
+Logs in a coach using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/login`
+- **Controller**: `coachGoogleRegistrationSignin`
+- **Request Body**:
+  - `email` (string): Coach's email
+  - `accessToken`, `authToken`, `refreshToken` (string): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "User signed in successfully",
+    "genToken": { ...tokenObject },
+    "coachData": { ...coachObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Coach not found
+  - `500 Internal Server Error`
+
+---
+
+### 3. OTP Registration
+
+Generates an OTP for a new coach registration using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/register`
+- **Controller**: `coachRegisterUsingOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Coach's mobile number
+  - `countryCode` (string): Country code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Mobile number already registered
+  - `500 Internal Server Error`
+
+---
+
+### 4. OTP Login
+
+Generates an OTP for login using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/login`
+- **Controller**: `coachLoginUsingOtp`
+- **Request Body**:
+  - `mobileNumber` (string): Coach's mobile number
+  - `countryCode` (string): Country code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Mobile number not found
+  - `500 Internal Server Error`
+
+---
+
+### 5. Resend OTP
+
+Resend an OTP for registration or login.
+
+- **Method**: `POST`
+- **URL**: `/otp/resend`
+- **Controller**: `resendOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Coach's mobile number
+  - `countryCode` (string): Country code
+  - `action` (string): Action type (e.g., 'register', 'login')
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 6. Logout
+
+Logs out the currently authenticated coach.
+
+- **Method**: `POST`
+- **URL**: `/logout`
+- **Controller**: `coachLogout`
+- **Request Body**:
+  - `coach_id` (string): Coach's unique ID
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Logout successful"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 7. Verify OTP
+
+Verifies an OTP for registration or login.
+
+- **Method**: `GET`
+- **URL**: `/otp/verify`
+- **Controller**: `verifyOTP`
+- **Query Params**:
+  - `mobileNumber` (string): Coach's mobile number
+  - `countryCode` (string): Country code
+  - `otp` (string): OTP code
+  - `reset` (boolean, optional): For password reset flow
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP verified successfully",
+    "genToken": { ...tokenObject },
+    "access_token": "...",
+    "id_token": "...",
+    "refresh_token": "...",
+    "coach_id": "COHxxxxx"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid or expired OTP
+  - `500 Internal Server Error`
+
+---
+
+## 📦 Models
+
+### `IProfileModel` (Coach Profile)
+- **Description**: Stores coach profile and authentication information.
+- **Key Fields**:
+  - `coach_id` (string): Unique coach identifier (e.g., `COH00001`)
+  - `name` (string): Coach's name
+  - `awsUserName` (string): AWS username
+  - `email` (string): Coach's email address
+  - `age` (number): Age
+  - `gender` (string): Gender
+  - `licenseStatus` (string): License status
+  - `mobileNumber` (string): Mobile number
+  - `countryCode` (string): Country code
+  - `clientCount` (number): Number of clients coached
+  - `category` (string): Coaching category
+  - `categoryLevel` (string): Category level
+  - `peopleCoached` (number): Number of people coached
+  - `experience` (string): Experience description
+  - `bio` (string): Coach's biography
+  - `images` (string[]): Array of image URLs
+  - `profileImage` (string): Profile image URL
+  - `coverImage` (string): Cover image URL
+  - `appType` (string): App type
+  - `status` (string): Profile/account status
+  - `isVerified` (boolean): Whether the coach is verified
+  - `onBoardingComplete` (boolean): Onboarding completion status
+  - `lastLogin` (Date, optional): Last login timestamp
+  - `stage` (enum): `"VERIFIED" | "UNVERIFIED" | "UNDER REVIEW" | "SUSPENDED" | "STUDIO" | "DRAFT"`
+  - `connectedDevice` (string[]): Connected device IDs
+  - `liveSessionPrice` (number): Price for live sessions
+  - `bookingPrice` (number): Price for bookings
+  - `kycVerified` (boolean): KYC verification status
+  - `firstLiveSessionCreated` (boolean): Whether the first live session is created
+  - `firstWorkoutPlanCreated` (boolean): Whether the first workout plan is created
+  - `authType` (string): Authentication type
+
+---
+
+### `ICoachSession`
+- **Description**: Stores active session and authentication tokens for coaches.
+- **Key Fields**:
+  - `coachId` (string): Reference to the coach (`IProfileModel["coach_id"]`)
+  - `phone` (number, optional): Coach's phone number
+  - `userAgent` (string, optional): User agent string
+  - `authToken` (string): Auth token
+  - `accessToken` (string): Access token
+  - `refreshToken` (string): Refresh token
+  - `JWT_Token` (string): JWT token
+  - `createdAt` (Date): Session creation date
+  - `fcmToken` (string, optional): FCM token for push notifications
+
+---
+
+### `ICoachOTP`
+- **Description**: Stores OTP codes for coach authentication.
+- **Key Fields**:
+  - `mobileNumber` (number): Coach's mobile number
+  - `otp` (number): OTP code
+  - `createdAt` (Date): OTP creation timestamp
+  - `expiresAt` (Date): OTP expiration timestamp
+
+---
+
+### `ICoachTokenVerification`
+- **Description**: Stores verification tokens for coach authentication.
+- **Key Fields**:
+  - `coachId` (string): Coach identifier
+  - `token` (number): Verification token
+  - `createdAt` (Date): Token creation timestamp
+
+---
+
+## Notes
+
+- All endpoints are designed for coach authentication and registration flows.
+- Google OAuth endpoints require valid Google tokens.
+- OTP endpoints require valid phone/email and OTP codes.
+- The `idGenerationMiddleware('COH')` ensures unique coach IDs for new registrations.
+
+---
+## Summary Table
+
+| Method | Endpoint             | Description                |
+|--------|----------------------|----------------------------|
+| POST   | `/google/register`   | Google registration        |
+| POST   | `/google/login`      | Google login               |
+| POST   | `/otp/register`      | OTP registration           |
+| POST   | `/otp/login`         | OTP login                  |
+| POST   | `/otp/resend`        | Resend OTP                 |
+| POST   | `/logout`            | Logout                     |
+| GET    | `/otp/verify`        | Verify OTP                 |
+
+---

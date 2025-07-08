@@ -1,0 +1,254 @@
+---
+title: "Coach Blog Api Documentation "
+description: "REST API reference for Coach Blog."
+---
+
+# Coach Blog API
+
+This document outlines the API endpoints available to **Coaches** in Blog feature
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/coach
+```
+
+---
+
+---
+
+## Authentication & Token Requirements
+
+Most endpoints require a valid **JWT identity token** in the `Authorization` header (format: `Bearer <token>`), especially for file/image upload and blog creation. Some endpoints also require `x-refresh-token` and `x-username` headers for AWS credential refresh.
+
+---
+
+## Middleware
+
+### `multer.memoryStorage()`
+- **Purpose**: Handles file uploads in memory for image and thumbnail uploads.
+- **Usage**: Used in endpoints that upload images or thumbnails (e.g., `upload-file`, `create-blog`).
+
+---
+
+## Utility Functions
+
+### `uploadImage`
+- **Purpose**: Uploads an image buffer to AWS S3, handling token verification and credential refresh if needed.
+- **Inputs**: `buffer`, `mimeType`, `userId`, `identityToken`, `uploadContext`, `refreshToken`, `username`, `folderName`, `contentId?`
+- **Returns**: `{ location, key }` (S3 URL and object key)
+- **Notes**: Handles token expiration and AWS credential retrieval.
+
+### `deleteImageFromS3`
+- **Purpose**: Deletes an image from AWS S3 using its object key.
+- **Inputs**: `key` (S3 object key)
+- **Returns**: None (throws error on failure)
+
+---
+
+## Endpoints
+
+### 1. Create Draft Blog
+Creates a new draft blog or updates an existing one.
+- **Method**: `POST`
+- **URL**: `/create-blog`
+- **Middleware**: `multer.memoryStorage()` (for `thumbnail` upload)
+- **Controller**: `createDraftBlog`
+- **Headers**: `Authorization: Bearer <token>`, `x-refresh-token`, `x-username`
+- **Request Body**:
+  - `title`, `category`, `readTime`, `coachId`, `blogHeading`, `blogId?`, `tags?`, `thumbnail` (file)
+- **Success Response**:
+  ```json
+  { "success": true, "message": "Blog created successfully", "blogId": "BLG00001" }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing coachId or required fields
+  - `401 Unauthorized`: Missing or invalid token
+  - `404 Not Found`: Coach not found
+  - `500 Internal Server Error`
+
+---
+
+### 2. Upload Image File
+Uploads an image file to S3 for use in a blog.
+- **Method**: `POST`
+- **URL**: `/upload-file`
+- **Middleware**: `multer.memoryStorage()` (for `image` upload)
+- **Controller**: `uploadFile`
+- **Headers**: `Authorization: Bearer <token>`, `x-refresh-token`, `x-username`
+- **Request Body**:
+  - `coachId`, `blogId`, `image` (file)
+- **Success Response**:
+  ```json
+  { "success": true, "file": { "url": "<s3_url>" } }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing coachId or file
+  - `401 Unauthorized`: Missing or invalid token
+  - `500 Internal Server Error`
+
+---
+
+### 3. Delete Blog
+Deletes a blog by its ID.
+- **Method**: `POST`
+- **URL**: `/delete-blog`
+- **Controller**: `deleteBlog`
+- **Request Body**:
+  - `blogId`
+- **Success Response**:
+  ```json
+  { "message": "Blog deleted successfully" }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found
+  - `500 Internal Server Error`
+
+---
+
+### 4. Create Blog Version
+Creates a new version of a blog.
+- **Method**: `POST`
+- **URL**: `/version-blog/:blogId`
+- **Controller**: `versionBlog`
+- **Params**: `blogId`
+- **Success Response**:
+  ```json
+  { "message": "Blog version created successfully", "data": { ...blogObject }, "success": true }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found
+  - `400 Bad Request`: Version already exists in review
+  - `500 Internal Server Error`
+
+---
+
+### 5. Save Blog Post (Send for Review)
+Removes deleted images from S3 and sends blog for review.
+- **Method**: `PATCH`
+- **URL**: `/save-blog`
+- **Controller**: `saveBlogPost`
+- **Request Body**:
+  - `blogId`, `outputData` (array of content blocks)
+- **Success Response**:
+  ```json
+  { "message": "Blog post saved successfully", "data": { ...blogObject }, "success": true }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid outputData
+  - `500 Internal Server Error`
+
+---
+
+### 6. Update Blog Content
+Updates the content of a blog post.
+- **Method**: `PATCH`
+- **URL**: `/update-blog`
+- **Controller**: `updateBlog`
+- **Request Body**:
+  - `content`, `blogId`
+- **Success Response**:
+  ```json
+  { "data": { ...blogObject }, "success": true, "message": "Blog updated successfully" }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found
+  - `500 Internal Server Error`
+
+---
+
+### 7. Get Blogs by Coach
+Fetches all blogs by a specific coach.
+- **Method**: `GET`
+- **URL**: `/coach-blog/:coachId`
+- **Controller**: `getBlogsByCoach`
+- **Params**: `coachId`
+- **Success Response**:
+  ```json
+  { "success": true, "message": "Blogs retrieved successfully", "data": [ ...blogObjects ] }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found
+  - `500 Internal Server Error`
+
+---
+
+### 8. Get Blog by Blog ID
+Fetches a blog by its ID.
+- **Method**: `GET`
+- **URL**: `/get/:blogId`
+- **Controller**: `getBlogByBlogId`
+- **Params**: `blogId`
+- **Success Response**:
+  ```json
+  { "message": "Blog fetched successfully", "data": { ...blogObject }, "success": true }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found
+  - `500 Internal Server Error`
+
+---
+
+## 📦 Models
+
+### `Blog`
+- **Description**: Stores all blog post details created by coaches.
+- **Fields**:
+  - `blogId` (string): Unique blog identifier (e.g., `BLG00001`)
+  - `title` (string): Blog title
+  - `thumbnail` (string): S3 URL of the thumbnail image
+  - `category` (string): Blog category
+  - `blogHeading` (string): Blog heading
+  - `content` (mixed): Blog content (array of blocks or rich text)
+  - `userType` (string): 'COACH' (for coach blogs)
+  - `status` (string): Blog status (`draft`, `under review`, `published`, etc.)
+  - `authorId` (string): Coach ID
+  - `author` (string): Coach name
+  - `readTime` (string): Estimated read time
+  - `tags` (string[]): Tags for the blog
+  - `report`, `raiseEditRequest`, `deleteRequest`, `editRequest` (boolean): Various flags
+  - `likes`, `share`, `views` (number): Engagement metrics
+  - `profileImage` (string): Coach profile image
+  - `reviewer`, `approver` (string): Admins involved in review
+  - `state` (string): 'Active' or 'Inactive'
+  - `version` (number): Blog version
+
+### `BlogImage`
+- **Description**: Stores S3 image URLs and keys associated with a blog.
+- **Fields**:
+  - `blogId` (string): Blog identifier
+  - `images` (array): List of images with:
+    - `url` (string): S3 URL
+    - `key` (string): S3 object key
+
+### `ProfileModel`
+- **Description**: Stores coach profile details (used for author/coach lookup).
+- **Fields**:
+  - `coach_id` (string): Unique coach identifier
+  - `name` (string): Coach name
+  - `email` (string): Coach email
+  - `profileImage` (string): Profile image URL
+  - `bio` (string): Coach bio
+  - `category` (string): Coach category
+  - `status` (string): Profile status
+  - ... (other fields for demographics, experience, etc.)
+
+---
+---
+
+## 📋 API Summary Table
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/create-blog` | POST | Create or update a draft blog (with thumbnail upload) |
+| `/upload-file` | POST | Upload an image file to S3 for use in a blog |
+| `/delete-blog` | POST | Delete a blog by its ID |
+| `/version-blog/:blogId` | POST | Create a new version of a blog |
+| `/save-blog` | PATCH | Remove deleted images and send blog for review |
+| `/update-blog` | PATCH | Update the content of a blog post |
+| `/coach-blog/:coachId` | GET | Fetch all blogs by a specific coach |
+| `/get/:blogId` | GET | Fetch a blog by its ID |
+
+---
