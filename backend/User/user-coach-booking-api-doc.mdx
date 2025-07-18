@@ -1,0 +1,511 @@
+---
+title: "User's Coach Booking Api Documentation "
+description: "REST API reference for Coach Booking."
+---
+
+# User's Coach Booking API
+
+This document outlines the API endpoints available to **Users** in website: 'fitnearn.com'
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web
+```
+
+---
+---
+
+# User Coach Booking API (Private Session)
+
+This documentation covers all endpoints, models, and logic for booking a private session with a coach (excluding studio logic). It also includes payment/booking APIs and relevant utility/middleware details.
+
+---
+
+## Model Schemas
+
+### IPrivateSession
+```ts
+interface IPrivateSession {
+  sessionId: string;
+  coachId: string;
+  userId: string;
+  coachName: string;
+  title: string;
+  category: string;
+  dateTime: Date;
+  endDateTime: Date;
+  date: string;
+  seats: number;
+  bookedSeats: number;
+  timeSlot: string;
+  startTime: string;
+  endTime: string;
+  participantEmail: string[];
+  invitedEmail: string[];
+  meetLink: string;
+  status: string;
+  price: number;
+  cancelReason?: string;
+  sessionReminder: Date;
+  reviewer: string;
+  approver: string;
+  requestPayment: boolean;
+}
+```
+
+### IBooking (Payment Receipt)
+```ts
+interface IBooking {
+  userId: string;
+  bookingId: string;
+  orderId: string;
+  paymentId: string;
+  transactionId: string;
+  currency: string;
+  status: "success" | "failed" | "refunded" | 'pending' | 'declined';
+  sessionId: string;
+  sessionType: "Live Session" | "Booking Individual" | "Booking Group";
+  grandTotal: number;
+  actualAmount: number;
+  discountAmount: number;
+  discountPercent: number;
+  payment_mode: string;
+  payment_date: string;
+  seats: number;
+  note: string;
+  requestRaised?: Date;
+}
+```
+
+### ISession (User Booked Session)
+```ts
+interface ISession {
+  sessionId: string;
+  sessionType: string;
+  userRole: string;
+  isAttended: boolean;
+}
+```
+
+---
+
+## Middleware
+
+### `idGenerationMiddleware('LSX')`
+- **Purpose**: Generates a unique Private Session ID (`LSXxxxxx`) for new private session bookings.
+- **Usage**: Applied to the private session booking endpoint.
+
+### `idGenerationMiddleware('BID')`
+- **Purpose**: Generates a unique Booking ID (`BIDxxxxx`) for new payment receipts.
+- **Usage**: Applied to the booking/payment creation endpoint.
+
+---
+
+## Utility Functions
+
+### `addUserBookedSession`
+- **Purpose**: Adds a session to a user's booked sessions (by userId or email).
+- **Usage**: Called after successful booking or participant addition.
+
+### `removeUserBookedSession`
+- **Purpose**: Removes a session from a user's booked sessions.
+- **Usage**: Called when a user cancels a private session.
+
+### `parseDateTime`
+- **Purpose**: Parses date and time strings into a JavaScript `Date` object.
+- **Usage**: Used for slot conflict checking and session creation.
+
+---
+
+## Endpoints
+
+### 1. Book a Private Session with Coach
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/session/private/book`
+- **Middleware**: `idGenerationMiddleware('LSX')`
+- **Controller**: `bookUserPrivateSession`
+
+#### Functionality
+Creates a new private session with a coach. Generates a unique session ID, stores session details, and adds the session to the user's booked sessions. Sends notifications and emails as needed.
+
+- **Request Body**:
+  - `coachId`, `userId`, `title`, `category`, `date`, `timeSlot`, `startTime`, `endTime`, `price`, `participantEmail`, `invitedEmail`, etc.
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...privateSessionObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing required fields.
+  - `409 Conflict`: Duplicate session.
+  - `500 Internal Server Error`
+
+---
+
+### 2. Cancel a Booked Private Session
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/session/private/cancel`
+- **Controller**: `cancelUserPrivateSession`
+
+#### Functionality
+Cancels a user's private session booking. Removes the session from the user's booked sessions and updates the session status. Sends notifications and emails as needed.
+
+- **Request Body**:
+  - `userId`, `sessionId`, `cancelReason`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Session cancelled successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 3. Add Seats/Participants to Private Session
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/session/add-seat/:sessionId`
+- **Controller**: `addSessionSeats`
+
+#### Functionality
+Adds additional seats and/or participants to an existing private session. Handles both registered and invited users, updates session details, and sends notifications/emails.
+
+- **Request Body**:
+  - `newSeats`, `participantEmail` (array), `invitedEmail` (array), `price`, `userId`, `sessionType` (`private`)
+- **Params**:
+  - `sessionId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Seats added successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `400 Bad Request`: Email already exists in the session.
+  - `500 Internal Server Error`
+
+---
+
+### 4. Remove Participant from Private Session
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/session/remove-participant`
+- **Controller**: `removeParticipant`
+
+#### Functionality
+Removes a participant from a private session. Updates the session and user's booked sessions accordingly.
+
+- **Request Body**:
+  - `sessionId`, `userId`, `sessionType` (`private`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Participant removed successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session or participant not found.
+  - `500 Internal Server Error`
+
+---
+
+### 5. Remove Invited User from Private Session
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/session/remove-invited`
+- **Controller**: `removeInvitedUser`
+
+#### Functionality
+Removes an invited (not yet registered) user from a private session.
+
+- **Request Body**:
+  - `sessionId`, `email`, `sessionType` (`private`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Invited user removed successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session or invited user not found.
+  - `500 Internal Server Error`
+
+---
+
+### 6. Invite User to Private Session
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/session/invite`
+- **Controller**: `inviteUser`
+
+#### Functionality
+Sends an invitation email to a user to join a private session. Generates a unique invite token and stores it for tracking.
+
+- **Request Body**:
+  - `email`, `sessionId`, `userId`, `sessionType` (`private`), `resend` (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Invitation sent successfully",
+    "data": "user@email.com"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid email or already invited.
+  - `404 Not Found`: Session not found.
+  - `500 Internal Server Error`
+
+---
+
+### 7. Check Email in Private Session
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/session/email/:sessionId?email=...`
+- **Controller**: `checkSessionEmail`
+
+#### Functionality
+Checks if an email is already a participant or invitee in a private session.
+
+- **Params**:
+  - `sessionId`
+- **Query Params**:
+  - `email`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Email not part of the session"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found.
+  - `400 Bad Request`: Email already part of the session.
+  - `500 Internal Server Error`
+
+---
+
+### 8. Search Registered Emails
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/user/search-email?query=...`
+- **Controller**: `searchEmails`
+
+#### Functionality
+Searches for registered users by email or name. Returns suggestions and exact matches.
+
+- **Query Params**:
+  - `query` (string)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "suggestions": [ { "email": "...", "name": "..." } ],
+      "exactMatch": { "email": "...", "name": "..." }
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid query parameter.
+  - `500 Internal Server Error`
+
+---
+
+### 9. Check Coach Slot Conflict
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/coach/check-conflict/:coachId?date=...&timeSlot=...&sessionType=private`
+- **Controller**: `checkConflictingSession`
+
+#### Functionality
+Checks if a given date and time slot for a coach conflicts with any existing private session bookings. Uses `parseDateTime` utility for time parsing.
+
+- **Params**:
+  - `coachId`
+- **Query Params**:
+  - `date`, `timeSlot`, `sessionType` (`private`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "No conflicting time"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Arguments missing or conflicting time.
+  - `500 Internal Server Error`
+
+---
+
+### 10. Get All Booked Sessions for a User
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/session/get/:userId`
+- **Controller**: `getUserBookings`
+
+#### Functionality
+Fetches all booked sessions (public and private) for a user. For private session logic, only the `private` array is relevant.
+
+- **Params**:
+  - `userId`
+- **Success Response**:
+  ```json
+  {
+    "public": [ ...publicSessionObjects ],
+    "private": [ ...privateSessionObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: User not found.
+  - `500 Internal Server Error`
+
+---
+
+## Booking/Payment APIs
+
+### 11. Create Booking/Payment Receipt
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/booking/add`
+- **Middleware**: `idGenerationMiddleware('BID')`
+- **Controller**: `confirmBooking`
+
+#### Functionality
+Creates a payment receipt for a session booking (private or public). Stores payment details, applies discounts if user has a premium plan, and sends notifications/emails.
+
+- **Request Body**:
+  - `paymentId`, `userId`, `grandTotal`, `payment_mode`, `seats`, `note`, `currency`, `sessionId`, `orderId`, `sessionType` (should be `Booking Individual` or `Booking Group` for private)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...bookingObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing required fields.
+  - `404 Not Found`: Session not found.
+  - `409 Conflict`: Duplicate booking.
+  - `500 Internal Server Error`
+
+---
+
+### 12. Get All Bookings for a User
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/bookings/all/:userId`
+- **Controller**: `getAllBookingsByUserId`
+
+#### Functionality
+Fetches all payment receipts/bookings for a user.
+
+- **Params**:
+  - `userId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [ ...bookingObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: No bookings found.
+  - `500 Internal Server Error`
+
+---
+
+### 13. Get Booking by Booking ID
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/bookings/:bookingId`
+- **Controller**: `getBookingByBookingId`
+
+#### Functionality
+Fetches a payment receipt/booking by bookingId.
+
+- **Params**:
+  - `bookingId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...bookingObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Booking not found.
+  - `500 Internal Server Error`
+
+---
+
+### 14. Get All Bookings for a Session
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/bookings/session/:sessionId`
+- **Controller**: `getBookingsBySessionId`
+
+#### Functionality
+Fetches all payment receipts/bookings for a session.
+
+- **Params**:
+  - `sessionId`
+- **Query Params**:
+  - `userId` (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [ ...bookingObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: No bookings found.
+  - `500 Internal Server Error`
+
+---
+
+## Notes
+
+- All endpoints are for Private (Coach) Sessions only (no Studio logic).
+- Most endpoints require user authentication via JWT in the `Authorization` header.
+- Only the correct user can access or modify their own bookings/sessions.
+- Notification and email utilities are used for confirmations and reminders.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                                              | Description                                 | Required Headers                |
+|--------|-------------------------------------------------------|---------------------------------------------|---------------------------------|
+| POST   | `/api/fitnearn/web/users/session/private/book`        | Book a private session with coach           |                                 |
+| POST   | `/api/fitnearn/web/users/session/private/cancel`      | Cancel a booked private session             |                                 |
+| PATCH  | `/api/fitnearn/web/users/session/add-seat/:sessionId` | Add seats/participants to private session   |                                 |
+| PATCH  | `/api/fitnearn/web/users/session/remove-participant`  | Remove participant from private session     |                                 |
+| PATCH  | `/api/fitnearn/web/users/session/remove-invited`      | Remove invited user from private session    |                                 |
+| POST   | `/api/fitnearn/web/users/session/invite`              | Invite user to private session              |                                 |
+| GET    | `/api/fitnearn/web/users/session/email/:sessionId`    | Check email in private session              |                                 |
+| GET    | `/api/fitnearn/web/user/search-email`                 | Search registered emails                    |                                 |
+| GET    | `/api/fitnearn/web/users/coach/check-conflict/:coachId` | Check coach slot conflict                |                                 |
+| GET    | `/api/fitnearn/web/users/session/get/:userId`         | Get all booked sessions for a user          |                                 |
+| POST   | `/api/fitnearn/web/users/booking/add`                 | Create booking/payment receipt              |                                 |
+| GET    | `/api/fitnearn/web/users/bookings/all/:userId`        | Get all bookings for a user                 |                                 |
+| GET    | `/api/fitnearn/web/users/bookings/:bookingId`         | Get booking by bookingId                    |                                 |
+| GET    | `/api/fitnearn/web/users/bookings/session/:sessionId` | Get all bookings for a session              |                                 |
+
+--- 

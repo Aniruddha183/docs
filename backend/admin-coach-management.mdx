@@ -1,0 +1,530 @@
+---
+title: "Coach Management API Documentation"
+description: "REST API reference for Admin Coach Management in FitnEarn."
+---
+
+# Coach Management API
+
+This document outlines the API endpoints available to **Admins** for managing coaches within the FitnEarn system. It covers coach profile management, approval/rejection, dashboard analytics, encryption utilities, and more.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/admin/coach
+```
+
+---
+
+## Authentication & Token Requirements
+
+All endpoints require:
+- `authenticateAdminToken` middleware (JWT in `gentoken` header)
+- `authorize` middleware with appropriate permission string (e.g., `GET_COACHES`, `UPDATE_COACH_PROFILE`)
+
+---
+
+## Middleware
+
+### `authenticateAdminToken`
+- **Purpose**: Verifies the admin's JWT token for authentication.
+
+### `authorize(permission)`
+- **Purpose**: Checks if the admin has the required permission for the endpoint.
+
+### `idGenerationMiddleware('COH')`
+- **Purpose**: Generates a unique Coach ID (`COHxxxxx`) for new coach profiles.
+
+### `multer.memoryStorage()`
+- **Purpose**: Handles file uploads in memory for image encryption.
+
+---
+
+## Utility Functions
+
+### `uploadEncryptedDataToS3(buffer, filename, mimetype, coachId)`
+- **Purpose**: Encrypts image data and uploads it securely to AWS S3, returning the S3 URL, key, and encryption metadata.
+
+### `generatePresignedUrl(key, bucket, expiresInSec)`
+- **Purpose**: Generates a temporary signed URL for accessing files in S3.
+
+### `shootMail(templateId, emailData)`
+- **Purpose**: Sends notification emails to coaches using AWS SES and Shootmail.
+
+### KMS Utilities (`generateDataKeyWithKMS`, `encryptData`, `decryptData`, `decryptDataKeyWithKMS`)
+- **Purpose**: Handle encryption and decryption of sensitive data using AWS KMS and AES-256-GCM.
+
+---
+
+## Models
+
+### `IProfileModel`
+- **Description**: Stores coach profile information, including personal details, status, experience, and onboarding state.
+- **Key Fields**: `coach_id`, `name`, `email`, `mobileNumber`, `category`, `stage`, `isVerified`, `bio`, `images`, `status`, `connectedDevice`, `liveSessionPrice`, `bookingPrice`, etc.
+
+### `ICoachAvailability`
+- **Description**: Stores coach's available days and time slots for sessions.
+- **Key Fields**: `coachId`, `availableDays`, `availableTime`, `category`
+
+### `ICertificateModel`
+- **Description**: Stores certificates uploaded by the coach.
+- **Key Fields**: `coach_id`, `certificates[]` (with `certificateId`, `name`, `provider`, `validityFrom`, `validityTo`, `certificateUrl`)
+
+### `IBioModel`
+- **Description**: Stores the coach's bio and category.
+- **Key Fields**: `coach_id`, `category`, `bio`
+
+### `ICoachReasonModel`
+- **Description**: Stores approval, rejection, and suspension reasons for a coach, along with suspension metadata.
+- **Key Fields**: `coachId`, `approvalReasons[]`, `rejectionReasons[]`, `suspensionReasons[]`, `suspensionMeta`
+
+### `ICoachStepsTracker`
+- **Description**: Tracks coach's activity data (steps, calories) over time.
+- **Key Fields**: `coachId`, `trackerData[]` (with `date`, `data[]`, `totalCalorieCount`, `totalStepCount`)
+
+### `IPublicSession` & `IPrivateSession`
+- **Description**: Store public and private session details for coaches.
+- **Key Fields**: See session documentation for details.
+
+---
+
+## Endpoints
+
+### 1. Get All Coaches
+- **Method**: `GET`
+- **URL**: `/get`
+- **Functionality**: Fetches a list of all coaches, with optional filters for category, stage, and date. Supports sorting by name. Returns basic profile info for each coach.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Coaches fetched successfully",
+  "data": [ { "coach_id": "COH00001", "name": "John Doe", ... } ]
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 2. Get Coach By ID
+- **Method**: `GET`
+- **URL**: `/get/:id`
+- **Functionality**: Retrieves detailed profile, bio, availability, images, certificates, and reason data for a specific coach. Returns a comprehensive coach object.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Coach data fetched successfully",
+  "data": { "coach_id": "COH00001", "name": "John Doe", ... }
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 3. Add Coach Approval/Rejection/Suspension Reason
+- **Method**: `POST`
+- **URL**: `/add-reason`
+- **Functionality**: Adds an approval, rejection, or suspension reason for a coach. Updates coach status and sends notification emails. Also updates session/booking prices if provided.
+- **Request Body**: `{ coachId, type, reason, adminId, sessionPrice?, bookingPrice?, suspensionType?, strikeCount?, suspensionCount? }`
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "approval reason added successfully",
+  "data": { ...reasonObject }
+}
+```
+- **Error Response**: `400 Bad Request`, `500 Internal Server Error`
+
+---
+
+### 4. Update Coach Profile
+- **Method**: `PATCH`
+- **URL**: `/update/:id`
+- **Functionality**: Partially updates a coach's profile, including images, availability, and certificates. Handles upserts for related models.
+- **Request Body**: Partial profile fields to update.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Coach profile updated successfully",
+  "data": { ...updatedProfile }
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 5. Update Coach Reason Comment
+- **Method**: `PATCH`
+- **URL**: `/reason/:coachId/:type/:reasonId`
+- **Functionality**: Updates a specific approval, rejection, or suspension reason comment for a coach.
+- **Request Body**: `{ newComment }`
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "approval reason updated successfully",
+  "data": { ...reasonObject }
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 6. Delete Coach Reason Comment
+- **Method**: `DELETE`
+- **URL**: `/reason/:coachId/:type/:reasonId`
+- **Functionality**: Deletes a specific reason comment (approval, rejection, or suspension) for a coach.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "approval reason deleted successfully",
+  "data": { ...reasonObject }
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 7. Create Coach Profile
+- **Method**: `POST`
+- **URL**: `/create`
+- **Middleware**: `idGenerationMiddleware('COH')`
+- **Functionality**: Creates a new coach profile, including bio, availability, images, and certificates. Returns the created profile.
+- **Request Body**: All required profile fields, images, certificates, etc.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Coach profile created successfully",
+  "data": { ...profileObject }
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 8. Delete Coach Profile
+- **Method**: `DELETE`
+- **URL**: `/delete/:id`
+- **Functionality**: Deletes a coach profile and all related data (bio, availability, images, certificates, reasons).
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Coach profile and related data deleted successfully"
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 9. Revoke Coach Suspension
+- **Method**: `PATCH`
+- **URL**: `/revoke-suspension/:coachId`
+- **Functionality**: Revokes a coach's suspension, updating their stage and clearing suspension metadata.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Suspension revoked successfully"
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 10. Coach Progress Board
+- **Method**: `GET`
+- **URL**: `/progress-board/:coachId`
+- **Functionality**: Returns a dashboard summary of a coach's live sessions, bookings, blogs, and workout videos, including counts by status.
+- **Success Response**:
+```json
+{
+  "data": { ...progressBoardData },
+  "success": true
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 11. Live Session Dashboard (All Coaches)
+- **Method**: `GET`
+- **URL**: `/live-session-data`
+- **Functionality**: Returns aggregate live session statistics across all coaches, with optional date filtering.
+- **Success Response**:
+```json
+{
+  "data": { "liveSessionData": { ... }, "liveSession": [ ... ] },
+  "success": true
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 12. Coach Booking Dashboard (All Coaches)
+- **Method**: `GET`
+- **URL**: `/coach-booking-data`
+- **Functionality**: Returns aggregate booking statistics across all coaches, with optional date filtering.
+- **Success Response**:
+```json
+{
+  "data": { "coachBookingData": { ... }, "coachBooking": [ ... ] },
+  "success": true
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 13. Coach Workout Dashboard (All Coaches)
+- **Method**: `GET`
+- **URL**: `/coach-workout-data`
+- **Functionality**: Returns aggregate workout video statistics across all coaches, with optional date filtering.
+- **Success Response**:
+```json
+{
+  "data": { "workoutVideoData": { ... }, "workoutVideo": [ ... ] },
+  "success": true
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 14. Coach Blog Dashboard (All Coaches)
+- **Method**: `GET`
+- **URL**: `/coach-blog-data`
+- **Functionality**: Returns aggregate blog statistics across all coaches, with optional date filtering.
+- **Success Response**:
+```json
+{
+  "data": { "coachBookingData": { ... }, "coachBlog": [ ... ] },
+  "success": true
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 15. Get Steps Activity Data
+- **Method**: `GET`
+- **URL**: `/get-steps-activity-data/:coachId`
+- **Functionality**: Fetches all steps tracker data for a coach, including daily activity, calories, and steps.
+- **Success Response**:
+```json
+{
+  "data": [ ...stepsTracker ],
+  "success": true
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+### 16. Filter Coach Steps Activity Data
+- **Method**: `GET`
+- **URL**: `/filter-coach-steps-activity/:coachId`
+- **Functionality**: Filters and groups a coach's activity data by month, week, or date, returning calories and steps breakdowns.
+- **Query Params**: `month`, `week`, `date` (as applicable)
+- **Success Response**:
+```json
+{
+  "data": { ...filteredData },
+  "success": true
+}
+```
+- **Error Response**: `500 Internal Server Error`
+
+---
+
+### 17. Encrypt Image Data
+- **Method**: `POST`
+- **URL**: `/encrypt-image/:coachId`
+- **Middleware**: `multer.single('image')`
+- **Functionality**: Encrypts an uploaded image and stores it securely in S3. Returns the S3 URL, key, and encryption metadata.
+- **Request Body**: Multipart form-data with `image` file.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "message": "Document uploaded securely",
+  "s3Url": "...",
+  "s3Key": "...",
+  "encryptionMetadata": { ... }
+}
+```
+- **Error Response**: `400 Bad Request`, `500 Internal Server Error`
+
+---
+
+### 18. Decrypt Image Data
+- **Method**: `GET`
+- **URL**: `/decrypt-image?s3Key=...`
+- **Functionality**: Decrypts an encrypted image from S3 and returns a temporary signed URL for access.
+- **Success Response**:
+```json
+{
+  "success": true,
+  "url": "..."
+}
+```
+- **Error Response**: `404 Not Found`, `500 Internal Server Error`
+
+---
+
+## Coach Agreement Management
+
+Coach agreement management allows admins to add, update, and retrieve legal agreements for coaches. Agreements include validity dates, pricing, and a signed document uploaded to S3. These endpoints ensure that all coach engagements are properly documented and managed by authorized admins.
+
+### 1. Add Coach Agreement
+
+Uploads and creates a new agreement for a coach, including validity, pricing, and the signed document. The agreement file is uploaded to S3, and the agreement details are stored in the database. Only authorized admins can perform this action.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/admin/coach/agreement-add`
+- **Middleware**: `authenticateAdminToken`, `authorize('ADD_COACH_AGREEMENT')`, `upload.single('agreement')`
+- **Controller**: `addCoachAgreement`
+- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:
+  - `coachId` (string): Coach's unique ID
+  - `adminId` (string): Admin's unique ID
+  - `validFrom` (string, date): Start date of agreement
+  - `validTo` (string, date): End date of agreement
+  - `bookingPrice` (number): Price per booking
+  - `liveSessionPrice` (number): Price per live session
+  - File: `agreement` (PDF or image)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...coachAgreementObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Coach or admin not found
+  - `400 Bad Request`: Missing required fields
+  - `401 Unauthorized`: Authorization token missing
+  - `500 Internal Server Error`
+- **Functionality**: Validates input, checks admin and coach existence, uploads agreement to S3, and stores agreement details in the database.
+
+---
+
+### 2. Update Coach Agreement
+
+Updates the validity dates and pricing of an existing coach agreement. Does not update the agreement file. Only authorized admins can update agreements.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/admin/coach/agreement-update`
+- **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_COACH_AGREEMENT')`
+- **Controller**: `updateCoachAgreement`
+- **Request Body**:
+  - `coachId` (string): Coach's unique ID
+  - `validFrom` (string, date): New start date
+  - `validTo` (string, date): New end date
+  - `bookingPrice` (number): New booking price
+  - `liveSessionPrice` (number): New live session price
+- **Success Response**:
+  ```json
+  {
+    "message": "updated successfully",
+    "success": true,
+    "data": { ...coachAgreementObject }
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+- **Functionality**: Finds the agreement by coach ID and updates the relevant fields in the database.
+
+---
+
+### 3. Get Coach Agreement
+
+Retrieves the agreement details for a specific coach. Only authorized admins can access this information.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/admin/coach/agreement-get?coachId=<coachId>`
+- **Middleware**: `authenticateAdminToken`, `authorize('GET_COACH_AGREEMENT')`
+- **Controller**: `getCoachAgreement`
+- **Query Param**: `coachId` (string): Coach's unique ID
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": { ...coachAgreementObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Agreement not found
+  - `500 Internal Server Error`
+- **Functionality**: Looks up the agreement for the given coach ID and returns the details if found.
+
+---
+
+## 📦 Model: CoachAgreement
+
+Represents a legal agreement between a coach and the platform, including validity, pricing, and the signed document.
+
+```ts
+interface ICoachAgreementModel {
+  coachId: string;
+  coachName: string;
+  validFrom: Date;
+  validTo: Date;
+  bookingPrice: number;
+  liveSessionPrice: number;
+  agreementURL: string;
+  agreementKey: string;
+  adminId: string;
+}
+```
+
+- **coachId**: Unique identifier for the coach
+- **coachName**: Name of the coach
+- **validFrom/validTo**: Agreement validity period
+- **bookingPrice/liveSessionPrice**: Pricing details
+- **agreementURL/agreementKey**: S3 file location and key
+- **adminId**: Admin who created/updated the agreement
+
+---
+
+## 🛠️ Utility Functions
+
+- **uploadImage**: Handles uploading agreement files to AWS S3, using admin and coach context for secure storage.
+- **logger**: Logs errors and important events for audit and debugging.
+
+---
+
+## 📋 API Summary Table
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/get` | GET | Fetch all coaches with optional filters |
+| `/get/:id` | GET | Fetch detailed profile for a coach |
+| `/add-reason` | POST | Add approval/rejection/suspension reason for a coach |
+| `/update/:id` | PATCH | Update coach profile (partial) |
+| `/reason/:coachId/:type/:reasonId` | PATCH | Update a specific reason comment |
+| `/reason/:coachId/:type/:reasonId` | DELETE | Delete a specific reason comment |
+| `/create` | POST | Create a new coach profile |
+| `/delete/:id` | DELETE | Delete a coach profile and related data |
+| `/revoke-suspension/:coachId` | PATCH | Revoke a coach's suspension |
+| `/progress-board/:coachId` | GET | Get dashboard summary for a coach |
+| `/live-session-data` | GET | Aggregate live session stats (all coaches) |
+| `/coach-booking-data` | GET | Aggregate booking stats (all coaches) |
+| `/coach-workout-data` | GET | Aggregate workout stats (all coaches) |
+| `/coach-blog-data` | GET | Aggregate blog stats (all coaches) |
+| `/get-steps-activity-data/:coachId` | GET | Get all steps tracker data for a coach |
+| `/filter-coach-steps-activity/:coachId` | GET | Filter/group coach activity data |
+| `/encrypt-image/:coachId` | POST | Encrypt and upload image to S3 |
+| `/decrypt-image` | GET | Decrypt image and return signed URL |
+| `/api/fitnearn/admin/coach/agreement-add` | POST | Add a new coach agreement with file upload |
+| `/api/fitnearn/admin/coach/agreement-update` | PATCH | Update validity and pricing of a coach agreement |
+| `/api/fitnearn/admin/coach/agreement-get` | GET | Retrieve a coach's agreement details |
+
+--- 

@@ -1,0 +1,616 @@
+---
+title: "User Blog Api Documentation "
+description: "REST API reference for User Blog."
+---
+
+# User Blog API
+
+This document outlines the API endpoints available to **Users** in website: 'fitnearn.com'
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web
+```
+
+---
+---
+
+## Middleware
+
+### `multer.single(field)`
+
+- **Purpose**: Handles file uploads (e.g., `thumbnail`, `file`) in multipart/form-data requests.
+
+### `idGenerationMiddleware('CMT')`
+
+- **Purpose**: Generates a unique Comment ID (`CMTxxxxx`) for new blog comments or replies.
+- **Usage**: Applied to the comment creation endpoint.
+
+---
+
+## Endpoints
+
+### 1. Create Draft Blog
+
+Creates a new draft blog for the user.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/create-blog`
+- **Middleware**: `multer.single('thumbnail')`
+- **Controller**: `createDraftBlog`
+- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `title`, `category`, `readTime`, `userId`, `blogHeading`, `tags`
+  - File: `thumbnail` (image, optional)
+- **Success Response**:
+  ```json
+  {
+    "data": "BLG00001",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing required fields.
+  - `404 Not Found`: User not found.
+  - `500 Internal Server Error`
+
+---
+
+### 2. Upload Blog Image File
+
+Uploads an image file to S3 for a blog.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/upload-file`
+- **Middleware**: `multer.single('file')`
+- **Controller**: `uploadFile`
+- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `userId`, `blogId`
+  - File: `file` (image)
+- **Success Response**:
+  ```json
+  {
+    "success": 1,
+    "file": { "url": "https://..." }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing userId or upload error.
+  - `401 Unauthorized`: Missing/invalid token.
+
+---
+
+### 3. Upload Blog Image from URL
+
+Uploads an image to S3 from a provided URL.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/upload-url`
+- **Controller**: `uploadUrl`
+- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
+- **Request Body**:  
+  - `userId`, `blogId`, `url`
+- **Success Response**:
+  ```json
+  {
+    "success": 1,
+    "file": { "url": "https://..." }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing userId or upload error.
+  - `401 Unauthorized`: Missing/invalid token.
+
+---
+
+### 4. Delete Blog
+
+Deletes a blog and its associated images.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/delete-blog/:blogId`
+- **Controller**: `deleteBlog`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Blog and associated images deleted successfully",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `500 Internal Server Error`
+
+---
+
+### 5. Delete All Blogs
+
+Deletes all blogs and their images (admin/dev use).
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/delete`
+- **Controller**: `deleteAllBlogs`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "All blogs deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 6. Create/Edit User Bio
+
+Creates or edits the user's bio.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/create-bio`
+- **Controller**: `createBio`
+- **Request Body**:  
+  - `userId`, `bio`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Bio created/updated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing fields.
+  - `500 Internal Server Error`
+
+---
+
+### 7. Save Blog Post (Publish)
+
+Removes deleted images from S3 and sends blog for review/publish.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/save-blog/:blogId`
+- **Controller**: `saveBlogPost`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Blog post saved successfully",
+    "blog": { ...blogObject },
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `400 Bad Request`: Blog already under review.
+  - `500 Internal Server Error`
+
+---
+
+### 8. Update Blog Content
+
+Updates the content of a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/update-blog`
+- **Controller**: `updateBlog`
+- **Request Body**:  
+  - `content`, `blogId`
+- **Success Response**:
+  ```json
+  { ...updatedBlogObject }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `500 Internal Server Error`
+
+---
+
+### 9. Request Blog Edit
+
+Requests an edit for a blog under review.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/edit-request/:blogId`
+- **Controller**: `editRequest`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Edit Request ticket raised successfully",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 10. Request Blog Delete
+
+Requests deletion for a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/delete-request/:blogId`
+- **Controller**: `deleteBlogRequest`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Blog deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `500 Internal Server Error`
+
+---
+
+### 11. Report Blog
+
+Reports a blog for inappropriate content.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/report/:blogId`
+- **Controller**: `reportBlog`
+- **Params**:  
+  - `blogId`
+- **Request Body**:  
+  - `reason`, `userId`
+- **Success Response**:
+  ```json
+  {
+    "message": "Blog reported successfully",
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog or user not found.
+  - `400 Bad Request`: Blog already reported.
+  - `500 Internal Server Error`
+
+---
+
+### 12. Get Blogs by User
+
+Fetches all blogs by a specific user.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/blog/user-blog/:userId`
+- **Controller**: `getBlogsByUser`
+- **Params**:  
+  - `userId`
+- **Success Response**:
+  ```json
+  [ ...blogObjects ]
+  ```
+- **Error Responses**:
+  - `404 Not Found`: User or blogs not found.
+  - `500 Internal Server Error`
+
+---
+
+### 13. Get Blog by Blog ID
+
+Fetches a blog by its ID.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/blog/:blogId`
+- **Controller**: `getBlogByBlogId`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "data": { "blog": { ...blogObject }, "bio": "..." },
+    "isLiked": false,
+    "success": true
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `500 Internal Server Error`
+
+---
+
+### 14. Check Blog Eligibility
+
+Checks if a user is eligible to create a blog.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/blog/user-blog-count/:userId`
+- **Controller**: `checkBlogEligibility`
+- **Params**:  
+  - `userId`
+- **Success Response**:
+  ```json
+  { "message": "Eligible" }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: User not found.
+  - `500 Internal Server Error`
+
+---
+
+### 15. Search Blogs
+
+Searches published blogs by text.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/user/blog/search`
+- **Controller**: `searchBlogs`
+- **Query Params**:  
+  - `searchText`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "blogs": [ ...blogObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing search text.
+  - `500 Internal Server Error`
+
+---
+
+### 16. Fetch All Blogs
+
+Fetches all published and active blogs.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/user/blog/fetch-all`
+- **Controller**: `fetchAllBlogs`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "blogs": [ ...blogObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 17. Get User Blog Activity
+
+Fetches a user's blog-related activity (likes, comments, reports).
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/blog/user-activity/:userId`
+- **Controller**: `getUserActivity`
+- **Params**:  
+  - `userId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "likes": [ ...likeObjects ],
+    "comments": [ ...commentObjects ],
+    "reports": { ...reportObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: User not found.
+  - `500 Internal Server Error`
+
+---
+
+### 18. Add Comment or Reply
+
+Adds a comment or reply to a blog.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/comment/add`
+- **Middleware**: `idGenerationMiddleware('CMT')`
+- **Controller**: `addCommentOrReply`
+- **Request Body**:  
+  - `blogId`, `userId`, `comment`, `parentCommentId` (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Comment added successfully",
+    "data": { ...commentObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: User not found.
+  - `404 Not Found`: Parent comment not found.
+  - `500 Internal Server Error`
+
+---
+
+### 19. Delete Comment or Reply
+
+Deletes a comment or reply.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/blog/comment/delete/:commentId`
+- **Controller**: `deleteCommentOrReply`
+- **Params**:  
+  - `commentId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Root comment and all related replies deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Comment or reply not found.
+  - `500 Internal Server Error`
+
+---
+
+### 20. Get Blog Comments
+
+Fetches all comments (and replies) for a blog.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/blog/comment/get/:blogId`
+- **Controller**: `getBlogComments`
+- **Params**:  
+  - `blogId`
+- **Query Params**:  
+  - `userId` (optional, for like status)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [ ...commentObjects ]
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 21. Like/Dislike Comment or Reply
+
+Likes or dislikes a comment or reply.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/comment/like/:commentId`
+- **Controller**: `likeCommentOrReply`
+- **Params**:  
+  - `commentId`
+- **Request Body**:  
+  - `action` (`like` or `dislike`), `userId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Comment liked"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Comment not found.
+  - `400 Bad Request`: Already liked/disliked or invalid action.
+  - `500 Internal Server Error`
+
+---
+
+### 22. Report Comment or Reply
+
+Reports a comment or reply.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/comment/report/:commentId`
+- **Controller**: `reportCommentOrReply`
+- **Params**:  
+  - `commentId`
+- **Request Body**:  
+  - `reason`, `userId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Comment reported",
+    "data": { ...commentObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Comment not found.
+  - `400 Bad Request`: Already reported.
+  - `500 Internal Server Error`
+
+---
+
+### 23. Like/Unlike Blog
+
+Likes or unlikes a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/:userId/blog/:blogId/like`
+- **Controller**: `handleUserBlogLike`
+- **Params**:  
+  - `userId`, `blogId`
+- **Request Body**:  
+  - `action` (`add` or `remove`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Blog liked"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog or user not found.
+  - `400 Bad Request`: Already liked/unliked or invalid action.
+  - `500 Internal Server Error`
+
+---
+
+### 24. Share Blog
+
+Increments the share counter for a blog.
+
+- **Method**: `PATCH`
+- **URL**: `/api/fitnearn/web/users/blog/share/:blogId`
+- **Controller**: `shareBlogCounter`
+- **Params**:  
+  - `blogId`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "blog shared"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Blog not found.
+  - `500 Internal Server Error`
+
+---
+
+## Notes
+
+- File upload endpoints require Cognito tokens for AWS S3 access.
+- Most endpoints require user authentication via JWT in the `Authorization` header.
+- Only the blog author can edit or delete their own blogs.
+- Some endpoints (delete all blogs, update user type) are for admin/developer use only.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                                             | Description                        | Required Headers                |
+|--------|------------------------------------------------------|------------------------------------|---------------------------------|
+| POST   | `/api/fitnearn/web/users/blog/create-blog`           | Create draft blog                  | Authorization, x-refresh-token, x-username |
+| POST   | `/api/fitnearn/web/users/blog/upload-file`           | Upload blog image file             | Authorization, x-refresh-token, x-username |
+| POST   | `/api/fitnearn/web/users/blog/upload-url`            | Upload blog image from URL         | Authorization, x-refresh-token, x-username |
+| POST   | `/api/fitnearn/web/users/blog/delete-blog/:blogId`   | Delete blog                        |                                 |
+| POST   | `/api/fitnearn/web/users/blog/delete`                | Delete all blogs                   |                                 |
+| POST   | `/api/fitnearn/web/users/blog/create-bio`            | Create/edit user bio               |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/save-blog/:blogId`     | Save/publish blog                  |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/update-blog`           | Update blog content                |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/edit-request/:blogId`  | Request blog edit                  |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/delete-request/:blogId`| Request blog delete                |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/report/:blogId`        | Report blog                        |                                 |
+| GET    | `/api/fitnearn/web/users/blog/user-blog/:userId`     | Get blogs by user                  |                                 |
+| GET    | `/api/fitnearn/web/users/blog/:blogId`               | Get blog by ID                     |                                 |
+| GET    | `/api/fitnearn/web/users/blog/user-blog-count/:userId`| Check blog eligibility            |                                 |
+| GET    | `/api/fitnearn/web/user/blog/search`                 | Search blogs                       |                                 |
+| GET    | `/api/fitnearn/web/user/blog/fetch-all`              | Fetch all blogs                    |                                 |
+| GET    | `/api/fitnearn/web/users/blog/user-activity/:userId` | Get user blog activity             |                                 |
+| POST   | `/api/fitnearn/web/users/blog/comment/add`           | Add comment or reply               |                                 |
+| POST   | `/api/fitnearn/web/users/blog/comment/delete/:commentId` | Delete comment or reply         |                                 |
+| GET    | `/api/fitnearn/web/users/blog/comment/get/:blogId`   | Get blog comments                  |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/comment/like/:commentId` | Like/dislike comment or reply    |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/comment/report/:commentId` | Report comment or reply         |                                 |
+| PATCH  | `/api/fitnearn/web/users/:userId/blog/:blogId/like`  | Like/unlike blog                   |                                 |
+| PATCH  | `/api/fitnearn/web/users/blog/share/:blogId`         | Share blog                         |                                 |
+
+---

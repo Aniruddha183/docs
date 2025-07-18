@@ -20,7 +20,7 @@ This document outlines the API endpoints available to **admins** for managing co
 
 ### `authenticateAdminToken`
 
-- **Purpose**: Authenticates admin users using a JWT (`gentoken` header).
+- **Purpose**: Authenticates admin users using a JWT (`genToken` header).
 - **How it works**:  
   - Verifies the JWT.
   - Checks for a valid session in the database.
@@ -78,7 +78,7 @@ Creates a new draft blog or updates an existing one.
 - **Authorization**: `CREATE_BLOG`
 - **Middleware**: `multer.single('thumbnail')`
 - **Controller**: `adminCreateDraftBlog`
-- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Headers**: `genToken`, `Authorization`, `x-refresh-token`, `x-username`
 - **Request Body**:  
   - `title`, `category`, `readTime`, `adminId`, `blogHeading`, `tags`, `thumbnailURL`, `thumbnailKey`, `stage`
   - File: `thumbnail` (image)
@@ -95,7 +95,7 @@ Uploads an image file to S3 for a blog.
 - **Authorization**: `CREATE_BLOG`
 - **Middleware**: `multer.single('image')`
 - **Controller**: `uploadFile`
-- **Headers**: `gentoken`, `Authorization`, `x-refresh-token`, `x-username`
+- **Headers**: `genToken`, `Authorization`, `x-refresh-token`, `x-username`
 - **Request Body**:  
   - `adminId`, `blogId`
   - File: `image` (image)
@@ -111,7 +111,7 @@ Adds reviewer comments and sets blog status to `pending approval`.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `REVIEW_BLOG`
 - **Controller**: `reviewerAdminReview`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -124,7 +124,7 @@ Creates a new version of a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `VERSION_BLOG`
 - **Controller**: `versionBlog`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -137,7 +137,7 @@ Approves, denies, or retires a blog and adds approver comments.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `APPROVE_BLOG`
 - **Controller**: `approverAdminReview`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -150,7 +150,7 @@ Updates the status, comments, and state of a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `CREATE_BLOG`
 - **Controller**: `updateBlogStatus`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -163,7 +163,7 @@ Approves edit access to a requested blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `APPROVE_EDIT`
 - **Controller**: `giveEditRequest`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -176,7 +176,7 @@ Updates the content of a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `CREATE_BLOG`
 - **Controller**: `updateBlog`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -189,7 +189,7 @@ Removes deleted images from S3 and sends blog for review.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `CREATE_BLOG`
 - **Controller**: `saveBlogPost`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -202,7 +202,7 @@ Edits a reviewer or approver comment.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `EDIT_COMMENT`
 - **Controller**: `editComment`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -215,7 +215,7 @@ Assigns a reviewer admin to a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `ASSIGN_REVIEWER`
 - **Controller**: `assignReviewer`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -228,7 +228,7 @@ Assigns an approver admin to a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `ASSIGN_APPROVER`
 - **Controller**: `assignApprover`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -241,7 +241,7 @@ Fetches all blogs from the Blog model.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `GET_BLOGS`
 - **Controller**: `getAllBlogs`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -254,7 +254,7 @@ Fetches a blog by its blogId.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `READ_BLOG`
 - **Controller**: `getBlogByBlogId`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -267,7 +267,7 @@ Fetches all blogs currently under admin review.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `GET_BLOGS`
 - **Controller**: `getBlogsUnderReview`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -280,7 +280,7 @@ Fetches all blog requests for edit after sent for review.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `GET_BLOGS`
 - **Controller**: `getEditRequest`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -293,7 +293,7 @@ Fetches all blog requests for deletion.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `GET_BLOGS`
 - **Controller**: `getDeleteRequestedBlogs`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -306,7 +306,7 @@ Fetches all admin review comments for a blog.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `READ_COMMENTS`
 - **Controller**: `getAdminComments`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -329,7 +329,7 @@ Soft deletes a blog (marks as deleted).
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `DELETE_BLOG`
 - **Controller**: `adminDeleteBlog`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
@@ -342,13 +342,13 @@ Deletes a reviewer or approver comment.
 - **Authentication**: `authenticateAdminToken`
 - **Authorization**: `DELETE_COMMENT`
 - **Controller**: `deleteAdminComment`
-- **Headers**: `gentoken`
+- **Headers**: `genToken`
 
 ---
 
 ## Notes
 
-- All routes are secured by `authenticateAdminToken` and require a valid `gentoken` header.
+- All routes are secured by `authenticateAdminToken` and require a valid `genToken` header.
 - Each route uses `authorize(permission)` middleware to ensure RBAC.
 - File upload endpoints require additional Cognito tokens for AWS S3 access.
 - Blog versioning and review workflows are supported.
@@ -359,26 +359,26 @@ Deletes a reviewer or approver comment.
 
 | Method | Endpoint                        | Description                        | Required Headers                |
 |--------|---------------------------------|------------------------------------|---------------------------------|
-| POST   | `/save-draft`                   | Create or update draft blog        | gentoken, Authorization, x-refresh-token, x-username |
-| POST   | `/upload-file`                  | Upload blog image                  | gentoken, Authorization, x-refresh-token, x-username |
-| POST   | `/review-blog`                  | Reviewer review blog               | gentoken                        |
-| POST   | `/version-blog/:blogId`         | Version blog                       | gentoken                        |
-| PATCH  | `/approver-review`              | Approver review blog               | gentoken                        |
-| PATCH  | `/publish/:blogId`              | Update blog status                 | gentoken                        |
-| PATCH  | `/edit/:blogId`                 | Approve edit request               | gentoken                        |
-| PATCH  | `/update`                       | Update blog content                | gentoken                        |
-| PATCH  | `/save/:blogId`                 | Save blog post (send for review)   | gentoken                        |
-| PATCH  | `/edit-comment`                 | Edit admin comment                 | gentoken                        |
-| PATCH  | `/assign-reviewer`              | Assign reviewer                    | gentoken                        |
-| PATCH  | `/assign-approver`              | Assign approver                    | gentoken                        |
-| GET    | `/get`                          | Get all blogs                      | gentoken                        |
-| GET    | `/:blogId`                      | Get blog by ID                     | gentoken                        |
-| GET    | `/get/review`                   | Get blogs under review             | gentoken                        |
-| GET    | `/get/edit`                     | Get blogs requested for edit       | gentoken                        |
-| GET    | `/get/delete`                   | Get blogs requested for deletion   | gentoken                        |
-| GET    | `/get-comments/:blogId`         | Get admin review comments          | gentoken                        |
-| GET    | `/get-versioned-blogs`          | Get all versioned blogs            | gentoken                        |
-| DELETE | `/delete/:blogId`               | Delete blog                        | gentoken                        |
-| DELETE | `/delete-comment`               | Delete admin comment               | gentoken                        |
+| POST   | `/save-draft`                   | Create or update draft blog        | genToken, Authorization, x-refresh-token, x-username |
+| POST   | `/upload-file`                  | Upload blog image                  | genToken, Authorization, x-refresh-token, x-username |
+| POST   | `/review-blog`                  | Reviewer review blog               | genToken                        |
+| POST   | `/version-blog/:blogId`         | Version blog                       | genToken                        |
+| PATCH  | `/approver-review`              | Approver review blog               | genToken                        |
+| PATCH  | `/publish/:blogId`              | Update blog status                 | genToken                        |
+| PATCH  | `/edit/:blogId`                 | Approve edit request               | genToken                        |
+| PATCH  | `/update`                       | Update blog content                | genToken                        |
+| PATCH  | `/save/:blogId`                 | Save blog post (send for review)   | genToken                        |
+| PATCH  | `/edit-comment`                 | Edit admin comment                 | genToken                        |
+| PATCH  | `/assign-reviewer`              | Assign reviewer                    | genToken                        |
+| PATCH  | `/assign-approver`              | Assign approver                    | genToken                        |
+| GET    | `/get`                          | Get all blogs                      | genToken                        |
+| GET    | `/:blogId`                      | Get blog by ID                     | genToken                        |
+| GET    | `/get/review`                   | Get blogs under review             | genToken                        |
+| GET    | `/get/edit`                     | Get blogs requested for edit       | genToken                        |
+| GET    | `/get/delete`                   | Get blogs requested for deletion   | genToken                        |
+| GET    | `/get-comments/:blogId`         | Get admin review comments          | genToken                        |
+| GET    | `/get-versioned-blogs`          | Get all versioned blogs            | genToken                        |
+| DELETE | `/delete/:blogId`               | Delete blog                        | genToken                        |
+| DELETE | `/delete-comment`               | Delete admin comment               | genToken                        |
 
 ---

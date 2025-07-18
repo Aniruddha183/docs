@@ -232,7 +232,8 @@
                 "backend/api-doc-admin-coach-booking-management",
                 "backend/api-doc-admin-live-session-management",
                 "backend/api-doc-admin-blog-management",
-                "backend/api-doc-admin-refund-management"
+                "backend/api-doc-admin-refund-management",
+                "backend/admin-coach-management"
               ]
             },
             {
@@ -245,7 +246,11 @@
             },
             {
               "group": "User",
-              "pages": ["placeholder-user-doc"]
+              "pages": [
+                "backend/User/user-blog-api-doc",
+                "backend/User/user-live-session-api-doc",
+                "backend/User/user-coach-booking-api-doc"
+              ]
             }
           ]
         }
