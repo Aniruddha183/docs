@@ -1,0 +1,666 @@
+---
+title: "Live Sessions & Bookings API Documentation"
+description: "REST API reference for Studio App's Live Session Management and Studio Booking Operations."
+---
+
+This document outlines the API endpoints available to **Studios** for managing live sessions and studio bookings in Studio App.
+
+## Base URL
+
+```
+/api/fitnearn/app/studio
+```
+
+## Middleware
+
+### `authenticateStudioToken()`
+
+- **Purpose**: Validates JWT token and authenticates studio owner requests.
+- **Usage**: Required in all protected studio owner endpoints.
+
+---
+
+## Live Session Management Endpoints
+
+### 1. Create or Edit Live Session
+
+Creates a new live session or updates an existing one. Supports both draft creation and step-by-step updates.
+
+- **Method**: `POST`
+- **URL**: `/LS/create`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `createOrEditLS`
+- **Request Body**:
+
+  - `sessionId` (string): Unique session identifier (optional for creation, required for updates)
+  - `ownerId` (string): Studio owner ID (required)
+  - `sessionName` (string): Name/title of the session (required)
+  - `description` (string): Detailed description of the session (optional)
+  - `studioId` (string): Studio ID (required for offline sessions)
+  - `intensity` (string): Workout intensity level (e.g., "Low", "Medium", "High") (optional)
+  - `calories` (number): Estimated calories burned (optional)
+  - `equipment` (array): List of equipment needed (optional)
+  - `sessionType` (string): "Online" or "Offline" (required)
+  - `category` (string): Session category (e.g., "Yoga", "Gym", "Dance") (optional)
+  - `level` (string): Difficulty level (e.g., "Beginner", "Intermediate", "Advanced") (optional)
+  - `focusArea` (string): Target body area or fitness goal (optional)
+  - `sessionDate` (string): Session date in DD-MM-YYYY format (required for scheduling)
+  - `sessionTime` (string): Session start time in hh:mm AM/PM format (required for scheduling)
+  - `duration` (number): Duration in minutes (required for scheduling)
+  - `sessionLink` (string): Online meeting link (required for online sessions) (optional)
+  - `thumbnail` (string): Session image URL (optional)
+  - `key` (string): S3 key for thumbnail image (optional)
+  - `additionalFields` (object): Extra session metadata (optional)
+    - `calories` (number): Additional calorie information
+    - `duration` (number): Additional duration details
+
+- **Example Request (Create)**:
+
+```json
+{
+  "ownerId": "OWN001",
+  "sessionName": "Morning Yoga Flow",
+  "description": "Start your day with energizing yoga poses",
+  "sessionType": "Online",
+  "category": "Yoga",
+  "level": "Beginner",
+  "intensity": "Medium",
+  "calories": 200,
+  "equipment": ["Yoga Mat", "Blocks"],
+  "focusArea": "Flexibility",
+  "sessionDate": "20-11-2025",
+  "sessionTime": "07:00 AM",
+  "duration": 60,
+  "sessionLink": "https://zoom.us/j/123456",
+  "thumbnail": "https://s3.amazonaws.com/image.jpg",
+  "key": "Studio/OWN001/image.jpg"
+}
+```
+
+- **Example Request (Update)**:
+
+```json
+{
+  "sessionId": "LSS00001",
+  "sessionName": "Evening Yoga Flow",
+  "sessionDate": "21-11-2025",
+  "sessionTime": "06:00 PM",
+  "duration": 90
+}
+```
+
+- **Success Response (Create)**:
+
+```json
+{
+  "success": true,
+  "message": "Morning Yoga Flow is Created",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Success Response (Update)**:
+
+```json
+{
+  "success": true,
+  "message": "Session updated successfully",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+  - `400 Bad Request`: The Time Slot is Unavailable / StudioId is required for offline sessions / Studio address is missing
+  - `404 Not Found`: Your account doesn't exist anymore / Session not found / No verified and active studio found for your account / This studio isn't verified or is inactive
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`
+
+- **Business Logic**:
+  - For **Online Sessions**: Requires at least one verified and active studio for the owner
+  - For **Offline Sessions**: Requires specific verified and active studio with valid address
+  - Checks time slot availability before creating/updating
+  - Automatically manages booked slots in the system
+  - Replaces old thumbnail image in S3 when updated
+  - Recalculates session times when date/time/duration changes
+  - Sets session state to "Draft" and status to "Inactive" on creation
+  - Price calculated based on owner's `livePerSessionPayement` for online or studio's `pricePerHour` for offline
+
+---
+
+### 2. Send Live Session for Review
+
+Submits a live session for admin review, changing its state from Draft to Under Review.
+
+- **Method**: `PATCH`
+- **URL**: `/LS/sendForReview/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `sendLSForReview`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session Sent for Review",
+  "data": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+  - `400 Bad Request`: SessionId is missing
+  - `404 Not Found`: SessionId not found
+  - `500 Internal Server Error`
+
+- **State Transitions**:
+  - If session stage is "Complete": State changes to "In Review"
+  - Otherwise: State changes to "New"
+  - Stage always set to "Under Review"
+
+---
+
+### 3. Get Live Session List
+
+Retrieves all live sessions for a studio owner with optional filtering by session name, stage, and time range.
+
+- **Method**: `GET`
+- **URL**: `/LS/list/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getStudioLSList`
+- **URL Parameters**:
+  - `ownerId` (string): Studio owner identifier (required)
+- **Query Parameters** (optional):
+  - `sessionName` (string): Filter by session name (partial match, case-insensitive)
+  - `stage` (string): Filter by stage - "Draft", "Under Review", "Past", "Upcoming", "Denied"
+  - `time` (string): Time range filter - "allTime" (default), "day", "lastWeek", "lastMonth"
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "sessionId": "LSS00001",
+      "sessionName": "Morning Yoga Flow",
+      "state": "Draft",
+      "sessionType": "Online",
+      "category": "Yoga",
+      "sessionLevel": "Beginner",
+      "thumbnail": "https://s3.amazonaws.com/image.jpg",
+      "sessionStartTime": "2025-11-20T07:00:00Z",
+      "sessionEndTime": "2025-11-20T08:00:00Z",
+      "timeSlot": "07-08 AM",
+      "duration": 60,
+      "createdAt": "2025-11-15T10:00:00Z",
+      "updatedAt": "2025-11-15T10:00:00Z",
+      "seats": 20
+    }
+  ],
+  "totalSessions": 1
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: No live sessions found / No sessions match this filter
+  - `500 Internal Server Error`
+
+- **Stage Filter Details**:
+
+  - **Draft**: Sessions in draft state
+  - **Under Review**: Sessions in "New", "In Review", or "Pending Approval" states (displayed as "In Progress")
+  - **Past**: Completed, Cancelled, Payment Pending, Payment Successful, Payment Cancelled, or Closed
+  - **Upcoming**: Approved sessions
+  - **Denied**: Rejected sessions
+
+- **Time Filter Details**:
+
+  - **day**: Sessions scheduled for today
+  - **lastWeek**: Sessions from the last 7 days
+  - **lastMonth**: Sessions from the last 30 days
+  - **allTime**: No time filtering applied
+
+- **Sorting**:
+  - Past/All sessions: Sorted by most recent first (descending)
+  - Other stages: Sorted by session start time (ascending)
+
+---
+
+### 4. Get Live Session Details
+
+Retrieves detailed information about a specific live session including populated reviewer, approver, and studio data.
+
+- **Method**: `GET`
+- **URL**: `/LS/detail/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getLSById`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": {
+      "sessionId": "LSS00001",
+      "sessionName": "Morning Yoga Flow",
+      "description": "Start your day with energizing yoga poses",
+      "state": "In Progress",
+      "sessionType": "Online",
+      "category": "Yoga",
+      "sessionLevel": "Beginner",
+      "intensity": "Medium",
+      "calories": 200,
+      "equipment": ["Yoga Mat", "Blocks"],
+      "focusArea": "Flexibility",
+      "thumbnail": "https://s3.amazonaws.com/image.jpg",
+      "sessionStartTime": "2025-11-20T07:00:00Z",
+      "sessionEndTime": "2025-11-20T08:00:00Z",
+      "timeSlot": "07:00 AM - 08:00 AM",
+      "duration": 60,
+      "sessionLink": "https://zoom.us/j/123456",
+      "price": 500,
+      "taxRate": 18,
+      "seats": 20,
+      "status": "Inactive",
+      "studioId": {
+        "studioId": "STUDIO001",
+        "name": "Fitness Hub",
+        "address": {
+          "city": "Mumbai"
+        }
+      },
+      "createdAt": "2025-11-15T10:00:00Z",
+      "updatedAt": "2025-11-15T10:00:00Z"
+    },
+    "comments": {
+      "sessionId": "LSS00001",
+      "reviewComments": [
+        {
+          "comment": "Please add more details",
+          "adminId": "ADM001",
+          "date": "2025-11-16T09:00:00Z",
+          "isVisible": true
+        }
+      ],
+      "rejectionComments": [],
+      "cancelledComments": []
+    }
+  }
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Session not found
+  - `500 Internal Server Error`
+
+- **Notes**:
+  - Comments are sorted by latest first
+  - Only visible comments are returned
+  - Under review states ("New", "In Review", "Pending Approval") displayed as "In Progress"
+
+---
+
+### 5. Cancel Live Session
+
+Cancels an approved or draft live session and adds a strike to the owner if the session was approved.
+
+- **Method**: `PATCH`
+- **URL**: `/LS/cancel/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `cancelLiveSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Request Body**:
+
+  - `reason` (string): Cancellation reason (required)
+
+- **Example Request**:
+
+```json
+{
+  "reason": "Instructor unavailable due to emergency"
+}
+```
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Live Session cancelled successfully",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Live session not found
+  - `500 Internal Server Error`
+
+- **Business Logic**:
+  - Session state changed to "Cancelled"
+  - Session status changed to "Inactive"
+  - Session stage changed to "Closed"
+  - Sets `cancelledBy` to "Studio Owner"
+  - Records cancellation date
+  - Removes session from booked slots
+  - Adds cancellation comment to session
+  - If session was approved: Adds a strike to the owner's account
+
+---
+
+### 6. Delete Live Session
+
+Permanently deletes a live session and all associated data including bookings, comments, and refunds.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteLS/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `deleteLiveSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Live session : Morning Yoga Flow deleted successfully"
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Live Session not found
+  - `500 Internal Server Error`
+
+- **Cascading Deletions**:
+  - Deletes thumbnail image from S3
+  - Removes session from user booked sessions
+  - Deletes all studio comments for the session
+  - Deletes all user bookings for the session
+  - Deletes all refunds related to those bookings
+  - Removes session from booked studio slots
+
+---
+
+## Studio Booking Management Endpoints
+
+### 1. Get Studio Booking List
+
+Retrieves all booked sessions for a studio owner with filtering by status and time range.
+
+- **Method**: `GET`
+- **URL**: `/bookings/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getSessionList`
+- **URL Parameters**:
+  - `ownerId` (string): Studio owner identifier (required)
+- **Query Parameters** (optional):
+  - `status` (string): Filter by status - "all" (default), "upcoming", "past"
+  - `time` (string): Time range filter - "allTime" (default), "today", "upcomingWeek", "lastWeek"
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "bookedSessions": [
+    {
+      "ownerId": "OWN001",
+      "sessionId": "SESSION001",
+      "sessionTitle": "Gym Session",
+      "sessionStartTime": "2025-11-20T18:00:00Z",
+      "sessionEndTime": "2025-11-20T19:00:00Z",
+      "sessionTimeSlot": "06:00 PM - 07:00 PM",
+      "category": "Gym",
+      "bookingType": "Offline",
+      "status": "Upcoming",
+      "bookedAt": "2025-11-15T12:00:00Z"
+    }
+  ],
+  "totalSessions": 1,
+  "message": "Booking sessions fetched successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: No booking sessions found for these filters
+  - `500 Internal Server Error`
+
+---
+
+### 2. Get Studio Booking Details
+
+Retrieves detailed information about a specific booked session including studio details and participants.
+
+- **Method**: `GET`
+- **URL**: `/booking/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getSessionById`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "bookingId": "SESSION001",
+    "title": "Gym Session",
+    "sessionTimeSlot": "06:00 PM - 07:00 PM",
+    "studioName": "Fitness Hub",
+    "isSessionFree": false,
+    "hasUserAttended": true,
+    "thumbnail": "https://s3.amazonaws.com/studio.jpg",
+    "duration": 1,
+    "city": "Mumbai",
+    "address": "Andheri West, Near Station, Mumbai, 400053",
+    "sessionPlace": "Studio",
+    "bookingType": "Offline",
+    "status": "Completed",
+    "createdAt": "2025-11-15T12:00:00Z",
+    "sessionStartTime": "2025-11-20T18:00:00Z",
+    "paymentComments": [],
+    "rejectionComments": [],
+    "rufundComments": []
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Session not found
+  - `500 Internal Server Error`
+
+---
+
+### 3. Cancel Studio Booking
+
+Cancels an upcoming booked session and adds a strike to the studio owner's account.
+
+- **Method**: `PATCH`
+- **URL**: `/cancelBooking/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `cancelSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Request Body**:
+
+  - `reason` (string): Cancellation reason (required)
+
+- **Example Request**:
+
+```json
+{
+  "reason": "Studio maintenance required"
+}
+```
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Booking cancelled successfully, and you got a strike",
+  "sessionId": "SESSION001"
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Session not found / Your account doesn't exist anymore / Session can not be Cancell at "Completed" stage
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`
+
+- **Business Logic**:
+  - Only upcoming sessions can be cancelled
+  - Session status changed to "Studio Rejected"
+  - Session stage changed to "Closed"
+  - Removes session from booked slots
+  - Adds cancellation comment to session history
+  - Automatically adds a strike to the owner's account
+
+---
+
+### 4. Delete Studio Booking
+
+Permanently deletes a booked session and all associated data including user bookings, comments, and refunds.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteBooking/:sessionId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `deleteStudioSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio session and all associated data deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Studio session not found / Session not found in studio sessions
+  - `500 Internal Server Error`
+
+---
+
+## Session States & Stages
+
+### Live Session States
+
+- `Draft`: Initial creation state
+- `New`: Sent for review but not yet reviewed
+- `In Review`: Under admin review
+- `Pending Approval`: Awaiting final approval
+- `Approved`: Approved and ready to go live
+- `Rejected`: Rejected by admin
+- `Completed`: Session finished
+- `Cancelled`: Cancelled by owner or admin
+- `Payment Pending`: Awaiting payment processing
+- `Payment Successful`: Payment completed
+- `Payment Cancelled`: Payment cancelled
+- `Closed`: Session ended
+
+### Live Session Stages
+
+- `Create`: Initial creation stage
+- `Under Review`: Submitted for review
+- `Complete`: All details finalized
+- `Closed`: Session ended
+
+### Studio Booking Status
+
+- `Upcoming`: Session scheduled and confirmed
+- `Completed`: Session finished successfully
+- `Studio Rejected`: Cancelled by studio owner
+- `User Cancelled`: Cancelled by user or system
+- `Closed`: Session ended
+
+### Studio Booking Stage
+
+- `Active`: Session is active
+- `Closed`: Session is closed
+
+---
+
+## Slot Management
+
+### Automatic Slot Booking
+
+- System automatically manages time slots to prevent double bookings
+- Slots are created when sessions are scheduled
+- Slots include: date, start time, end time, session ID, and session type
+- Slots are removed when sessions are cancelled or deleted
+
+### Time Slot Validation
+
+- Checks for conflicts with existing bookings before creating/updating sessions
+- Prevents overlapping sessions for the same owner
+- Returns error if requested slot is unavailable
+
+---
+
+## Strike System
+
+### When Strikes Are Added
+
+- Cancelling an approved live session
+- Cancelling an upcoming booked session
+
+### Strike Impact
+
+- Accumulation of strikes may affect account standing
+- Visible in owner's profile
+- May trigger account restrictions if threshold of 3 strikes exceeded
+
+---
+
+## Price Calculation
+
+### Live Sessions
+
+- **Online**: Based on owner's `livePerSessionPayement` rate
+- **Offline**: Based on studio's `pricePerHour` rate
+- Tax rate: Fixed at 18%
+
+### Booked Sessions
+
+- Price determined at booking time
+- Reflects studio's current pricing
+- May include discounts applied at booking
+
+---
+
+## Best Practices
+
+1. **Session Creation**:
+
+   - Always validate time slot availability before submitting
+   - Ensure all required fields are provided based on session type
+   - Upload clear, high-quality thumbnails
+   - Provide detailed descriptions to improve user engagement
+
+2. **Session Updates**:
+
+   - Only update changed fields to minimize data transfer
+   - Always provide session ID when editing
+   - Reschedule carefully as it resets state to Draft
+
+3. **Cancellations**:
+
+   - Provide clear reasons for cancellations
+   - Be aware that cancelling approved sessions adds strikes
+   - Cancel as early as possible to minimize user impact
+
+4. **Deletions**:
+   - Use deletion cautiously as it's irreversible
+   - Consider cancellation instead of deletion for approved sessions
+   - Ensure you have backup data if needed
+
+---

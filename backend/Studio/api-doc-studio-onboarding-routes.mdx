@@ -1,0 +1,176 @@
+---
+title: "Onboarding API Documentation"
+description: "REST API reference for Studio App Home page."
+---
+
+This document outlines the API endpoints available to **Studios** for onboarding in Studio App.
+
+## Base URL
+
+```
+/api/fitnearn/app/studio
+```
+
+## Middleware
+
+### `authenticateStudioToken()`
+
+- **Purpose**: Validates JWT token and authenticates studio owner requests.
+- **Usage**: Required in all protected studio owner endpoints.
+
+---
+
+## Endpoints
+
+### 1. Get Owner Profile
+
+Retrieves complete studio owner profile with KYC status and onboarding progress.
+
+- **Method**: `GET`
+- **URL**: `/getProfile/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getOwnerById`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "nextScreen": "home",
+    "profile": {
+      "ownerId": "STO00001",
+      "name": "John Studio",
+      "about": "Fitness studio owner...",
+      "email": "john@studio.com",
+      "phoneNumber": 1234567890,
+      "profileImage": "https://...",
+      "key": "image-key",
+      "stage": "Under Review",
+      "kycStage": "Verified",
+      "phoneNumberAdded": true,
+      "onBoardingComplete": false
+    },
+    "reason": {
+      "ownerId": "STO00001",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Profile not found
+  - `500 Internal Server Error`
+
+---
+
+### 2. Update Owner Profile
+
+Updates studio owner profile information including name, bio, and profile image.
+
+- **Method**: `PATCH`
+- **URL**: `/updateProfile/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `updateProfile`
+- **Request Body**:
+  - `name` (string): Studio owner's name
+  - `about` (string): Bio/description about the studio owner
+  - `profileImage`(string): Profile image URL
+  - `key`(string): S3 image key for the uploaded image
+- **Success Response**:
+
+```json Success Response
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "ownerId": "STO00001",
+    "name": "John Studio",
+    "about": "Experienced fitness studio owner",
+    "email": "john@studio.com",
+    "phoneNumber": 1234567890,
+    "imageUrl": "https://s3.amazonaws.com/...",
+    "phoneNumberAdded": true
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Bad Request`: Owner ID is required
+  - `404 Not Found`: Your profile is Suspended or Inactive
+  - `500 Internal Server Error`
+
+---
+
+### 3. Request Phone Number Update
+
+Initiates phone number update process by sending OTP to the new number.
+
+- **Method**: `POST`
+- **URL**: `/requestupdate/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `requestNumberUpdate`
+- **Request Body**:
+  - `number` (string): Studio's mobile number
+  - `countryCode` (string): Country code (eg. "91")
+  - `hashCode` (string): Hash code
+- **Success Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "OTP sent to 879XXXXXX"
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Bad Request`: Invalid inputs
+  - `404 Not Found`: Owner not found
+  - `409 Conflit `: This Phone Number Already Exist
+  - `500 Internal Server Error`
+
+---
+
+### 4. Verify Updated Phone Number
+
+Verifies OTP and updates the studio owner's phone number.
+
+- **Method**: `POST`
+- **URL**: `requestupdate/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `verifyUpdatedPhoneNumber`
+- **Request Body**:
+  - `otp` (string): OTP code received via SMS
+  - `phoneNumber` (string):New phone number (without country code)
+  - `countryCode` (string): Country code (e.g., "91")
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Phone number updated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Bad Request`: Missing required fields
+  - `404 Not Found`: Owner not found
+  - `409 Conflit `: This Phone Number Already Exist
+  - `500 Internal Server Error`
+
+---
+
+### 5. Delete Account (Soft Delete)
+
+Soft deletes a studio owner account by marking it as deleted.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteAccount/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `resendOTP`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Account deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Bad Request`: There are upcoming session in this Studio
+  - `404 Not Found`: Owner not found or already deleted
+  - `500 Internal Server Error`

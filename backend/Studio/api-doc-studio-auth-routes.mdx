@@ -1,0 +1,216 @@
+---
+title: "Authentication API Documentation"
+description: "REST API reference for Studio App Authentication."
+---
+
+This document outlines the API endpoints available to **Studios** for authenticating in Studio App.
+
+## Base URL
+
+```
+/api/fitnearn/app/studio
+```
+
+## Middleware
+
+### `idGenerationMiddleware('SOID')`
+
+- **Purpose**: Generates a unique Studio Owner ID (`SOIDxxxxx`) for new owner registrations.
+- **Usage**: Required in Owner registration endpoints.
+
+---
+
+## Endpoints
+
+### 1. Google Registration (Signup)
+
+Registers a new coach using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/register`
+- **Middleware**: `idGenerationMiddleware('SOID')`
+- **Controller**: `studioGoogleRegistrationSignup`
+- **Request Body**:
+  - `email` (string): Owner's email (required)
+  - `awsUserName` (string): AWS username (required)
+  - `accessToken`, `authToken`, `refreshToken` (string, optional): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Owner registered successfully",
+    "user": { ...ownerObject },
+    "genToken": { ...tokenObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing or duplicate email
+  - `500 Internal Server Error`: Registration failure
+
+---
+
+### 2. Google Login
+
+Logs in a studio using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/login`
+- **Controller**: `studioOwnerGoogleRegistrationSignin`
+- **Request Body**:
+  - `email` (string): Studio's email (required)
+  - `refreshToken` (string): Google OAuth tokens (required)
+  - `accessToken`, `authToken`(string): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "User signed in successfully",
+    "phoneNumberAdded": boolean
+    "genToken": { ...stringenObject },
+    "newTokens": {
+      access_token: { ...string }
+      id_token: { ...string }
+      refresh_token: { ...string }
+    },
+    "ownerData": { ...coachObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Incorrect Email, User doesn't exist
+  - `403 Not Found`: Profile is deleted, Not allowed to login next 15 days
+  - `500 Internal Server Error`
+
+---
+
+### 3. OTP Registration
+
+Generates an OTP for a new owner registration using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/register`
+- **Controller**: `studioOwnerRegisterUsingOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `409 Bad Request`: Mobile number already registered
+  - `500 Internal Server Error`
+
+---
+
+### 4. OTP Login
+
+Generates an OTP for login using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/login`
+- **Controller**: `studioOwnerLoginUsingOtp`
+- **Request Body**:
+  - `mobileNumber` (string): Owner's mobile number
+  - `countryCode` (string): Country code
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Incorrect number, User doesn't exist
+  - `500 Internal Server Error`
+
+---
+
+### 5. Resend OTP
+
+Resend an OTP for registration or login.
+
+- **Method**: `POST`
+- **URL**: `/otp/resend`
+- **Controller**: `resendOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `action` (string): Action type (e.g., 'register', 'login')
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 6. Logout
+
+Logs out the currently authenticated coach.
+
+- **Method**: `GET`
+- **URL**: `/logout/:ownerId`
+- **Controller**: `studioLogout`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Logout successful"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 7. Verify OTP
+
+Verifies an OTP for registration or login.
+
+- **Method**: `GET`
+- **URL**: `/otp/verify`
+- **Controller**: `verifyOTP`
+- **Query Params**:
+  - `phoneNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `otp` (string): OTP code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP verified successfully",
+    "genToken": { ...tokenObject },
+    "access_token": "...",
+    "id_token": "...",
+    "refresh_token": "...",
+    "ownerId": "COHxxxxx"
+    "onBoardComplete": boolean
+    "phoneNumberAdded": boolean
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid or expired OTP
+  - `500 Internal Server Error`
+
+---
+
+## Notes
+
+- All endpoints are designed for studio authentication and registration flows.
+- Google OAuth endpoints require valid Google tokens.
+- OTP endpoints require valid phone/email and OTP codes.
+- The `idGenerationMiddleware('SOID')` ensures unique owner IDs for new registrations.
+
+---
+
+---

@@ -1,0 +1,303 @@
+---
+title: "StudioList API Documentation"
+description: "REST API reference for Studio App's StudioList page."
+---
+
+This document outlines the API endpoints available to **Studios** for studio list in Studio App.
+
+## Base URL
+
+```
+/api/fitnearn/app/studio
+```
+
+## Middleware
+
+### `authenticateStudioToken()`
+
+- **Purpose**: Validates JWT token and authenticates studio owner requests.
+- **Usage**: Required in all protected studio owner endpoints.
+
+---
+
+## Endpoints
+
+### 1. Create or Edit Studio (DRAFT)
+
+Create Studio or edit a studio using (studioId) and save as Draft.
+
+- **Method**: `POST`
+- **URL**: `/createStudio`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `createOrEditStudio`
+- **Request Body**:
+
+  - `studioId` (string): Unique identifier for the studio (optional for creation, required for updates)
+  - `studioName` (string): Name of the studio (required)
+  - `studioType` (string): Type/category of the studio (required)
+  - `aboutStudio` (string): Description or details about the studio (optional)
+  - `currency` (string): Currency code (e.g., "INR", "USD") (required)
+  - `services` (array): List of services offered by the studio
+  - `amenities` (array): List of amenities available in the studio
+  - `city` (string): City where the studio is located
+  - `locality` (string): Local area or neighborhood
+  - `pincode` (string | number): Postal code of the studio location
+  - `areaDescription` (string): Description of the area or surroundings (optional)
+  - `latitude` (number): Geographic latitude of the studio
+  - `longitude` (number): Geographic longitude of the studio
+  - `dayAvailability` (array): Days when the studio operates (e.g., `["Mon", "Tue", "Wed"]`)
+  - `discountRate` (number): Discount percentage offered (optional)
+  - `couponCode` (string): Discount or promotional coupon code (optional)
+  - `pricePerSessionPerHour` (number): Base price per session/hour
+  - `priceAfterDiscount` (number): Price after applying discounts
+  - `freeTrial` (boolean): Indicates if a free trial is available
+  - `rules` (array): List of rules or terms for studio usage
+  - `certificateId` (string): Certification or license identifier
+  - `ownerId` (string): ID of the studio owner
+  - `state` (string): Status of the studio listing (default: `"Draft"`)
+  - `taxRate` (number): GST/Tax percentage (default: `18`)
+  - `operationalTime` (object): Opening and closing hours for the studio
+    - `tag` (string): Time period (e.g., `"Morning", "Evening", 24/7`)
+    - `timeSlots` (string): Time Slots (e.g., `"09-10 PM"`)
+  - `images` (array): List of uploaded image URLs or objects containing image metadata (optional)
+  - `keys` (array): Corresponding S3 keys or unique identifiers for uploaded images (optional)
+
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Studio updated successfully",
+    "studioId": "STUDIO0001"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Studio not found
+  - `409 Conflit `: Your account is deleted
+  - `500 Internal Server Error`
+
+---
+
+### 2. Send Studio for Review
+
+Submits a studio for admin review by changing its state from Draft to Under Review.
+
+- **Method**: `PATCH`
+- **URL**: `/sendForReview/:studioId`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `sendStudioForReview`
+- **URL Parameters**:
+  - `studioId` (string): Unique studio identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio sent for review successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Bad Request`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 3. Get Studio List
+
+Retrieves a list of all studios owned by a specific owner.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/app/studio/studioList/:ownerId`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `getStudioList`
+- **URL Parameters**:
+  - `ownerId` (string): Unique studio owner identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "studios": [
+    {
+      "studioId": "STUDIO0001",
+      "studioName": "Fitness Hub",
+      "studioType": "Gym",
+      "state": "Draft",
+      "city": "Mumbai",
+      "locality": "Andheri"
+    }
+  ]
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: No studios found
+  - `500 Internal Server Error`
+
+---
+
+### 4. Get Studio Details
+
+Retrieves detailed information about a specific studio.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/app/studio/studioDetail/:studioId`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `getStudioById`
+- **URL Parameters**:
+  - `studioId` (string): Unique studio identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "studio": {
+    "studioId": "STUDIO0001",
+    "studioName": "Fitness Hub",
+    "studioType": "Gym",
+    "aboutStudio": "Premier fitness center",
+    "currency": "INR",
+    "services": ["Personal Training", "Group Classes"],
+    "amenities": ["Parking", "Lockers", "Shower"],
+    "city": "Mumbai",
+    "locality": "Andheri",
+    "pincode": "400058",
+    "latitude": 19.1136,
+    "longitude": 72.8697,
+    "state": "Draft"
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 5. Delete Studio
+
+Deletes a studio from the system.
+
+- **Method**: `DELETE`
+- **URL**: `/api/fitnearn/app/studio/deleteStudio/:studioId`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `deleteTheStudio`
+- **URL Parameters**:
+  - `studioId` (string): Unique studio identifier (required)
+- **Success Response**:
+
+```json - Direct delete if state is ("Draft, Under Review", "Denied")
+{
+  "success": true,
+  "message": "Studio deleted successfully"
+}
+```
+
+```json - Raise query to delete "Verified" Studio
+{
+  "success": true,
+  "message": "Deletion request is sent, your Studio will be deleted soon"
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: `There are upcoming session in this Studio` or `Reason is missing`
+  - `404 Not Found`: Studio not found or already deleted
+  - `500 Internal Server Error`
+
+---
+
+### 6. Add Certificate
+
+Uploads and adds a certificate for the studio owner.
+
+- **Method**: `POST`
+- **URL**: `/addCertificate/:ownerId`
+- **Middleware**: `authenticateStudioToken`, `idGenerationMiddleware('CERT')`
+- **Controller**: `uploadCertificate`
+- **URL Parameters**:
+  - `ownerId` (string): Unique studio owner identifier (required)
+- **Request Body**:
+  - `name` (string): Name of the certificate (required)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (required)
+  - `key` (string): S3 key for the certificate file (required)
+  - `validityFrom` (Date): Date when certificate was issued (required)
+  - `validityTo` (Date): Certificate expiry date (required)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate uploaded successfully",
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 7. Edit Certificate
+
+Updates an existing certificate.
+
+- **Method**: `PATCH`
+- **URL**: `/editCertificate/:certificateId`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `editCertificate`
+- **URL Parameters**:
+  - `certificateId` (string): Unique certificate identifier (required)
+- **Request Body**:
+  - `name` (string): Name of the certificate (optional)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (optional)
+  - `key` (string): S3 key for the certificate file (optional)
+  - `validityFrom` (Date): Date when certificate was issued (optional)
+  - `validityTo` (Date): Certificate expiry date (optional)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate updated successfully"
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`
+
+---
+
+### 8. Delete Certificate
+
+Deletes a certificate from the system.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteCertificate`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `deleteCertificate`
+- **Request Body**:
+  - `studioId` (string): studioId identifier (required)
+  - `certificateId` (string): certificate identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`

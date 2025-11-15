@@ -251,6 +251,16 @@
                 "backend/User/user-live-session-api-doc",
                 "backend/User/user-coach-booking-api-doc"
               ]
+            },
+            {
+              "group": "Studio",
+              "pages": [
+                "backend/Studio/api-doc-studio-auth-routes",
+                "backend/Studio/api-doc-studio-onboarding-routes",
+                "backend/Studio/api-doc-studio-studioList-routes",
+                "backend/Studio/api-doc-studio-home-routes",
+                "backend/Studio/api-doc-studio-sessions-routes"
+              ]
             }
           ]
         }
