@@ -15,6 +15,10 @@ This document outlines the API endpoints available to **Studios** for home page 
 
 ### `authenticateStudioToken()`
 
+- **Headers (for user authorization)**:
+
+  -- `genToken` (string): GenToken to verify the user (required)
+
 - **Purpose**: Validates JWT token and authenticates studio owner requests.
 - **Usage**: Required in all protected studio owner endpoints.
 
@@ -22,6 +26,15 @@ This document outlines the API endpoints available to **Studios** for home page 
 
 - **Purpose**: Generates unique query IDs for issue reporting.
 - **Usage**: Applied to report creation endpoints.
+
+### `upload.single(<fieldName>)`
+
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Purpose**: Handles file upload using multer to S3
+- **Usage**: Required for generating image/attachment URLs for queries
 
 ---
 
@@ -38,7 +51,7 @@ Retrieves all sessions for a studio owner, optionally filtered by date.
 - **URL Parameters**:
   - `ownerId` (string): Unique studio owner identifier (required)
 - **Query Parameters** (required):
-  - `date` (string): Filter sessions by specific date (ISO format or YYYY-MM-DD)
+  - `date` (string): Filter sessions by specific date (YYYY-MM-DD)
 - **Success Response**:
 
   ```json
@@ -62,12 +75,10 @@ Retrieves all sessions for a studio owner, optionally filtered by date.
   }
   ```
 
-```
 - **Error Responses**:
   - `400 Not Found`: Date query parameter is required
   - `404 Not Found`: No sessions found for this owner
   - `500 Internal Server Error`
-```
 
 ---
 
