@@ -249,7 +249,9 @@
               "pages": [
                 "backend/User/user-blog-api-doc",
                 "backend/User/user-live-session-api-doc",
-                "backend/User/user-coach-booking-api-doc"
+                "backend/User/user-coach-booking-api-doc",
+                "backend/User/store-api-doc"
+
               ]
             },
             {
