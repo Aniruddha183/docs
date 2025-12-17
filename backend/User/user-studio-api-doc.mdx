@@ -1,0 +1,1138 @@
+---
+title: "StudioList API Documentation"
+---
+
+---
+
+## Studio Module
+
+The **Studio Module** is designed for users who wish to discover, book, live session, and review fitness studios, gyms, yoga centers, or personal training sessions — both online and offline.  
+It provides a seamless experience that connects users with studios in their nearby location and supports flexible booking options.
+
+### Module Overview
+
+Users can search for studios or sessions by **place name, city, or keyword**, and apply **filters** (such as distance, category, or session type) to refine their results. Once a suitable studio is found, the user can book:
+
+- **Offline sessions** — Attend in-person at the selected studio
+- **Online live sessions** — Join virtual classes hosted by studio owners or managers
+- **Personal training sessions** — One-on-one coaching based on availability
+
+This module centralizes all features to **simplify user effort**, offering smooth discovery, booking, payment, and review workflows.
+
+### Key Capabilities
+
+- **Studio Discovery:** Search and filter studios based on city or location proximity
+- **Session Types:** Support for _offline_, _online live_, and _personal_ training sessions
+- **Booking Flow:** Integrated session selection, availability checking, and booking confirmation
+- **Review Management:** Users can post feedback, upload review media, and rate their experiences
+- **Rating Insights:** Aggregated rating data helps studios improve and users make informed choices
+- **Seamless User Experience:** Designed to minimize steps for booking and feedback submission
+
+---
+
+### Studio List APIs
+
+Below are the APIs related to the **Studio List** within this module, allowing users to perfom all possible action that is inside the studios module.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/users/studio
+```
+
+---
+
+## Middleware
+
+### `idGenerationMiddleware('RCPT')`
+
+- **Purpose**: Generates a unique Receipt ID (`RCPTxxxxx`) for new refunds
+- **Usage**: Required for identifying each refund transaction
+
+### `upload.single('attachment')`
+
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Purpose**: Handles file upload using multer to S3
+- **Usage**: Required for generating image/attachment URLs for queries
+
+---
+
+## Endpoints
+
+### 1. Get Coordinates
+
+Retrieves geographical coordinates for a given address.
+
+- **Method**: `GET`
+- **URL**: `/get-coordinates`
+- **Controller**: `getCoordinates`
+- **Query Parameters**:
+  - `address` (string): Address to geocode (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "latitude": 29.8663,
+      "longitude": 77.8912
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Coordinates not found
+
+---
+
+### 2. Get Autocomplete Suggestions
+
+Returns place suggestions based on user input.
+
+- **Method**: `GET`
+- **URL**: `/suggestplaces`
+- **Controller**: `getAutoComplete`
+- **Query Parameters**:
+  - `input` (string): Search input (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "description": "Place 1", "place_id": "..." },
+      { "description": "Place 2", "place_id": "..." }
+    ]
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Input is required
+  - `404 Not Found`: Coordinates not found
+
+---
+
+### 3. Get Nearby Studios
+
+Fetches list of studios near specified location with optional filters.
+
+- **Method**: `GET`
+- **URL**: `/studiolist`
+- **Controller**: `getNearbyStudios`
+- **Query Parameters**:
+  - `lat` (string): Latitude (optional, defaults to Roorkee)
+  - `lng` (string): Longitude (optional, defaults to Roorkee)
+  - `address` (string): Address to search near (optional)
+  - `radius` (string): Search radius in meters (optional, default 50000)
+  - `userId` (string): User ID for personalization (optional)
+  - `categories` (string): Comma-separated studio types (optional)
+  - `amenities` (string): Comma-separated amenities (optional)
+  - `rating` (string): Minimum rating filter (optional)
+  - `time` (string): Time preference (optional)
+  - `date` (string): Date filter (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "studioId": "STD00123",
+        "name": "Fitness Hub",
+        "services": ["Yoga", "Gym"],
+        "distance": 2.5,
+        "shortAddress": "Delhi",
+        "reviewCount": 45,
+        "rating": 4.5,
+        "timeTag": ["Morning", "Evening"],
+        "firstTrial": false,
+        "isLike": false,
+        "checkinTime": "06:00 AM",
+        "thumbnail": "https://...",
+        "upcomingLiveSession": true
+      }
+    ],
+    "total": 1
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`: Error fetching nearby gyms
+
+---
+
+### 4. Get Studio Detail
+
+Retrieves detailed information about a specific studio.
+
+- **Method**: `GET`
+- **URL**: `/studioDetail/:studioId`
+- **Controller**: `getStudioDetail`
+- **URL Parameters**:
+  - `studioId` (string): Studio identifier (required)
+- **Query Parameters**:
+  - `userId` (string): User ID for personalization (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "studioId": "STD00123",
+      "name": "Fitness Hub",
+      "shortAddress": "Connaught Place",
+      "coordinates": { "lng": 77.2167, "lat": 28.6139 },
+      "services": ["Yoga", "Gym"],
+      "amenities": ["Shower", "Locker"],
+      "aboutStudio": "Premium fitness center...",
+      "studioTypes": ["Gym", "Yoga"],
+      "timeTags": ["Morning", "Evening"],
+      "reviewCount": 45,
+      "rating": 4.5,
+      "openingTime": "06:00 AM",
+      "closingTime": "10:00 PM",
+      "timeSlots": ["06-07 AM", "07-08 AM"],
+      "isLike": false,
+      "firstTrial": false,
+      "adminDiscountPercentage": 10,
+      "basePrice": 500,
+      "finalPrice": 450,
+      "discountPercentage": 5,
+      "taxRate": 18,
+      "taxAmount": 81,
+      "payableAmount": 531,
+      "owner": {
+        "name": "John Doe",
+        "bio": "Fitness enthusiast...",
+        "profileImage": "https://...",
+        "rating": 4.5
+      },
+      "rules": ["No smoking", "Proper attire required"],
+      "dayAvailability": ["Mon", "Tue", "Wed"],
+      "images": ["https://...", "https://..."],
+      "reviews": [...]
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 5. Like/Dislike Item
+
+Toggles like status for studios, live sessions, or other content.
+
+- **Method**: `POST`
+- **URL**: `/:userId/like/:type/:refId`
+- **Controller**: `likeItem`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `type` (string): Type of content - `likedBlogs`, `publicSessions`, `likedComments`, `likedStudios`, `likedStudiosLS`, `likedProducts`, `likedWorkoutsVideos` (required)
+  - `refId` (string): Reference ID of content (required)
+- **Query Parameters**:
+  - `action` (string): `like` or `dislike` (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "likedStudios liked successfully."
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing parameters or invalid type/action
+  - `200 OK`: Already liked/disliked
+  - `500 Internal Server Error`
+
+---
+
+### 6. Verify Studio Time Availability
+
+Checks if a specific time slot is available for booking.
+
+- **Method**: `GET`
+- **URL**: `/verifyTimeSlot/:studioId`
+- **Controller**: `verifyStudioTimeAvailability`
+- **URL Parameters**:
+  - `studioId` (string): Studio identifier (required)
+- **Query Parameters**:
+  - `userId` (string): User identifier (optional)
+  - `date` (string): Date in DD-MM-YYYY format (required)
+  - `time` (string): Time slot e.g., "09-10 PM" (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "This slot is available"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Fields missing or slot not available/passed
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 7. Check Live Session Booking
+
+Verifies if user has already booked a live session.
+
+- **Method**: `GET`
+- **URL**: `/verifyLSBooking/:userId`
+- **Controller**: `checkLSBooking`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+- **Query Parameters**:
+  - `sessionId` (string): Session identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Session is not booked yet."
+  }
+  ```
+  or
+  ```json
+  {
+    "success": false,
+    "message": "This session is already booked."
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 8. Book Studio Session
+
+Creates a new studio session booking.
+
+- **Method**: `POST`
+- **URL**: `/bookStudioSession`
+- **Controller**: `bookStudioSession`
+- **Request Body**:
+  - `userId` (string): User identifier (required)
+  - `studioId` (string): Studio identifier (required)
+  - `sessionTitle` (string): Title of session (required)
+  - `sessionDate` (string): Date in DD-MM-YYYY format (required)
+  - `sessionTimeSlot` (string): Time slot (required)
+  - `seat` (number): Number of seats (required)
+  - `category` (string): Session category (required)
+  - `discountAmount` (number): Discount applied (optional)
+  - `discountRate` (number): Discount percentage (optional)
+  - `participantsEmail` (array): List of participant emails (required)
+  - `invitedEmail` (array): List of invited emails (optional)
+  - `tax` (number): Tax amount (required)
+  - `total` (number): Total before tax (required)
+  - `grandTotal` (number): Final amount (required)
+  - `paymentMode` (string): Payment method (required)
+  - `orderId` (string): Payment order ID (required)
+  - `transactionId` (string): Transaction ID (required)
+  - `isSessionFree` (boolean): Whether session is free (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Studio Session is Booked ID :STBN00123",
+    "sessionId": "STBN00123"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Studio ID missing or date/slot passed
+  - `404 Not Found`: Studio or user not found
+  - `500 Internal Server Error`
+
+---
+
+### 9. Get User Studio Session List
+
+Retrieves all studio sessions for a user (upcoming or past).
+
+- **Method**: `GET`
+- **URL**: `/allSession/:userId`
+- **Controller**: `userStudioSessionList`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+- **Query Parameters**:
+  - `status` (string): `upcoming` or `past` (optional, default: `upcoming`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "liveSessions": [
+        {
+          "sessionId": "LS00123",
+          "sessionStartTime": "2025-01-15T10:00:00Z",
+          "sessionEndTime": "2025-01-15T11:00:00Z",
+          "sessionDuration": "60 Min",
+          "sessionName": "Morning Yoga",
+          "studioName": "Fitness Hub",
+          "sessionType": "Group",
+          "status": "Upcoming",
+          "bookingStatus": "Confirmed",
+          "amount": 500,
+          "bookedAt": "14-01-2025",
+          "type": "Live Session"
+        }
+      ],
+      "studioSessions": [
+        {
+          "sessionId": "STBN00456",
+          "sessionStartTime": "2025-01-16T14:00:00Z",
+          "sessionEndTime": "2025-01-16T15:00:00Z",
+          "sessionDuration": "1 Hr",
+          "sessionName": "Gym Session",
+          "studioName": "Power Gym",
+          "sessionType": "Offline",
+          "status": "Upcoming",
+          "bookingStatus": "Confirmed",
+          "amount": 300,
+          "bookedAt": "2025-01-14T12:00:00Z",
+          "type": "Studio Session"
+        }
+      ]
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: User not found
+  - `500 Internal Server Error`
+
+---
+
+### 10. Get Session Details
+
+Retrieves detailed information about a specific booked session.
+
+- **Method**: `GET`
+- **URL**: `/session/:userId/:sessionId`
+- **Controller**: `getSessionDetails`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `sessionId` (string): Session identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "sessionId": "STBN00123",
+      "studioId": "STD00456",
+      "address": "Connaught Place, Delhi",
+      "sessionTitle": "Morning Workout",
+      "studioName": "Fitness Hub",
+      "category": "Gym",
+      "sessionDate": "2025-01-15T10:00:00Z",
+      "sessionTimeSlot": "10:00 AM - 11:00 AM",
+      "sessionType": "Group",
+      "status": "Upcoming",
+      "bookedAt": "2025-01-14T12:00:00Z",
+      "thumbnail": "https://...",
+      "paymentMode": "Online",
+      "transactionid": "TXN00789",
+      "discountAmount": 50,
+      "participantsEmail": ["user1@example.com", "user2@example.com"],
+      "participantNames": ["John Doe", "Jane Smith"],
+      "invitedEmail": ["invite@example.com"],
+      "tax": 90,
+      "total": 500,
+      "grandTotal": 590,
+      "isSessionFree": false,
+      "studioOwnerName": "Owner Name",
+      "seats": 2,
+      "bookedSeats": 2,
+      "userId": "USR00123",
+      "isCreator": true,
+      "bookingId": ["BID00111"],
+      "cancelledDate": null,
+      "cancelledReason": null,
+      "cancelledBy": null,
+      "bookingDetails": [...],
+      "refundDetail": null,
+      "qrCode": "data:image/png;base64,..."
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found
+  - `500 Internal Server Error`
+
+---
+
+### 11. Cancel Session Booking
+
+Cancels a booked studio or live session.
+
+- **Method**: `PUT`
+- **URL**: `/session/cancel/:userId/:sessionId`
+- **Controller**: `cancelSessionBooking`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `sessionId` (string): Session identifier (required)
+- **Query Parameters**:
+  - `sessionType` (string): `LiveSession` or studio session (optional)
+- **Request Body**:
+  - `reason` (string): Cancellation reason (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Session cancelled successfully."
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Not creator, already cancelled, or session ongoing
+  - `404 Not Found`: Booking/session not found
+  - `500 Internal Server Error`
+
+---
+
+### 12. Generate QR Code
+
+Generates QR code for session check-in.
+
+- **Method**: `GET`
+- **URL**: `/session/qrcode/:userId/:sessionId`
+- **Controller**: `generateQRCode`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `sessionId` (string): Session identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: No sessions found
+  - `500 Internal Server Error`
+
+---
+
+### 13. Check Refund Eligibility
+
+Checks if a session is eligible for refund (must be >24 hours before start).
+
+- **Method**: `GET`
+- **URL**: `/session/checkRefund/:userId/:sessionId`
+- **Controller**: `checkRefundEligibility`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `sessionId` (string): Session identifier (required)
+- **Query Parameters**:
+  - `sessionType` (string): `LiveSession` or studio session (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Refund allowed"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Not creator, already cancelled, or hours before session`
+  - `404 Not Found`: Session not found`
+  - `500 Internal Server Error`
+
+---
+
+### 14. Invite User
+
+Sends invitation email to join a session.
+
+- **Method**: `POST`
+- **URL**: `/session/inviteUser`
+- **Controller**: `inviteUser`
+- **Request Body**:
+  - `email` (string): Invitee email (required)
+  - `sessionId` (string): Session identifier (required)
+  - `userId` (string): User identifier (required)
+  - `resend` (boolean): Whether resending invitation (optional)
+  - `sessionType` (string): Type of session (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Invitation sent successfully",
+    "data": "invitee@example.com"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid email, missing fields, or already invited`
+  - `404 Not Found`: Session not found`
+  - `500 Internal Server Error`
+
+---
+
+### 15. Initiate Refund
+
+Processes refund for cancelled bookings.
+
+- **Method**: `POST`
+- **URL**: `/session/initiateRefund`
+- **Middleware**: `idGenerationMiddleware('RCPT')`
+- **Controller**: `initiateRefund`
+- **Request Body**:
+  - `bookingIds` (array): Array of booking IDs to refund (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "refund initiated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: No booking found, already refunded, or invalid payment
+  - `500 Internal Server Error`
+
+---
+
+### 16. Confirm Booking
+
+Records payment confirmation for a booking.
+
+- **Method**: `POST`
+- **URL**: `/booking/add`
+- **Controller**: `confirmBooking`
+- **Request Body**:
+  - `paymentId` (string): Payment gateway payment ID (required)
+  - `userId` (string): User identifier (required)
+  - `discountRate` (number): Discount percentage (optional, default: 0)
+  - `discountAmount` (number): Discount amount (optional, default: 0)
+  - `grandTotal` (number): Final amount paid (required)
+  - `actualAmount` (number): Original amount (optional, default: 0)
+  - `payment_mode` (string): Payment method (required)
+  - `tax` (number): Tax percentage (optional, default: 0)
+  - `gstAmount` (number): GST amount (optional)
+  - `seats` (number): Number of seats booked (required)
+  - `note` (string): Additional notes (optional)
+  - `currency` (string): Currency code (required)
+  - `sessionId` (string): Session identifier (required)
+  - `orderId` (string): Payment order ID (required)
+  - `sessionType` (string): Type of session (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userId": "USR00123",
+      "bookingId": "BID00456",
+      "orderId": "order_xyz",
+      "transactionId": "TXN00789",
+      "sessionId": "STBN00123",
+      "sessionType": "Booking Individual",
+      "grandTotal": 590,
+      "payment_date": "15-01-2025",
+      ...
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing fields or session already booked
+  - `404 Not Found`: Session not found
+  - `409 Conflict`: Duplicate booking
+  - `500 Internal Server Error`
+
+---
+
+### 17. Book Free Live Session
+
+Books a free live session for a user.
+
+- **Method**: `POST`
+- **URL**: `/bookFreeLS`
+- **Controller**: `bookFreeLiveSession`
+- **Request Body**:
+  - `userId` (string): User identifier (required)
+  - `seats` (number): Number of seats (required)
+  - `sessionId` (string): Session identifier (required)
+  - `sessionType` (string): Type of session (optional, default: `Live Session`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Live session booked successfully : Morning Yoga"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing fields or session already booked
+  - `404 Not Found`: Session not found
+  - `409 Conflict`: Duplicate booking
+  - `500 Internal Server Error`
+
+---
+
+### 18. List Upcoming Live Sessions
+
+Retrieves upcoming live sessions for a studio.
+
+- **Method**: `GET`
+- **URL**: `/LS/list/:studioId`
+- **Controller**: `listUpcomingSessions`
+- **URL Parameters**:
+  - `studioId` (string): Studio identifier (required)
+- **Query Parameters**:
+  - `userId` (string): User identifier for personalization (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "sessions": [
+      {
+        "sessionId": "LS00123",
+        "status": "Approved",
+        "level": "Beginner",
+        "thumbnail": "https://...",
+        "isLiked": false,
+        "sessionName": "Morning Yoga",
+        "category": "Yoga",
+        "description": "Relaxing morning session",
+        "date": "15-01-2025",
+        "time": "10:00 AM - 11:00 AM",
+        "availableSeats": 8,
+        "basePrice": 500,
+        "adminDiscountPercentage": 10,
+        "finalPrice": 450,
+        "discountPercentage": 5,
+        "taxRate": 18,
+        "taxAmount": 81,
+        "payableAmount": 531,
+        "createdAt": "2025-01-10T08:00:00Z",
+        "isRegistered": false
+      }
+    ],
+    "totalSessions": 1
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: No upcoming live sessions found
+  - `500 Internal Server Error`
+
+---
+
+### 19. Get Live Session Detail
+
+Retrieves detailed information about a live session.
+
+- **Method**: `GET`
+- **URL**: `/LS/detail/:sessionId`
+- **Controller**: `getLSDetail`
+- **URL Parameters**:
+  - `sessionId` (string): Session identifier (required)
+- **Query Parameters**:
+  - `userId` (string): User identifier for personalization (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "session": {
+      "sessionId": "LS00123",
+      "sessionName": "Morning Yoga",
+      "description": "Relaxing morning session",
+      "sessionStartTime": "2025-01-15T10:00:00Z",
+      "sessionEndTime": "2025-01-15T11:00:00Z",
+      "sessionTime": "10:00 AM",
+      "sessionDate": "15-01-2025",
+      "duration": 60,
+      "focusArea": ["Flexibility", "Balance"],
+      "basePrice": 500,
+      "adminDiscountPercentage": 10,
+      "finalPrice": 450,
+      "discountPercentage": 5,
+      "taxRate": 18,
+      "taxAmount": 81,
+      "payableAmount": 531,
+      "totalSeats": 10,
+      "availableSeats": 8,
+      "calories": 200,
+      "exerciseLevel": "Beginner",
+      "intensity": "Low",
+      "sessionType": "Group",
+      "equipment": ["Mat"],
+      "category": "Yoga",
+      "premium": false,
+      "address": "Connaught Place, Delhi, 110001",
+      "timeUntilStart": "Starts in 2 hours",
+      "likes": 45,
+      "shares": 12,
+      "isLiked": false,
+      "thumbnail": "https://...",
+      "ownerName": "John Doe",
+      "isBooked": false
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing sessionId
+  - `404 Not Found`: Live session not found
+  - `500 Internal Server Error`
+
+---
+
+### 20. Get Recommended Sessions
+
+Returns recommended live sessions based on similarity to a given session.
+
+- **Method**: `GET`
+- **URL**: `/LS/recommendation/:sessionId`
+- **Controller**: `getRecommendedSessions`
+- **URL Parameters**:
+  - `sessionId` (string): Session identifier (required)
+- **Query Parameters**:
+  - `userId` (string): User identifier for personalization (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "recommendations": [
+      {
+        "sessionId": "LS00456",
+        "thumbnail": "https://...",
+        "status": "Approved",
+        "isLiked": false,
+        "level": "Beginner",
+        "sessionName": "Evening Yoga",
+        "equipment": ["Mat"],
+        "description": "Calming evening session",
+        "focusArea": ["Flexibility", "Relaxation"],
+        "currentStatus": "Upcoming"
+      }
+    ]
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Live session not found
+  - `500 Internal Server Error`
+
+---
+
+### 21. Get Booked Live Session Detail
+
+Retrieves details of a booked live session for a user.
+
+- **Method**: `GET`
+- **URL**: `/LS/booked/detail/:userId/:sessionId`
+- **Controller**: `getBookedLSDetail`
+- **URL Parameters**:
+  - `userId` (string): User identifier (required)
+  - `sessionId` (string): Session identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userId": "USR00123",
+      "sessionId": "LS00456",
+      "sessionTitle": "Morning Yoga",
+      "studioId": "STD00789",
+      "studioName": "Fitness Hub",
+      "category": "Yoga",
+      "sessionDate": "15-01-2025",
+      "sessionTime": "2025-01-15T10:00:00Z",
+      "sessionType": "Group",
+      "bookingType": "Paid",
+      "thumbnail": "https://...",
+      "exerciseLevel": "Beginner",
+      "equipment": ["Mat"],
+      "duration": "60 Min",
+      "bookedAt": "14-01-2025",
+      "sessionLink": "https://zoom.us/...",
+      "address": "Connaught Place, Delhi",
+      "isFree": false,
+      "bookingIds": ["BID00111"],
+      "status": "Approved",
+      "cancelledDate": null,
+      "cancelledReason": null,
+      "cancelledBy": null,
+      "booking": {
+        "bookingId": "BID00111",
+        "grandTotal": 531,
+        ...
+      },
+      "refundDetail": {
+        "refundId": "N/A",
+        "razorpay_refund_id": "N/A",
+        "refund_amount": 0,
+        "refund_status": "Pending"
+      },
+      "qrCode": "data:image/png;base64,..."
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Session not found in user booked session
+  - `500 Internal Server Error`
+
+---
+
+### 22. Share Studio or Live Session
+
+Records a share action for studio or live session.
+
+- **Method**: `GET`
+- **URL**: `/share/:id/:userId`
+- **Controller**: `shareStudioOrLS`
+- **URL Parameters**:
+  - `id` (string): Studio or session identifier (required)
+  - `userId` (string): User identifier (required)
+- **Query Parameters**:
+  - `type` (string): `LiveSession` or `Studio` (optional, default: `Studio`)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Studio shared successfully."
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing sessionId/userId or invalid type
+  - `404 Not Found`: Live session/studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 23. Report Live Session
+
+Allows users to report a live session for inappropriate content.
+
+- **Method**: `POST`
+- **URL**: `/LS/report/:sessionId`
+- **Controller**: `reportStudioLS`
+- **URL Parameters**:
+  - `sessionId` (string): Session identifier (required)
+- **Request Body**:
+  - `userId` (string): User identifier (required)
+  - `reason` (string): Report reason (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Session reported successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Session already reported
+  - `404 Not Found`: Session/user not found
+  - `500 Internal Server Error`
+
+---
+
+### 24. Report Studio
+
+Allows users to report a studio for inappropriate content or behavior.
+
+- **Method**: `POST`
+- **URL**: `/report/:studioId`
+- **Controller**: `reportStudio`
+- **URL Parameters**:
+  - `studioId` (string): Studio identifier (required)
+- **Request Body**:
+  - `userId` (string): User identifier (required)
+  - `reason` (string): Report reason (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Studio reported successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Studio already reported
+  - `404 Not Found`: Studio/user not found
+  - `500 Internal Server Error`
+
+---
+
+### 25. Create Query for Session
+
+Allows users to raise a query/complaint regarding a session.
+
+- **Method**: `POST`
+- **URL**: `/raiseQuery`
+- **Middleware**: `upload.single('attachment')`
+- **Controller**: `createQueryForSession`
+- **Request Body** (multipart/form-data):
+  - `issueType` (string): Type of issue (optional, default: `Other`)
+  - `message` (string): Query message (required)
+  - `userId` (string): User identifier (required)
+  - `referenceId` (string): Session/studio reference ID (required)
+  - `attachment` (file): Supporting file (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Query submitted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing required fields or duplicate query
+  - `401 Unauthorized`: Missing/invali
+
+---
+
+### 26. Post Studio Review
+
+Allows a user to submit a review for a studio they have booked.
+
+- **Method**: `POST`
+- **URL**: `/api/fitnearn/web/users/store/postReview/:productId`
+- **Controller**: `postReview`
+- **Middleware**:
+  - `upload.single('file')`: Handles optional review image uploads
+  - `idGenerationMiddleware('REVID')`: Generates unique review ID
+- **Request Parameters**:
+  - `productId` (string): Studio identifier (required)
+- **Request Body**:
+  - `rating` (number): Rating value (required)
+  - `userId` (string): User identifier (required)
+  - `review` (string): Review content (optional)
+  - `type` (string): Must be `"Studio"` (required)
+  - `file` (file): Image file of rating (optional)
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Success Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Review is Posted"
+  }
+  ```
+
+- **Error Responses**:
+
+  - `401 Unauthorized`: Missing rating, user ID, or authorization tokens
+  - `400 Bad Request`: Invalid review type or duplicate review
+  - `403 Forbidden`: User has not booked the studio
+  - `404 Not Found`: User not found
+  - `500 Internal Server Error`: Unexpected error during review posting or file upload
+
+---
+
+### 27. Get All Studio Reviews
+
+Fetches all reviews for a specific studio.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/store/allReviews/:productId`
+- **Controller**: `getReviews`
+- **Query Parameters**:
+
+  - `type` (string): Must be `"Studio"` (required)
+  - `search` (string): Optional keyword to filter review content
+  - `sortby` (string): Sorting criteria (`latest`, `oldest`, `mostrated`) (optional, default: `mostrated`)
+    **Success Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Reviews retrieved successfully",
+    "data": {
+      "totalReviews": 12,
+      "finalReviews": [
+        {
+          "reviewId": "REVID00123",
+          "rating": 4.5,
+          "content": "Amazing studio experience!",
+          "userId": "USR00056",
+          "createdAt": "2025-01-10T12:00:00Z",
+          ...
+        }
+      ]
+    }
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request`: Missing or invalid parameters
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`: Error retrieving reviews
+
+---
+
+### 28. Get Studio Rating Details
+
+Retrieves aggregate rating data and distribution for a studio.
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/users/store/ratingDetails/:productId`
+- **Controller**: `getRatingDetails`
+- **Query Parameters**:
+  - `type` (string): Must be `"Studio"` (required)
+- **Success Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Ratings retrieved successfully",
+    "data": {
+      "totalRatings": 4.6,
+      "ratingDetails": {
+        "5": 45,
+        "4": 10,
+        "3": 3,
+        "2": 1,
+        "1": 0
+      }
+    }
+  }
+  ```
+
+- **Error Responses**:
+
+  - `400 Bad Request`: Missing or invalid type parameter
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`: Error fetching ratings
+
+---
+
+### 29. Get Dropdowns and Values
+
+Get all dropdowns fields & names that is used in Filters & Dropdowns
+
+#### Base URL
+
+```
+https://5600bev1n3.execute-api.ap-south-1.amazonaws.com/dev
+```
+
+- **Method**: `GET`
+- **URL**: `/api/fitnearn/web/admin/get/subcategories/namefields/:subcategoryId`
+- **Controller**: `getNameFieldsForSubCategory`
+- **URL Parameters**:
+  - `idOrName` (string): subcategory Id or its name (required)
+- **Query Parameters**:
+  - `status` (string): status i.e "Active" or "Inactive" in (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "subCategoryID": "SUB_CATEGORY00016",
+      "mainCategoryID": "MAIN_CATEGORY00005",
+      "subCategoryName": "Studio Amenities",
+      "status": "Active",
+      "additionalFieldsDefinitions": [],
+      "nameFields": [
+        {
+          "nameFieldID": "NAMEFIELD00121",
+          "subCategoryID": "SUB_CATEGORY00016",
+          "name": "Free Wi-fi",
+          "status": "Active"
+        },
+        {
+          "nameFieldID": "NAMEFIELD00120",
+          "subCategoryID": "SUB_CATEGORY00016",
+          "name": "Childcare Facilities",
+          "status": "Active"
+        }
+      ]
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Subcategory not found`
+  - `500 Internal Server Error`
+
+---

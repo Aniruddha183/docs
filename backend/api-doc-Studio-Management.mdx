@@ -1,14 +1,43 @@
-***
-
-# Studio Management API Documentation
-
-This document outlines the API endpoints for Studio Management in the FitEarn application.
+---
+title: "Studio Management API Documentation"
+description: "This document outlines the API endpoints for Studio Management in the FitEarn application."
+---
 
 ## Base URL
 
 ```
 /api/fitnearn/web/admin/studio
 ```
+
+## Middleware
+
+### `authenticateAdminToken()`
+
+- **Headers (for user authorization)**:
+  -- `genToken` (string): GenToken to verify admin (required)
+
+- **Purpose**: Validates JWT token and authenticates admin user requests.
+- **Usage**: Required in all protected admin endpoints.
+
+### `authenticateAdminToken(<permission name)`
+
+- **Purpose**: Validates admin user permission & boundries.
+- **Usage**: Required in all protected admin endpoints.
+
+### `idGenerationMiddleware(<prefix>)`
+
+- **Output** : ADMINXXXXX
+- **Purpose**: Generates unique query IDs for issue reporting.
+- **Usage**: Applied to report creation endpoints.
+
+### `upload.single(<fieldName>)`
+
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Purpose**: Handles file upload using multer to S3
+- **Usage**: Required for generating image/attachment URLs for queries
 
 ## Endpoints
 
@@ -185,9 +214,103 @@ This document outlines the API endpoints for Studio Management in the FitEarn ap
 
 ---
 
+### 6. Add Certificate
+
+Uploads and adds a certificate for the studio owner.
+
+- **Method**: `POST`
+- **URL**: `/addCertificate`
+- **Middleware**: `authenticateAdminToken`, `idGenerationMiddleware('CERT')`
+- **Controller**: `uploadCertificate`
+- **Request Body**:
+  - `ownerId` (string): Unique studio owner identifier (required)
+  - `name` (string): Name of the certificate (required)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (required)
+  - `key` (string): S3 key for the certificate file (required)
+  - `validityFrom` (Date): Date when certificate was issued (required)
+  - `validityTo` (Date): Certificate expiry date (required)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate uploaded successfully",
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 7. Edit Certificate
+
+Updates an existing certificate.
+
+- **Method**: `PATCH`
+- **URL**: `/editCertificate`
+- **Middleware**: `authenticateAdminToken`
+- **Controller**: `editCertificate`
+- **Request Body**:
+  - `certificateId` (string): Unique certificate identifier (required)
+  - `name` (string): Name of the certificate (optional)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (optional)
+  - `key` (string): S3 key for the certificate file (optional)
+  - `validityFrom` (Date): Date when certificate was issued (optional)
+  - `validityTo` (Date): Certificate expiry date (optional)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate updated successfully"
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`
+
+---
+
+### 8. Delete Certificate
+
+Deletes a certificate from the system.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteCertificate`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `deleteCertificate`
+- **Request Body**:
+  - `studioId` (string): studioId identifier (required)
+  - `certificateId` (string): certificate identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`
+
+---
+
 # Studio Booking Management
 
-This section outlines the API endpoints for managing **studio booking sessions** in the FitnEarn platform.
+This section outlines the API endpoints for managing **Studio booking sessions** in the FitnEarn platform.
 
 ---
 
@@ -266,7 +389,45 @@ This section outlines the API endpoints for managing **studio booking sessions**
 
 ---
 
-### 3. Edit Studio Session
+### 3. Cancel Studio Booking
+
+Cancels an upcoming booked session and adds a strike to the studio owner's account.
+
+- **Method**: `PATCH`
+- **URL**: `/session/cancell/:sessionId`
+- **Middleware**: `authenticateAdminToken(), authorize('CANCEL_STUDIO_BOOKING')`
+- **Controller**: `cancelStudioSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Request Body**:
+
+  - `reason` (string): Cancellation reason (required)
+
+- **Example Request**:
+
+```json
+{
+  "reason": "Studio maintenance required"
+}
+```
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Booking cancelled successfully",
+  "sessionId": "SESSION001"
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Session not found / Session can not be Cancell at "Completed" stage
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`
+
+### 4. Edit Studio Session
 
 - **Method**: `PATCH`
 - **Endpoint**: `/session/:sessionId`
@@ -300,7 +461,7 @@ This section outlines the API endpoints for managing **studio booking sessions**
 
 ---
 
-### 4. Delete Studio Session
+### 5. Delete Studio Session
 
 - **Method**: `DELETE`
 - **Endpoint**: `/session/delete/:sessionId`
@@ -334,15 +495,11 @@ This section outlines the API endpoints for managing **studio live sessions** in
 
 ### 1. Create Live Session Draft
 
-**Method**: `POST`
-
-**Endpoint**: `/LS/create`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
-
-**Request Body**:
+- **Method**: `POST`
+- **Endpoint**: `/LS/create`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Request Body**:
 
 ```json
 {
@@ -366,7 +523,7 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -376,26 +533,21 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Studio not found
-`500 Internal Server Error` – Creation failed
+- `404 Not Found` – Studio not found
+- `500 Internal Server Error` – Creation failed
 
 ---
 
 ### 2. Send Live Session for Review
 
-**Method**: `PATCH`
-
-**Endpoint**: `/LS/sendForReview/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
-
-**Path Parameters**:
-
-`sessionId`: (string)
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/sendForReview/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
 
 **Response**:
 
@@ -407,28 +559,95 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Update failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Update failed
 
 ---
 
-### 3. Request for Live Session Approval
+### 3. Assign Reviewer to Live Session
 
-**Method**: `PATCH`
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/assignReviewer/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/requestForApproval/:sessionId`
+- **Request Body**:
 
-**Authentication**: `authenticateAdminToken`
+```json
+{
+  "reviewer": "ADMIN00002"
+}
+```
 
-**Authorization**: `ASSIGN_REVIEWER`
+- **Response**:
 
-**Path Parameters**:
+```json
+{
+  "success": true,
+  "message": "Reviewer assigned successfully",
+  "sessionId": "LSS00001"
+  "reviewer": "ADMIN00002"
+}
+```
 
-`sessionId`: (string)
+- **Error Responses**:
 
-**Request Body**:
+- `400 Bad Request` – Required fields are missing
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
+
+---
+
+### 4. Assign Approver to Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/assignApprover/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_APPROVER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "approver": "ADMIN00002"
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Approver assigned successfully",
+  "sessionId": "LSS00001"
+  "approver": "ADMIN00002"
+}
+```
+
+- **Error Responses**:
+
+- `400 Bad Request` – Required fields are missing
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
+
+---
+
+### 5. Request for Live Session Approval
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/requestForApproval/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
 
 ```json
 {
@@ -438,38 +657,33 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
   "success": true,
-  "message": "Reviewer assigned successfully",
+  "message": "Request for approval sent",
   "sessionId": "LSS00001"
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Failed to update
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
 
 ---
 
-### 4. Approve or Reject Live Session
+### 6. Approve or Reject Live Session
 
-**Method**: `PATCH`
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/approve/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_APPROVER`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/approve/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `ASSIGN_APPROVER`
-
-\*Path Parameters\*\*:
-
-`sessionId`: (string)
-
-**Request Body**:
+- **Request Body**:
 
 ```json
 {
@@ -483,7 +697,7 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -493,28 +707,23 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`400 Bad Request` – Invalid type
-`500 Internal Server Error` – Update failed
+- `400 Bad Request` – Invalid type
+- `500 Internal Server Error` – Update failed
 
 ---
 
-### 5. Cancel Live Session
+### 7. Cancel Live Session
 
-**Method**: `PATCH`
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/cancel/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CANCEL_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/cancel/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `CANCEL_STUDIO_LIVE_SESSION`
-
-**Path Parameters**:
-
-`sessionId`: (string)
-
-**Request Body**:
+- **Request Body**:
 
 ```json
 {
@@ -524,7 +733,7 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -534,28 +743,23 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Update failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Update failed
 
 ---
 
-### 6. Edit Live Session
+### 8. Edit Live Session
 
-**Method**: `PATCH`
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/edit/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO_LIVE_SESSION`
+- \*\*Path Parameter
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/edit/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `EDIT_STUDIO_LIVE_SESSION`
-
-**Path Parameters**:
-
-`sessionId`: (string)
-
-**Request Body**: _(Only editable fields depending on session state)_
+- **Request Body**: _(Only editable fields depending on session state)_
 
 ```json
 {
@@ -565,7 +769,7 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -575,28 +779,23 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
 `404 Not Found` – Session not found
 `500 Internal Server Error` – Update failed
 
 ---
 
-### 7. Copy Live Session
+### 9. Copy Live Session
 
-**Method**: `POST`
+- **Method**: `POST`
+- **Endpoint**: `/LS/copy/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/copy/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `CREATE_STUDIO_LIVE_SESSION`
-
-**Path Parameters**:
-
-`sessionId`: (string)
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -606,26 +805,49 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Copy failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Copy failed
 
 ---
 
-### 8. Get Live Session by ID
+### 10. Get All Live Sessions (Filterable)
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/LS/list`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIO_LIVE_SESSIONS`
+- **Query Params**:
+- `sortBy`: `A-Z` | `Z-A`
+- `startDate`, `endDate`: Date range
+- `sessionId`, `studioId`, `ownerId`, `sessionName`, `category`, `stage`, `stages`
 
-**Endpoint**: `/LS/getDetail/:sessionId`
+- **Response**:
 
-**Authentication**: `authenticateAdminToken`
+```json
+{
+  "success": true,
+  "data": [ { ...sessionData } ],
+  "totalSessions": 5
+}
+```
 
-**Authorization**: `READ_STUDIO_LIVE_SESSION`
+- **Error Responses**:
 
-**Path Parameters**:
+- `404 Not Found` – No matching sessions
+- `500 Internal Server Error` – Query failed
 
-`sessionId`: (string)
+---
+
+### 11. Get Live Session by ID
+
+- **Method**: `GET`
+- **Endpoint**: `/LS/getDetail/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
 
 **Response**:
 
@@ -639,61 +861,61 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Query failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Query failed
 
 ---
 
-### 9. Get All Live Sessions (Filterable)
+### 12. Get Live Session participants
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/LS/getParticipantDetails/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_LIVE_SESSION`
 
-**Endpoint**: `/LS/list`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `GET_STUDIO_LIVE_SESSIONS`
-
-**Query Params**:
-
-`sortBy`: `A-Z` | `Z-A`
-`startDate`, `endDate`: Date range
-`sessionId`, `studioId`, `ownerId`, `sessionName`, `category`, `stage`, `stages`
-
-**Response**:
+- **Response**:
 
 ```json
 {
   "success": true,
-  "data": [ { ...sessionData } ],
-  "totalSessions": 5
+  "sessionid" : "LSS00001",
+  "totalParticipants": 10
+  "data": {
+    "refundAllowed": ture
+    "participants": {
+      "userId" : "USR00001",
+      "userName":"User",
+      "email":"example@email.com",
+      "isAttended":true
+    },
+    "bookings": { ... }
+    "refunds": { ... }
+  }
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – No matching sessions
-`500 Internal Server Error` – Query failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error`
 
 ---
 
-### 10. Delete Live Session
+### 13. Delete Live Session
 
-**Method**: `DELETE`
+- **Method**: `DELETE`
+- **Endpoint**: `/LS/delete/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
 
-**Endpoint**: `/LS/delete/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `DELETE_STUDIO_LIVE_SESSION`
-
-**Path Parameters**:
-
-`sessionId`: (string)
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -702,10 +924,10 @@ This section outlines the API endpoints for managing **studio live sessions** in
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Session not found
-`500 Internal Server Error` – Deletion failed
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Deletion failed
 
 ---
 
@@ -717,23 +939,18 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 
 ### 1. Get Studio Owner List
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/profileList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_OWNERS`
+- **Query Parameters (Optional)**:
+  `ownerId`: string
+  `ownerName`: string
+  `studioName`: string
+  `city`: string
+  `status`: string
 
-**Endpoint**: `/profileList`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `GET_OWNERS`
-
-**Query Parameters (Optional)**:
-
-`ownerId`: string
-`ownerName`: string
-`studioName`: string
-`city`: string
-`status`: string
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -743,7 +960,7 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
 `404 Not Found` – No owners found
 `500 Internal Server Error` – Query failed
@@ -752,19 +969,14 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 
 ### 2. Get Studio Owner By ID
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/profileDetail/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
 
-**Endpoint**: `/profileDetail/:ownerId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `READ_OWNER`
-
-**Path Parameters**:
-
-`ownerId`: string
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -780,7 +992,7 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
 `404 Not Found` – Profile not found
 `500 Internal Server Error` – Query failed
@@ -789,17 +1001,12 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 
 ### 3. Delete Studio Owner
 
-**Method**: `DELETE`
-
-**Endpoint**: `/profile/delete/:ownerId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `DELETE_OWNER`
-
-**Path Parameters**:
-
-`ownerId`: string
+- **Method**: `DELETE`
+- **Endpoint**: `/profile/delete/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
 
 **Response**:
 
@@ -819,19 +1026,14 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 
 ### 4. Edit Studio Owner Profile
 
-**Method**: `PATCH`
+- **Method**: `PATCH`
+- **Endpoint**: `/profile/edit/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
 
-**Endpoint**: `/profile/edit/:ownerId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `EDIT_OWNER`
-
-**Path Parameters**:
-
-`ownerId`: string
-
-**Request Body**:
+- **Request Body**:
 
 ```json
 {
@@ -842,7 +1044,7 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -858,32 +1060,72 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
 `404 Not Found` – Profile not found
 `500 Internal Server Error` – Update failed
 
 ---
 
+### 4. Deactivate Owner Profile
+
+- **Method**: `PATCH`
+- **Endpoint**: `/profile/deactivate`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_OWNER`
+
+- **Request Body**:
+
+```json
+{
+  "ownerId": "string",
+  "action": "boolean",
+  "status": `"Active" or "Inactive"`
+}
+```
+
+- **Response**
+
+```json - Checking before deactivation
+{
+  "success": true,
+  "message": "2 upcoming sessions found.",
+  "upcomingSessions": 2,
+  "sessionIds": ["LSS00001", "LSS00002"]
+}
+```
+
+```json - Deactivated profile
+{
+  "success": true,
+  "message": "Profile is Deactivated",
+  "cancelledSessions": ["LSS00001", "LSS00002"]
+}
+```
+
+```json - Re-activated profile
+{
+  "success": true,
+  "message": "Owner Profile reactivated successfully."
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Profile not found
+- `500 Internal Server Error` – Update failed
+
+---
+
 ### 5. Get All KYC Profiles
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/kyc/profileList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_KYC`
+- **Query Parameters (Optional)**: -`name`: string -`userId`: string -`kycTokenId`: string -`nationality`: string -`stage`: string
 
-**Endpoint**: `/kyc/profileList`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `VIEW_KYC`
-
-**Query Parameters (Optional)**:
-
-`name`: string
-`userId`: string
-`kycTokenId`: string
-`nationality`: string
-`stage`: string
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -893,32 +1135,25 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – No KYC profile found
-`500 Internal Server Error` – Query failed
+- `404 Not Found` – No KYC profile found
+- `500 Internal Server Error` – Query failed
 
 ---
 
 ### 6. Get KYC Profile Detail
 
-**Method**: `GET`
+- **Method**: `GET`
+- **Endpoint**: `/kyc/profileDetail/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_KYC`
+- **Path Parameters**:
+  `ownerId`: string
+- **Query Parameters (Optional)**:
+  `decrypt`: boolean (to get decrypted values and S3 URLs)
 
-**Endpoint**: `/kyc/profileDetail/:ownerId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `READ_KYC`
-
-**Path Parameters**:
-
-`ownerId`: string
-
-**Query Parameters (Optional)**:
-
-`decrypt`: boolean (to get decrypted values and S3 URLs)
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -950,10 +1185,10 @@ This section outlines the API endpoints for managing **studio owners** in the Fi
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-`404 Not Found` – Profile not found
-`500 Internal Server Error` – Fetch failed
+- `404 Not Found` – Profile not found
+- `500 Internal Server Error` – Fetch failed
 
 ---
 
@@ -965,23 +1200,16 @@ This section outlines the API endpoints for managing **Analytics of sessions** i
 
 ### 1. Get Studio Analytics by Owner
 
-**Method**: `GET`
-
-**Endpoint**: `/analytics/:ownerId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `GET_ANALYTICS`
-
-**Path Parameters**:
-
+- **Method**: `GET`
+- **Endpoint**: `/analytics/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_ANALYTICS`
+- **Path Parameters**:
   `ownerId`: `string` – Unique ID of the studio owner
-
-**Query Parameters** (optional):
-
+- **Query Parameters** (optional):
   `range`: `string` – Can be `lastWeek`, `lastMonth`, or `allTime` (default: `lastWeek`)
 
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -989,52 +1217,86 @@ This section outlines the API endpoints for managing **Analytics of sessions** i
   "data": {
     "range": "lastWeek",
     "liveSessions": {
-      "totalSessions": { "current": 5, "previous": 3, "percentageChange": 66.67 },
-      "completedSessions": { "current": 3, "previous": 2, "percentageChange": 50 },
-      "upcomingSessions": { "current": 1, "previous": 1, "percentageChange": 0 },
-      "underReviewSessions": { "current": 0, "previous": 1, "percentageChange": -100 },
-      "cancelledSessions": { "current": 1, "previous": 0, "percentageChange": 100 },
+      "totalSessions": {
+        "current": 5,
+        "previous": 3,
+        "percentageChange": 66.67
+      },
+      "completedSessions": {
+        "current": 3,
+        "previous": 2,
+        "percentageChange": 50
+      },
+      "upcomingSessions": {
+        "current": 1,
+        "previous": 1,
+        "percentageChange": 0
+      },
+      "underReviewSessions": {
+        "current": 0,
+        "previous": 1,
+        "percentageChange": -100
+      },
+      "cancelledSessions": {
+        "current": 1,
+        "previous": 0,
+        "percentageChange": 100
+      },
       "deniedSessions": { "current": 0, "previous": 0, "percentageChange": 0 }
     },
     "bookingSessions": {
-      "totalSessions": { "current": 10, "previous": 7, "percentageChange": 42.86 },
-      "completedSessions": { "current": 6, "previous": 5, "percentageChange": 20 },
-      "upcomingSessions": { "current": 2, "previous": 1, "percentageChange": 100 },
-      "rejectedSessions": { "current": 1, "previous": 0, "percentageChange": 100 },
-      "cancelledSessions": { "current": 1, "previous": 1, "percentageChange": 0 }
+      "totalSessions": {
+        "current": 10,
+        "previous": 7,
+        "percentageChange": 42.86
+      },
+      "completedSessions": {
+        "current": 6,
+        "previous": 5,
+        "percentageChange": 20
+      },
+      "upcomingSessions": {
+        "current": 2,
+        "previous": 1,
+        "percentageChange": 100
+      },
+      "rejectedSessions": {
+        "current": 1,
+        "previous": 0,
+        "percentageChange": 100
+      },
+      "cancelledSessions": {
+        "current": 1,
+        "previous": 1,
+        "percentageChange": 0
+      }
     }
   }
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-  `404 Not Found` – Owner or sessions not found
-  `500 Internal Server Error` – Something went wrong
+- `404 Not Found` – Owner or sessions not found
+- `500 Internal Server Error` – Something went wrong
 
 ---
 
 ### 2. Get Live Session Analytics by Session ID
 
-**Method**: `GET`
-
-**Endpoint**: `/analytics/LS/:sessionId`
-
-**Authentication**: `authenticateAdminToken`
-
-**Authorization**: `GET_ANALYTICS`
-
-**Path Parameters**:
-
+- **Method**: `GET`
+- **Endpoint**: `/analytics/LS/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_ANALYTICS`
+- **Path Parameters**:
   `sessionId`: `string` – Unique ID of the live session
 
-**Query Parameters** (optional):
+- **Query Parameters** (optional):
+- `range`: `string` – `lastWeek`, `lastMonth`, `allTime`, or `custom`
+- `startDate`: `string` (if `range=custom`)
+- `endDate`: `string` (if `range=custom`)
 
-  `range`: `string` – `lastWeek`, `lastMonth`, `allTime`, or `custom`
-  `startDate`: `string` (if `range=custom`)
-  `endDate`: `string` (if `range=custom`)
-
-**Response**:
+- **Response**:
 
 ```json
 {
@@ -1069,9 +1331,117 @@ This section outlines the API endpoints for managing **Analytics of sessions** i
 }
 ```
 
-**Error Responses**:
+- **Error Responses**:
 
-  `404 Not Found` – Session not found
-  `500 Internal Server Error` – Failed to retrieve analytics
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to retrieve analytics
 
 ---
+
+### 3. Get Studio Analytics by Studio ID
+
+- **Method**: `GET`
+- **Endpoint**: `/analytics/:studioId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_ANALYTICS`
+- **Path Parameters**:
+  `studioId`: `string` – Unique ID of the studio
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalLikes": 10,
+    "totalShares": 3,
+    "totalReports": 28,
+    "totalBookings": 7,
+    "totalCancelled": 7,
+    "cancellationRate": 7,
+    "totalReviews": 7,
+    "avgRating": 7,
+    "avgRating": 7,
+    "usersWhoLiked": [
+      {
+        "userId": "USR001",
+        "name": "John Doe"
+      }
+    ],
+    "usersWhoShared": [
+      {
+        "userId": "USR001",
+        "name": "John Doe"
+      }
+    ],
+    "reportDetails": [
+      {
+        "userId": "USR002",
+        "reportId": "RPT002",
+        "reportDesc": "Link is not wrorking",
+        "name": "Abhinav",
+        "status": "Pending",
+        "date": "2025-06-02T12:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Studio not found
+- `500 Internal Server Error` – Failed to retrieve analytics
+
+---
+
+### 1. Add Studio Reason / Action Comment
+
+Records administrative actions such as approval, rejection, or review comments for studios, studio owners, or KYC profiles.  
+This API is used internally by admins or reviewers to maintain transparency in decision-making and notify the respective studio owners.
+
+- **Method**: `POST`
+- **URL**: `/addReason`
+- **Controller**: `addReason`
+- **Request Body**
+
+```json
+{
+  "id": "STD00123", //  Required | The identifier of the target entity (studioId, ownerId, or KYC ownerId)
+  "type": "approval", // Required | The action type: "rejection", "approval", "review", "payment", "refund", "cancellation", "kycapproval", "kycrejection"
+  "reason": "Documents verified", // Optional | Required only for rejection-related actions ("rejection", "kycrejection", "cancellation", "review")
+  "adminId": "ADM00045", // Required | The ID of the admin performing the action
+  "studioType": "studio", // Required | Target type: "studio" (studio approval/rejection), "owner" (profile approval/rejection), or "kyc" (KYC verification/rejection)
+  "isVisible": true // Optional | Determines if the reason/comment is visible to the user; defaults to true for rejection-type actions
+}
+```
+
+#### Behavior by Type
+
+| Type           | Updates Performed                               | Required `reason`                  | Example Notification |
+| -------------- | ----------------------------------------------- | ---------------------------------- | -------------------- |
+| `approval`     | Marks studio/owner/KYC as verified/approved     | `"Your studio has been verified!"` |
+| `rejection`    | Marks studio/owner as denied and inactive       | `"Your studio got rejected"`       |
+| `review`       | Adds internal admin comments for review process | `"Review comment recorded"`        |
+| `payment`      | Adds a payment-related comment                  | `"Payment noted"`                  |
+| `refund`       | Logs refund comment entry                       | `"Refund processed"`               |
+| `cancellation` | Records cancellation-related comments           | `"Booking cancelled"`              |
+| `kycapproval`  | Verifies owner’s KYC                            | `"Your KYC is now verified"`       |
+| `kycrejection` | Rejects owner’s KYC                             | `"Your KYC has been rejected"`     |
+
+---
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "message": "approval reason added successfully"
+}
+```
+
+- **Error Responses**:
+
+- `400 Bad Request` – Missing required fields
+- `404 Not Found` – Studio/Owner/KYC not found
+- `500 Internal Server Error`

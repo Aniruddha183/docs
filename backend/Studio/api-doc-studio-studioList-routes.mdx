@@ -15,6 +15,10 @@ This document outlines the API endpoints available to **Studios** for studio lis
 
 ### `authenticateStudioToken()`
 
+- **Headers (for user authorization)**:
+
+  -- `genToken` (string): GenToken to verify the user (required)
+
 - **Purpose**: Validates JWT token and authenticates studio owner requests.
 - **Usage**: Required in all protected studio owner endpoints.
 
