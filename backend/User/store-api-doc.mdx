@@ -1,0 +1,635 @@
+# User Store API Documentation
+
+This document outlines the API endpoints for the User Store module of the FitEarn application, allowing users to browse products, manage carts, place orders, and manage reviews.
+
+## Base URL
+
+```
+/api/fitnearn/web/users
+```
+
+_(All endpoints are relative to this base URL unless otherwise specified)_
+
+## Authentication
+
+Most endpoints generally do not require strict JWT middleware in the route definition shown, but some like `raiseQuery` use `authenticateCognitoUser`. However, `userId` is frequently passed as a parameter.
+Where `gentoken` or specific headers are required, they are noted.
+
+---
+
+## 1. Product Management
+
+### 1.1 Get All Products
+
+Retrieve a list of products with filtering options.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/get-allProducts`
+- **Query Params**:
+  - `userId` (Optional): To check if products are liked by the user.
+  - `search`: Search by product name.
+  - `category`: Filter by comma-separated categories.
+  - `price`: Filter by max base price.
+  - `rating`: Filter by exact average rating.
+  - `color`: Filter by comma-separated colors.
+  - `size`: Filter by comma-separated sizes.
+  - `stock`: If present, filters for 'InStock' products.
+  - `bestSeller`: If present, filters for best-selling products.
+  - `isFreeDelivery`: If present, filters for free delivery products.
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "productId": "PROD00347",
+        "name": "checking shipping rates",
+        "description": "checking shipping rates",
+        "price": 450,
+        "priceOff": 500,
+        "discountRate": 10,
+        "taxRate": 18,
+        "rating": 0,
+        "totalReviewCount": 0,
+        "thumbnail": "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/39f798ad61013cf5d6e061baad97dfef.jpg",
+        "bestSeller": false,
+        "category": "Sipper Bottle",
+        "color": "Green",
+        "size": "xl",
+        "vaiantPrice": 500,
+        "inStock": true,
+        "variantId": "VAR000363",
+        "isLiked": false,
+        "isFreeDelivery": false,
+        "orderLimit": 10,
+        "shippingChargeRate": 10,
+        "createdAt": "2025-12-05T14:43:47.194Z"
+      }
+    ]
+  }
+  ```
+
+### 1.2 Get Product By ID
+
+Get full details of a specific product.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/get-product/:productId`
+- **Path Params**: `productId`
+- **Query Params**: `userId` (Optional, to check 'isLiked' status)
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "productId": "PROD00361",
+      "name": "TEST SAT 1",
+      "description": "THIS IS THE DESC OF THE&nbsp; PROD",
+      "highlights": ["THIS IS THE HIGHLIGHT OF THE  PROD"],
+      "price": 950,
+      "priceOff": 1000,
+      "discountRate": 5,
+      "rating": 5,
+      "category": "Meditation Products",
+      "totalReviewCount": 1,
+      "colors": ["Black", "Blue", "White", "Green"],
+      "size": ["M", "S", "L"],
+      "baseStockQuantity": 0,
+      "inStock": false,
+      "variant": [
+        {
+          "_id": "6934002e1d2af89d89fa7bf7",
+          "productId": "PROD00361",
+          "variantId": "VAR000381",
+          "variantName": "TEST SAT 1",
+          "variantStockQuantity": 38,
+          "inventoryStatus": "InStock",
+          "variantImages": [
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/6a224fa97b0b16be480daf3d45ea1992.jpg",
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/gym bag.jpg",
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/afefed9c4c035d07578bcf4f1b04fbb4.jpg"
+          ],
+          "color": "Black",
+          "size": "M",
+          "variantPrice": 1000,
+          "taxRate": 18,
+          "discountRate": 5,
+          "description": "THIS IS THE DESC OF THE&nbsp; PROD",
+          "highlights": "THIS IS THE HIGHLIGHT OF THE  PROD",
+          "status": "Active",
+          "state": "Publish",
+          "bestSeller": false,
+          "orderLimit": 5
+        },
+        {
+          "_id": "6934014b1d2af89d89fa7c17",
+          "productId": "PROD00361",
+          "variantId": "VAR00382",
+          "variantName": "TEST PROD 2",
+          "variantStockQuantity": 0,
+          "inventoryStatus": "OutOfStock",
+          "variantImages": [
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/ffdd2d543640517c77b12fb5e540e6ac.jpg",
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/4295f8cf7df02c0b0c855165d14c6288.jpg",
+            "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/bd4a80819755971d90f3f3d2c9030620.jpg"
+          ],
+          "color": "Blue",
+          "size": "M",
+          "variantPrice": 1200,
+          "taxRate": 18,
+          "discountRate": 0,
+          "description": "THIS IS THE DESC OF THE&nbsp; PROD",
+          "highlights": "THIS IS THE HIGHLIGHT OF THE  PROD",
+          "status": "Active",
+          "state": "Draft",
+          "bestSeller": false,
+          "orderLimit": 1
+        }
+      ],
+      "isLiked": false,
+      "images": [
+        "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/6a224fa97b0b16be480daf3d45ea1992.jpg",
+        "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/gym bag.jpg",
+        "https://uiimagesfnew.s3.ap-south-1.amazonaws.com/uploads/Gym Essentials/afefed9c4c035d07578bcf4f1b04fbb4.jpg"
+      ],
+      "reviews": [
+        {
+          "username": "Abhishek",
+          "rating": 5,
+          "content": "dfghjk,",
+          "reviewFileUrl": "https://fitnearn-be-web-dev.s3.ap-south-1.amazonaws.com/Review/user/USR00569/ab4ce00a-98ef-478a-a077-b87ed189d2c1",
+          "createdAt": "2025-12-12T13:59:51.391Z"
+        }
+      ],
+      "sizeGuide": null,
+      "shippingChargeRate": 10
+    }
+  }
+  ```
+
+### 1.3 Get Similar Products
+
+Get product suggestions similar to the given product.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/similarProducts/:productId`
+- **Path Params**: `productId`
+- **Query Params**: `userId` (Optional)
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+       { "productId": "PROD456", "name": "Similar Item", ... }
+    ]
+  }
+  ```
+
+### 1.4 Like / Dislike Product
+
+Toggle like status for a product.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/:userId/like/:productId`
+- **Path Params**: `userId`, `productId`
+- **Query Params**: `action` (Required: `like` or `dislike`)
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Product Liked" // or "Product like removed"
+  }
+  ```
+
+### 1.5 Get Liked Products
+
+Get a list of products liked by the user.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/get-likedProducts/:userId`
+- **Path Params**: `userId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [ { "productId": "PROD123", ... } ]
+  }
+  ```
+
+### 1.6 Share Product
+
+Increment the share count for a product.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/share/:productId`
+- **Path Params**: `productId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Product share count updated successfully",
+    "data": { "totalShares": 5 }
+  }
+  ```
+
+---
+
+## 2. Cart Management
+
+### 2.1 Add to Cart
+
+Add an item to the user's cart.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/addToCart/:userId`
+- **Path Params**: `userId`
+- **Request Body**:
+  ```json
+  {
+    "productId": "PROD123",
+    "variantId": "VAR001", // Optional
+    "size": "M",
+    "color": "Red",
+    "quantity": 1,
+    "price": 499
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Products are added" }
+  ```
+
+### 2.2 Get Cart Items
+
+Retrieve current items in the user's cart with total calculation.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/cartItems/:userId`
+- **Path Params**: `userId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "cartProducts": [
+        {
+          "productId": "PROD123",
+          "name": "T-Shirt",
+          "price": 499,
+          "quantity": 1,
+          "size": "M",
+          "color": "Red"
+        }
+      ],
+      "totalAmount": 499
+    }
+  }
+  ```
+
+### 2.3 Toggle Quantity
+
+Update the quantity of a specific item in the cart.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/store/toggleQuantity/:userId`
+- **Path Params**: `userId`
+- **Request Body**:
+  ```json
+  {
+    "productId": "ITEM_OBJECT_ID", // Corresponds to cart item _id
+    "quantity": 2
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Quantity is updated" }
+  ```
+
+### 2.4 Delete Cart Item
+
+Remove an item from the cart.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/store/:productId/deleteItem/:userId`
+- **Path Params**: `productId` (This is the Product ID, not Item ID), `userId`
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Item Deleted" }
+  ```
+
+---
+
+## 3. Review Management
+
+### 3.1 Post Review
+
+Submit a review for a purchased product.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/postReview/:productId`
+- **Path Params**: `productId`
+- **Middlewares**: `upload.single('file')`, `idGenerationMiddleware('REVID')`
+- **Headers**:
+  - `Authorization`: `Bearer <identityToken>` (If uploading image)
+  - `x-refresh-token`: `<token>` (If uploading image)
+  - `x-username`: `<username>` (If uploading image)
+  - `Content-Type`: `multipart/form-data` (If uploading image)
+- **Request Body**:
+  - `rating`: Number (1-5)
+  - `userId`: String
+  - `review`: String (Content)
+  - `type`: "Product" or "Studio"
+  - `file`: (Optional) Image file
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Review is Posted" }
+  ```
+
+### 3.2 Get Reviews
+
+Get all reviews for a product or studio.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/allReviews/:productId`
+- **Path Params**: `productId`
+- **Query Params**:
+  - `type`: "Product" or "Studio"
+  - `search`: Filter by content
+  - `sortby`: "latest", "oldest", "mostrated"
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalReviews": 5,
+      "finalReviews": [
+        {
+          "username": "John",
+          "rating": 5,
+          "content": "Great!",
+          "createdAt": "..."
+        }
+      ]
+    }
+  }
+  ```
+
+### 3.3 Get Rating Details
+
+Get rating distribution (5-star count, 4-star count, etc.).
+
+- **Method**: `GET`
+- **Endpoint**: `/store/ratingDetails/:productId`
+- **Path Params**: `productId`
+- **Query Params**: `type` ("Product" or "Studio")
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalRatings": 4.5,
+      "ratingDetails": { "oneStar": 0, "fiveStar": 10, ... }
+    }
+  }
+  ```
+
+---
+
+## 4. Checkout Management
+
+### 4.1 Add Shipping Address
+
+- **Method**: `POST`
+- **Endpoint**: `/store/addAddress/:userId`
+- **Path Params**: `userId`
+- **Middleware**: `idGenerationMiddleware('ADRS')`
+- **Request Body**:
+  ```json
+  {
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "phoneNumber": "9876543210",
+    "address": "123 Main St",
+    "city": "Mumbai",
+    "pincode": 400001,
+    "landmark": "Near Park"
+  }
+  ```
+- **Response** (`201 Created`):
+  ```json
+  { "success": true, "message": "Address Added", "data": "ADRS12345" }
+  ```
+
+### 4.2 Update Shipping Address
+
+- **Method**: `PATCH`
+- **Endpoint**: `/store/:addressId/updateAddress/:userId`
+- **Path Params**: `addressId`, `userId`
+- **Request Body**: _Same as Add Address, or `{ "deliverHere": true }` to set default._
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Address Updated" }
+  ```
+
+### 4.3 Get Shipping Address
+
+- **Method**: `GET`
+- **Endpoint**: `/store/getAddress/:userId`
+- **Path Params**: `userId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userId": "USR1",
+      "addresses": [
+        { "addressId": "ADRS1", "address": "...", "deliverHere": true }
+      ]
+    }
+  }
+  ```
+
+### 4.4 Delete Shipping Address
+
+- **Method**: `DELETE`
+- **Endpoint**: `/store/deleteAddress/:addressId`
+- **Path Params**: `addressId`
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Your ADRS123 Address is Deleted" }
+  ```
+
+### 4.5 Validate Coupon
+
+- **Method**: `GET`
+- **Endpoint**: `/store/validateCoupon`
+- **Query Params**: `couponCode`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": { "isValid": true, "discountRate": 10 }
+  }
+  ```
+
+---
+
+## 5. Order Management
+
+### 5.1 Create Order
+
+Place a new order. Starts a transaction to verify stock and save the order.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/createOrder/:userId`
+- **Path Params**: `userId`
+- **Middleware**: `idGenerationMiddleware('ORDER')`
+- **Request Body**:
+  ```json
+  {
+    "products": [
+      {
+        "productId": "PROD1",
+        "variantId": "VAR1",
+        "quantity": 1,
+        "price": 499,
+        "color": "Red",
+        "size": "M"
+      }
+    ],
+    "shippingAddressId": "ADRS123",
+    "amount": 450,
+    "tax": 18,
+    "shippingCharge": 40,
+    "discountAmount": 50,
+    "grandTotal": 508,
+    "paymentMode": "UPI",
+    "paymentStatus": "Success",
+    "transactionId": "TXN123456",
+    "couponCode": "SAVE100" // Optional
+  }
+  ```
+- **Response** (`201 Created`):
+  ```json
+  {
+    "success": true,
+    "message": "Order placed successfully",
+    "orders": { "orderId": "ORDER123" }
+  }
+  ```
+
+### 5.2 Validate Products
+
+Check if products in the cart are still valid and in stock before checkout.
+
+- **Method**: `POST`
+- **Endpoint**: `/store/validateProducts/:userId`
+- **Path Params**: `userId`
+- **Request Body**:
+  ```json
+  {
+    "products": [{ "productId": "PROD1", "variantId": "VAR1", "quantity": 1 }]
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "All products are available..." }
+  ```
+
+### 5.3 Order List
+
+Get a list of user's orders (Active or Past).
+
+- **Method**: `GET`
+- **Endpoint**: `/store/orderslist/:userId`
+- **Path Params**: `userId`
+- **Query Params**: `pastOrders` (Boolean/String: if present, returns past orders like 'Delivered' or 'Cancelled')
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "totalOrders": 2,
+    "data": [
+      {
+        "orderId": "ORDER123",
+        "fulfilments": [{ "fulfilmentId": "FUL1", "stage": "Processing" }]
+      }
+    ]
+  }
+  ```
+
+### 5.4 Get Order Details
+
+Get details for a specific order.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/order/:userId/:orderId`
+- **Path Params**: `userId`, `orderId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "orderId": "ORDER123",
+      "amounts": { "grandTotal": 508 },
+      "fulfilments": [...]
+    }
+  }
+  ```
+
+### 5.5 Get Fulfilment Details
+
+Get details of a specific fulfilment within an order.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/fulfilment/:fulfilmentId`
+- **Path Params**: `fulfilmentId`
+- **Response** (`200 OK`):
+  ```json
+  {
+     "success": true,
+     "data": { "fulfilment": { ... }, "order": { ... } }
+  }
+  ```
+
+### 5.6 Generate Invoice
+
+Generate and retrieve the invoice PDF URL for a fulfilment.
+
+- **Method**: `GET`
+- **Endpoint**: `/store/order/:userId/invoice/:fulfilmentId`
+- **Path Params**: `userId`, `fulfilmentId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": "https://s3-bucket-url.com/invoices/INV123.pdf"
+  }
+  ```
+
+---
+
+## 6. Support
+
+### 6.1 Raise Query
+
+Raise a support ticket/query for a specific product/fulfilment.
+
+- **Method**: `POST`
+- **Endpoint**: `/raiseQuery`
+- **Middleware**: `authenticateCognitoUser`, `idGenerationMiddleware('QRY')`, `upload.single('attachment')`
+- **Query Params**: `userId`, `referenceId` (The Fulfilment ID)
+- **Request Body** (FormData):
+  - `mobNum`: String
+  - `issueType`: String
+  - `message`: String
+  - `urgency_level`: String
+  - `attachment`: File (Optional)
+- **Response** (`201 Created`):
+  ```json
+  {
+    "success": true,
+    "message": "Query submitted successfully",
+    "query": { "query_ID": "QRY123", "query_status": "Pending" }
+  }
+  ```

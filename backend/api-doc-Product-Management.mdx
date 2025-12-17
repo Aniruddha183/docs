@@ -1,555 +1,436 @@
-***
+# Store Management API Documentation
 
-# Product Management API Documentation
-
-This document outlines the API endpoints for Product Management of the FitEarn application.
+This document outlines the API endpoints for Product, Order, and Store Management of the FitEarn application.
 
 ## Base URL
-
 ```
 /api/fitnearn/web/admin/store
 ```
+*(All endpoints are relative to this base URL unless otherwise specified)*
 
-## Endpoints
+## Authentication & Headers
+The API uses a custom header for authentication.
 
-### 1. Add Draft Product
+### Required Header
+All protected endpoints must include the following header:
 
-This endpoint allows an admin to create a draft product with necessary details. The product is saved in a "Draft" state and must include exactly 4 images.
+- **Key**: `gentoken`
+- **Value**: `<your_jwt_token>`
+
+> **Note**: This is used by the `authenticateAdminToken` middleware. Do not use `Authorization: Bearer ...`.
+
+---
+
+## 1. Product Management
+
+### 1.1 Add Draft Product
+Creates a product in "Draft" state. The product is saved but not visible to customers until published. If all required fields for a variant are present, it also creates a base variant.
 
 - **Method**: `POST`
-- **Endpoint**: `/api/fitnearn/web/admin/store/addDraftProduct`
-- **Authentication**: `authenticateAdminToken` (Admin)
-
+- **Endpoint**: `/addDraftProduct`
+- **Middlewares**:
+  - `idGenerationMiddleware('PROD')`
+  - `authenticateAdminToken`
+  - `authorize('CREATE_PRODUCT')`
+- **Headers**:
+  - `gentoken`: `<token>`
+  - `Content-Type`: `application/json`
 - **Request Body**:
-
   ```json
   {
-    "name": "T-shirt",
-    "description": "Premium cotton t-shirt",
-    "category": "Clothing",
-    "price": 499,
-    "images": ["url1", "url2", "url3", "url4"],
-    "quantity": 20,
-    "isActive": true,
+    "productName": "Men's Running T-Shirt",
+    "description": "High-quality breathable fabric... ",
+    "productCategory": "Athleisure",
+    "basePrice": 499,
+    "baseStockQuantity": 50,
+     "baseImages": [
+         "https://fitnearn-be-web-dev.s3.ap-south-1.amazonaws.com/admin/Product/undefined/2fc603a3-1bcd-4b46-91ec-43dca128d475",
+         "https://fitnearn-be-web-dev.s3.ap-south-1.amazonaws.com/admin/Product/undefined/2fc603a3-1bcd-4b46-91ec-43dca128d475",
+         "https://fitnearn-be-web-dev.s3.ap-south-1.amazonaws.com/admin/Product/undefined/7f89658b-1bdf-427a-b4e9-0f64888e3d84"
+   ], // Min 3 required for variant creation, Max 4
+    "sellerName": "FitEarn Official",
+    "sellerId": "SELLER001",
+    "createdBy": "ADMIN001",
+    "taxRate": 18,
+    "size":"S",
+    "color": "Red",
+    "orderLimit": 5,
+    "isActive": false,
     "bestSeller": false,
-    "isCoupon": true,
-    "discountRate": 15,
-    "couponCode": "SAVE15",
-    "modelNumber": "TSH-2024",
-    "highlights": ["100% cotton", "Unisex"],
+    "discountRate": 10,
+    "modelNumber": "MOD-2024-X",
     "freeDelivery": true,
-    "adminId": "ADM-001",
-    "sizeGuide": "Refer to our sizing chart"
+    "sizeGuide": "url",
+    "estimatedDeliveryTime": "3 weak",
+    "warranty": "6 Months",
+    "productHsnCode": "6109",
+    "shippingChargeRate": 0,
+    "thumbnailMediaId": []
+  }
+  ```
+- **Response** (`201 Created`):
+  ```json
+  {
+    "success": true,
+    "message": " Product Added and Published",
+    "data": {
+      "product": {
+        "productId": "PROD12345",
+        "productName": "Men's Running T-Shirt",
+        "inventoryStatus": "InStock",
+        "status": "Inactive",
+        "state": "Draft",
+        "variantId": ["VAR000001"],
+        "baseStockQuantity": 50,
+        "createdAt": "2024-06-12T10:00:00.000Z",
+        "updatedAt": "2024-06-12T10:00:00.000Z"
+      }
+    }
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Maximum 4 images are allowed"
+  }
+  ```
+  *(Or if description exceeds limit)*:
+  ```json
+  {
+    "success": false,
+    "message": "Description should not exceed 250 words"
   }
   ```
 
-  - `name` (string, required): Name of the product.
-  - `description` (string, required): Detailed description of the product.
-  - `category` (string, required): Product category name.
-  - `price` (number, required): Price of the product.
-  - `images` (array of strings, required): Exactly 4 image URLs.
-  - `quantity` (number, required): Inventory count.
-  - `isActive` (boolean, optional): Is the product available for purchase.
-  - `bestSeller` (boolean, optional): Mark as best seller.
-  - `isCoupon` (boolean, optional): Is a coupon applicable.
-  - `discountRate` (number, optional): Discount percentage if any.
-  - `couponCode` (string, optional): Coupon code if any.
-  - `modelNumber` (string, optional): Unique model identifier.
-  - `highlights` (array of strings, optional): Key selling points.
-  - `freeDelivery` (boolean, optional): Eligible for free delivery.
-  - `adminId` (string, required): Admin ID who is creating the product.
-  - `sizeGuide` (string, optional): Reference to size guide text or URL.
+### 1.2 Add & Publish Product
+Creates a product and immediately publishes it (State: 'Publish', Status: 'Active'). Requires all mandatory fields.
 
-- **Response**:
-
-  - **Status**: `201 Created`
-  - **Body**:
-    ```json
-    {
-      "success": true,
-      "message": "Product is Saved",
-      "data": "PROD1234"
+- **Method**: `POST`
+- **Endpoint**: `/addPublishProduct`
+- **Middlewares**:
+  - `idGenerationMiddleware('PROD')`
+  - `authenticateAdminToken`
+  - `authorize('CREATE_PRODUCT')`
+- **Headers**:
+  - `gentoken`: `<token>`
+  - `Content-Type`: `application/json`
+- **Request Body**: *Same as 1.1, but strict requirements for fields.*
+- **Response** (`201 Created`):
+  ```json
+  {
+    "success": true,
+    "message": " Product Added and Published",
+    "data": {
+      "product": {
+        "productId": "PROD67890",
+        "state": "Publish",
+        "status": "Active",
+        "inventoryStatus": "InStock"
+      }
     }
-    ```
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Missing required fields"
+  }
+  ```
 
-- **Error Responses**:
-
-  - **Status**: `400 Bad Request` – Required field(s) missing
-
-    ```json
-    {
-      "success": false,
-      "message": "Missing required fields"
-    }
-    ```
-
-  - **Status**: `400 Bad Request` – Invalid number of images
-
-    ```json
-    {
-      "success": false,
-      "message": "Exactly 4 images are required"
-    }
-    ```
-
-  - **Status**: `401 Unauthorized` – Token not provided or invalid
-
-    ```json
-    {
-      "success": false,
-      "message": "Unauthorized: Admin token is missing or invalid"
-    }
-    ```
-
-  - **Status**: `403 Forbidden` – No permission
-
-    ```json
-    {
-      "success": false,
-      "message": "You do not have permission to perform this action"
-    }
-    ```
-
-  - **Status**: `500 Internal Server Error` – General server error
-    ```json
-    {
-      "success": false,
-      "message": "Error while adding product: [error details]"
-    }
-    ```
-
----
-
-### 2. Publish Product
-
-This endpoint allows an admin to publish a product that was previously saved as a draft.
+### 1.3 Publish Product
+Publishes an existing draft product. Updates state to 'Publish' and status to 'Active'. Creates a base variant if not exists.
 
 - **Method**: `PUT`
-- **Endpoint**: `/api/fitnearn/web/admin/store/publishProduct/{productId}`
-- **Authentication**: `authenticateAdminToken` (Admin)
-
-- **Path Parameter**:
-
-  - `productId` (string, required): The ID of the draft product to be published.
-
-- **Response**:
-
-  - **Status**: `200 OK`
-  - **Body**:
-    ```json
-    {
-      "success": true,
-      "message": "Product has been published successfully"
-    }
-    ```
-
-- **Error Responses**:
-
-  - **Status**: `400 Bad Request` – Missing or invalid product ID
-
-    ```json
-    {
-      "success": false,
-      "message": "Invalid product ID"
-    }
-    ```
-
-  - **Status**: `404 Not Found` – Product not found
-
-    ```json
-    {
-      "success": false,
-      "message": "Draft product not found"
-    }
-    ```
-
-  - **Status**: `401 Unauthorized`
-
-    ```json
-    {
-      "success": false,
-      "message": "Unauthorized: Admin token is missing or invalid"
-    }
-    ```
-
-  - **Status**: `500 Internal Server Error`
-    ```json
-    {
-      "success": false,
-      "message": "Error while publishing product: [error details]"
-    }
-    ```
-
----
-
-### 3. Edit Product
-
-This endpoint allows an admin to update an existing product's details (whether it's draft or published).
-
-- **Method**: `PATCH`
-- **Endpoint**: `/api/fitnearn/web/admin/store/editProduct/{productId}`
-- **Authentication**: `authenticateAdminToken` (Admin)
-
-- **Path Parameter**:
-
-  - `productId` (string, required): The ID of the product to be edited.
-
-- **Request Body**:
-
+- **Endpoint**: `/publishProduct/:productId`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('PUBLISH_PRODUCT')`
+- **Headers**: `gentoken: <token>`
+- **Path Params**: `productId`
+- **Response** (`200 OK`):
   ```json
   {
-    "name": "Updated T-shirt",
-    "description": "Updated description",
-    "price": 599,
-    "images": ["url1", "url2", "url3", "url4"],
-    "quantity": 30,
-    "isActive": true,
-    "discountRate": 10,
-    "adminId": "ADM-001"
+    "success": true,
+    "message": "Product published successfully and base variant created",
+    "data": {
+      "product": {
+        "productId": "PROD12345",
+        "state": "Publish",
+        "status": "Active"
+      }
+    }
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Product not found"
   }
   ```
 
-- **Response**:
+### 1.4 Edit Product
+Update an existing product. Also updates the Base Variant if fields like description, price, etc., are changed.
 
-  - **Status**: `200 OK`
-  - **Body**:
-    ```json
-    {
-      "success": true,
-      "message": "Product has been updated successfully"
+- **Method**: `PATCH`
+- **Endpoint**: `/editProduct/:productId`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('EDIT_PRODUCT')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "productName": "Updated T-Shirt",
+    "basePrice": 599,
+    "description": "Updated breathable fabric description...",
+    "stockQuantity": 100
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Product and Base Variant updated successfully",
+    "data": {
+      "productId": "PROD12345",
+      "productName": "Updated T-Shirt",
+      "basePrice": 599
     }
-    ```
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Product not found"
+  }
+  ```
 
-- **Error Responses**:
-
-  - **Status**: `400 Bad Request` – Invalid data
-
-    ```json
-    {
-      "success": false,
-      "message": "Invalid request body"
-    }
-    ```
-
-  - **Status**: `404 Not Found` – Product not found
-
-    ```json
-    {
-      "success": false,
-      "message": "Product not found"
-    }
-    ```
-
-  - **Status**: `401 Unauthorized`
-
-    ```json
-    {
-      "success": false,
-      "message": "Unauthorized: Admin token is missing or invalid"
-    }
-    ```
-
-  - **Status**: `500 Internal Server Error`
-    ```json
-    {
-      "success": false,
-      "message": "Error while updating product: [error details]"
-    }
-    ```
-
-### 4. Get Product List
-
-This endpoint allows the admin to retrieve a list of products with optional filters like product ID, name, category, price, status, and inventory level.
+### 1.5 Get Product List
+Retrieve products with comprehensive filtering options.
 
 - **Method**: `GET`
-- **Endpoint**: `/api/fitnearn/web/admin/store/getProductList`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `VIEW_PRODUCTS`
-
-- **Query Parameters** (all optional):
-
-  - `productId` (string): Filter by Product ID (partial match allowed)
-  - `productName` (string): Filter by Product Name
-  - `category` (string): Filter by Product Category
-  - `price` (number): Exact match on price
-  - `status` (string): Filter by Product Status (e.g., "active")
-  - `inventoryStatus` (number): Filter products with quantity less than or equal to this value
-
-- **Response**:
-
+- **Endpoint**: `/getProductList`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('VIEW_PRODUCTS')`
+- **Headers**: `gentoken: <token>`
+- **Query Params**: `productId`, `productName`, `category`, `price`, `status`, `state`, `inventoryStatus`, `sortBy`, `hasVariant`, `startDate`, `endDate`, `quantityLimit`, `search`.
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
     "data": [
       {
-        "productId": "PROD1234",
-        "name": "T-shirt",
-        "variantId": "2 Variants",
-        "price": 499,
-        "quantity": 10,
-        "status": "active",
-        "category": "Clothing",
-        "updatedAt": "2024-06-01T10:00:00.000Z"
+        "productId": "PROD123",
+        "productName": "T-Shirt",
+        "productCategory": "Clothing",
+        "basePrice": 499,
+        "baseStockQuantity": 50,
+        "status": "Active",
+        "state": "Publish",
+        "inventoryStatus": "InStock",
+        "variantCount": 2,
+        "sellerName": "Expert Seller",
+        "createdAt": "2024-06-01"
       }
     ],
     "totalProducts": 1
   }
   ```
-
-- **Error Response**:
+- **Error Response** (`500 Internal Server Error`):
   ```json
   {
     "success": false,
-    "message": "Error while getting product list"
+    "message": "Error while getting product list: <error_details>"
   }
   ```
 
----
-
-### 5. Get Product By ID
-
-This endpoint allows the admin to get complete product details, including all variants, for a given `productId`.
+### 1.6 Get Product By ID
+Get full product details including all associated variants.
 
 - **Method**: `GET`
-- **Endpoint**: `/api/fitnearn/web/admin/store/getProduct/:productId`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `READ_PRODUCT`
-
-- **Path Parameter**:
-
-  - `productId` (string, required): Unique ID of the product
-
-- **Response**:
-
+- **Endpoint**: `/getProduct/:productId`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('READ_PRODUCT')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
     "data": {
-      "product": {
-        "productId": "PROD1234",
-        "name": "T-shirt",
-        "description": "Premium cotton tee",
-        "variantId": ["VAR001", "VAR002"],
-        ...
-      },
+      "productId": "PROD123",
+      "productName": "T-Shirt",
+      "baseStockQuantity": 100,
+      "inventoryStatus": "InStock",
+      "hasBaseVariant": true,
       "variants": [
         {
           "variantId": "VAR001",
-          "size": "M",
-          "color": "Red"
-        },
-        {
-          "variantId": "VAR002",
-          "size": "L",
-          "color": "Blue"
+          "variantName": "Red T-Shirt",
+          "variantStockQuantity": 20,
+          "color": "Red",
+          "size": "M"
         }
       ]
     }
   }
   ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Product not found"
+  }
+  ```
 
-- **Error Responses**:
-
-  - **Status**: `404 Not Found`
-
-    ```json
-    {
-      "success": false,
-      "message": "Product not found"
-    }
-    ```
-
-  - **Status**: `500 Internal Server Error`
-    ```json
-    {
-      "success": false,
-      "message": "Error while getting product list"
-    }
-    ```
-
-### 6. Copy Product
-
-This endpoint allows the admin to create a new draft product by duplicating an existing one.
+### 1.7 Copy Product
+Duplicate a product's details into a new Draft product.
 
 - **Method**: `POST`
-- **Endpoint**: `/api/fitnearn/web/admin/store/copyProduct/:productId`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `COPY_PRODUCT`
-- **Middleware**: `idGenerationMiddleware('PROD')`
-
-- **Path Parameter**:
-
-  - `productId` (string, required): ID of the product to copy
-
-- **Response**:
-
+- **Endpoint**: `/copyProduct/:productId`
+- **Middlewares**:
+  - `idGenerationMiddleware('PROD')`
+  - `authenticateAdminToken`
+  - `authorize('COPY_PRODUCT')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`201 Created`):
   ```json
   {
     "success": true,
     "message": "Product copied successfully",
     "data": {
-      "productId": "PROD5678",
+      "productId": "PROD9999",
       "state": "Draft"
     }
   }
   ```
-
-- **Error Responses**:
-  - `400 Bad Request` – Missing Product ID
-  - `404 Not Found` – Product not found
-  - `500 Internal Server Error` – Server error while copying product
-
----
-
-### 7. Delete Product (Single)
-
-This endpoint allows the admin to delete a single product by its ID.
-
-- **Method**: `DELETE`
-- **Endpoint**: `/api/fitnearn/web/admin/store/deleteProduct/:productId`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `DELETE_PRODUCT`
-
-- **Path Parameter**:
-
-  - `productId` (string, required): ID of the product to delete
-
-- **Response**:
-
+- **Error Response** (`404 Not Found`):
   ```json
   {
-    "message": "Product deleted successfully"
+    "success": false,
+    "message": "Product not found"
   }
   ```
 
-- **Error Responses**:
-  - `404 Not Found` – Product not found
-  - `500 Internal Server Error` – Error deleting product
-
----
-
-### 8. Delete Products (Bulk)
-
-This endpoint allows the admin to delete multiple products by passing an array of product IDs.
+### 1.8 Delete Products (Bulk)
+Delete multiple products by ID.
 
 - **Method**: `DELETE`
-- **Endpoint**: `/api/fitnearn/web/admin/store/deleteManyProduct`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `DELETE_PRODUCT`
-
+- **Endpoint**: `/deleteManyProduct`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('DELETE_PRODUCT')`
+- **Headers**: `gentoken: <token>`
 - **Request Body**:
-
   ```json
   {
-    "productIds": ["PROD1234", "PROD5678"]
+    "productIds": ["PROD1", "PROD2"]
   }
   ```
-
-- **Response**:
-
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Product deleted successfully" }
+  ```
+- **Error Response** (`400 Bad Request`):
   ```json
   {
-    "success": true,
-    "message": "Product deleted successfully"
+    "success": false,
+    "message": "Product IDs are required"
   }
   ```
-
-- **Error Responses**:
-  - `400 Bad Request` – No product IDs provided
-  - `404 Not Found` – Product(s) not found
-  - `500 Internal Server Error` – Error deleting products
 
 ---
 
-### 9. Add Product Variant
+## 2. Variant Management
+
+### 2.1 Add Variant
+Add a new variant to an existing product. Checks against store capacity.
 
 - **Method**: `POST`
-- **Endpoint**: `/api/fitnearn/web/admin/store/addProductVariant`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `CREATE_PRODUCT_VARIANT`
-- **Middleware**: `idGenerationMiddleware('VAR')`, `upload.array('image')`
-
-- **Request Body** (Form Data):
-
-  - `name`: (string) Name of the variant
-  - `size`: (string) Size (e.g., S, M, L)
-  - `color`: (string) Color
-  - `quantity`: (number) Quantity of the variant
-  - `addOn`: (string) Any additional features
-  - `adminId`: (string) Admin ID
-  - `productId`: (string) Associated product ID
-  - `image`: (file[]) Images to upload
-
-- **Response**:
-
+- **Endpoint**: `/addProductVariant`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('CREATE_PRODUCT_VARIANT')`
+  - `idGenerationMiddleware('VAR')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
   ```json
   {
-    "success": true,
-    "message": "Variant ID VAR1234 is added"
+    "productId": "PROD1",
+    "variantName": "Var 1",
+    "variantStockQuantity": 10,
+    "variantImages": ["url1", "url2", "url3"], // Min 3 required
+    "size": "M",
+    "color": "Red",
+    "variantPrice": 499,
+    "taxRate": 18,
+    "description": "Variant Desc",
+    "highlights": ["Classic fit"],
+    "orderLimit": 2
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Variant VAR123456 added successfully" }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Store is full"
   }
   ```
 
-- **Error Responses**:
-  - `400 Bad Request` – Quantity constraints, product not found
-  - `401 Unauthorized` – Missing identity token
-  - `500 Internal Server Error` – Image upload or DB error
-
----
-
-### 10. Edit Product Variant
+### 2.2 Edit Variant
+Update variant details. Updates parent product if this is a Base Variant.
 
 - **Method**: `PATCH`
-- **Endpoint**: `/api/fitnearn/web/admin/store/editProductVariant`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `EDIT_PRODUCT_VARIANT`
-- **Middleware**: `upload.array('image')`
-
-- **Request Body** (Form Data):
-
-  - `variantId`: (string) Variant ID to edit
-  - `name`: (string) Updated name
-  - `size`: (string) Updated size
-  - `color`: (string) Updated color
-  - `quantity`: (number) Updated quantity
-  - `addOn`: (string) Updated addOn
-  - `adminId`: (string) Admin ID
-  - `productId`: (string) Product ID
-  - `image`: (file[]) Optional new images
-
-- **Response**:
-
+- **Endpoint**: `/editProductVariant`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('EDIT_PRODUCT_VARIANT')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
   ```json
   {
-    "success": true,
-    "message": "Variant ID VAR1234 is Updated"
+    "variantId": "VAR123",
+    "productId": "PROD1",
+    "variantName": "Red Variant Updated",
+    "variantStockQuantity": 15,
+    "variantPrice": 549
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  { "success": true, "message": "Variant ID VAR123 updated successfully" }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Product or Variant not found"
   }
   ```
 
-- **Error Responses**:
-  - `400 Bad Request` – Quantity exceeds product stock
-  - `401 Unauthorized` – Missing token
-  - `404 Not Found` – Variant or product not found
-  - `500 Internal Server Error` – Image upload or update error
-
----
-
-### 11. Delete Product Variants (Bulk)
+### 2.3 Delete Variants (Bulk)
+Delete one or more variants. Cannot delete Base Variants.
 
 - **Method**: `DELETE`
-- **Endpoint**: `/api/fitnearn/web/admin/store/deleteManyVariants`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `DELETE_PRODUCT`
-
+- **Endpoint**: `/deleteManyVariants`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('DELETE_PRODUCT')`
+- **Headers**: `gentoken: <token>`
 - **Request Body**:
-
   ```json
-  {
-    "variantIds": ["VAR1234", "VAR5678"]
-  }
+  { "variantIds": ["VAR1", "VAR2"] }
   ```
-
-- **Response**:
-
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
@@ -558,49 +439,339 @@ This endpoint allows the admin to delete multiple products by passing an array o
     "updatedProducts": 1
   }
   ```
-
-- **Error Responses**:
-  - `400 Bad Request` – No variant IDs provided
-  - `404 Not Found` – No matching variants found
-  - `500 Internal Server Error` – Server error during deletion
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Variant IDs are required"
+  }
+  ```
 
 ---
 
-## Order Management
+## 3. Order & Fulfilment Management
 
-These endpoints are for Order Management and Task Management.
-
-
-### 1. Get Order List
+### 3.1 Get Order List
+Retrieves orders with calculated seller payments and penalties handled dynamically.
 
 - **Method**: `GET`
-- **Endpoint**: `/api/fitnearn/web/admin/store/getOrderList`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `VIEW_ORDERS`
-
-- **Query Parameters**:
-
-  - `orderId` (optional)
-  - `customerName` (optional)
-  - `date` (optional) - Format: YYYY-MM-DD
-  - `paymentStatus` (optional)
-  - `fullfillment` (optional)
-  - `deliveryStatus` (optional)
-
-- **Response**:
+- **Endpoint**: `/getOrderList`
+- **Middlewares**: `authenticateAdminToken`, `authorize('VIEW_ORDERS')`
+- **Headers**: `gentoken: <token>`
+- **Query Params**: `orderId`, `state`, `startDate`, `endDate`, `minAmount`, `maxAmount`, `sortBy`.
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
     "data": [
       {
         "orderId": "ORD123",
-        "customerName": "John Doe",
-        "paymentStatus": "Paid",
-        "deliveryStatus": "Delivered",
-        "amount": 499,
-        "fullfillment": "Fullfilled",
-        "date": "2024-06-17T09:00:00Z",
-        "userId": "USR001"
+        "date": "2024-05-20T10:00:00.000Z",
+        "orderAmount": 1000,
+        "totalAmountPaidToSeller": 950,
+        "state": "Placed"
+      }
+    ]
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Error while getting order list"
+  }
+  ```
+
+### 3.2 Get Fulfilments by Order
+Get fulfilment sub-orders for a specific order.
+
+- **Method**: `GET`
+- **Endpoint**: `/orders/:orderId/fulfilments`
+- **Middlewares**: `authenticateAdminToken`, `authorize('VIEW_ORDERS')`
+- **Headers**: `gentoken: <token>`
+- **Path Params**: `orderId`
+- **Query Params**: `state`, `stage`, `minAmount`, `maxAmount`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "orderId": "ORD123",
+        "fulfilmentId": "FUL001",
+        "sellerName": "Seller A",
+        "assignedTo": "USR002",
+        "assignedToUser": { "_id": "USR002", "name": "Admin Two" },
+        "stage": "Processing",
+        "state": "Pending",
+        "amountPaidByUser": 500,
+        "createdAt": "2024-06-01T10:00:00Z"
+      }
+    ]
+  }
+  ```
+
+### 3.3 Get Fulfilment Details
+Get comprehensive details for a single fulfilment (product, tasks, timelines, shipping).
+
+- **Method**: `GET`
+- **Endpoint**: `/fulfilments/:fulfilmentId/details`
+- **Middlewares**: `authenticateAdminToken`, `authorize('READ_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "orderId": "ORD123",
+      "fulfilmentId": "FUL001",
+      "assignedTo": "USR002",
+      "sellerName": "Seller A",
+      "stage": "Processing",
+      "state": "Pending",
+      "productDetail": {
+        "productId": "PROD1",
+        "productName": "T-Shirt",
+        "quantity": 1,
+        "size": "M",
+        "color": "Red"
+      },
+      "shippingInformation": {
+        "address": "123 Street",
+        "city": "Delhi"
+      },
+      "tasks": [
+        {
+          "taskId": "TASK001",
+          "taskDetail": "Verify stock",
+          "status": "Open",
+          "taskType": "PROCESSING"
+        }
+      ],
+      "timelines": [
+        {
+          "comment": "Order verified",
+          "adminId": "USR001",
+          "createdAt": "2024-06-01T11:00:00Z"
+        }
+      ]
+    }
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Fulfilment doesn't exist"
+  }
+  ```
+
+### 3.4 Get Order Summary (Financial)
+Get financial breakdown for a fulfilment.
+
+- **Method**: `GET`
+- **Endpoint**: `/fulfilments/:fulfilmentId/summary`
+- **Middlewares**: `authenticateAdminToken`, `authorize('READ_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "orderPaymentStatus": "Success",
+      "transactionId": "TXN123456",
+      "modeOfPayment": "UPI",
+      "subtotal": 450,
+      "discountAmount": 50,
+      "taxAmount": 18,
+      "shippingCharges": 40,
+      "totalAmountPaidByUser": 458
+    }
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Fulfilment doesn't exist"
+  }
+  ```
+
+### 3.5 Update Fulfilment Details
+Update status, shipping info, seller remarks, or seller payment status.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/fulfilments/:fulfilmentId/update`
+- **Middlewares**: `authenticateAdminToken`, `authorize('EDIT_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "state": "Pending",
+    "stage": "Delivery",
+    "shippingPartner": "DHL",
+    "trackingId": "TRK123456",
+    "shippingDate": "2024-06-15",
+    "isDelivered": "Yes",
+    "deliveryDate": "2024-06-17",
+    "sellerRemark": "Dispatched",
+    "sellerPaymentStatus": "Paid",
+    "sellerTransactionId": "BNK999",
+    "sellerPaymentMode": "NEFT"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Fulfilment details updated successfully",
+    "data": {
+      "fulfilment": { "fulfilmentId": "FUL123", "state": "Pending", "stage": "Delivery" },
+      "sellerPayment": { "sellerPaymentStatus": "Paid" }
+    }
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Missing fulfilmentId"
+  }
+  ```
+
+### 3.6 Assign User to Fulfilment
+- **Method**: `PATCH`
+- **Endpoint**: `/assignTo/:fulfilmentId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('ASSIGN_ORDER_REVIEWER')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "assignedTo": "USR002"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "assignedTo updated successfully",
+    "fulfilmentId": "FUL123",
+    "assignedTo": "USR002"
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "sucess": false, // Note: typo 'sucess' in controller code
+    "message": "Required fields are missing"
+  }
+  ```
+
+---
+
+## 4. Task & Timeline Management
+
+### 4.1 Create or Edit Task
+- **Method**: `POST`
+- **Endpoint**: `/addEditTask`
+- **Middlewares**: `authenticateAdminToken`, `authorize('CREATE_TASK')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "taskId": "TASK001", // Optional (use for edit)
+    "fulfilmentId": "FUL123",
+    "taskDetail": "Check item quality",
+    "assignedTo": "USR003",
+    "taskType": "PROCESSING",
+    "isActive": true
+  }
+  ```
+- **Response** (`201 Created`):
+  ```json
+  {
+    "success": true,
+    "message": "PROCESSING is created successfully",
+    "taskId": "TASK1234"
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "fulfilmentId, taskDetail and assignedTo are required."
+  }
+  ```
+
+### 4.2 Close Task
+- **Method**: `PATCH`
+- **Endpoint**: `/closeTask/:taskId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('CLOSE_TASK')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Task TASK001 is closed successfully",
+    "taskId": "TASK001"
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Task not found or Closed already"
+  }
+  ```
+
+### 4.3 Add Timeline Comment
+Adds a comment to either a Task or a Fulfilment.
+
+- **Method**: `POST`
+- **Endpoint**: `/addTimeline`
+- **Middlewares**: `authenticateAdminToken`, `authorize('CREATE_TIMELINE')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "targetType": "fulfilment", // 'task' or 'fulfilment'
+    "fulfilmentId": "FUL123",   // required if targetType is fulfilment
+    "comment": "Called customer regarding delay",
+    "adminId": "USR001"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Comment added successfully"
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Missing required fields"
+  }
+  ```
+
+### 4.4 Get Timelines
+Get timeline for a specific fulfilment.
+
+- **Method**: `GET`
+- **Endpoint**: `/getTimelines/:fulfilmentId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('VIEW_TIMELINE')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "comment": "Order Verified",
+        "adminId": "USR001",
+        "admin": { "name": "Admin One", "USR_ID": "USR001" },
+        "createdAt": "2024-06-01T10:00:00Z"
       }
     ]
   }
@@ -608,89 +779,234 @@ These endpoints are for Order Management and Task Management.
 
 ---
 
-### 2. Get Order Detail
+## 5. Payments & Invoices
 
+### 5.1 Get Seller Payment Detail
 - **Method**: `GET`
-- **Endpoint**: `/api/fitnearn/web/admin/store/:userId/getOrderDetail/:orderId`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `READ_ORDER`
-
-- **Response**:
+- **Endpoint**: `/fulfilments/:fulfilmentId/seller-payment`
+- **Middlewares**: `authenticateAdminToken`, `authorize('READ_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
     "data": {
-      "isActive": true,
-      "orderId": "ORD123",
-      "state": "NEW",
-      "createdAt": "2024-06-17T09:00:00Z",
-      "assignedTo": "Jane Admin",
-      "assignedToId": "USR123",
-      "status": "Delivered",
-      "orderPlacedAt": "2024-06-17T09:00:00Z",
-      "paymentStatus": "Paid",
-      "productsDetails": [
-        {
-          "productId": "PROD001",
-          "category": "Fitness",
-          "quantity": 1,
-          "size": "M",
-          "color": "Red"
-        }
-      ],
-      "paymentDetails": { ... },
-      "customerDetails": { ... },
-      "timelines": [ ... ],
-      "tasks": [ ... ]
+      "fulfilmentId": "FUL123",
+      "sellerName": "Seller A",
+      "productPurchaseAmount": 500,
+      "fitcartCommissionRate": 10,
+      "calculatedCommissionAmount": 50,
+      "penalty": 0,
+      "finalAmountToSeller": 450,
+      "sellerPaymentStatus": "Pending"
     }
   }
   ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Seller payment record not found"
+  }
+  ```
 
----
-
-### 3. Add Task
+### 5.2 Make Seller Payment
+Updates manual payment info for a seller. Public endpoint (no token required).
 
 - **Method**: `POST`
-- **Endpoint**: `/api/fitnearn/web/admin/store/addEditTask`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `CREATE_TASK`
-
+- **Endpoint**: `/makeSellerPayment`
+- **Middlewares**: None.
+- **Headers**: `Content-Type: application/json`
 - **Request Body**:
-
   ```json
   {
-    "orderId": "ORD123",
-    "taskDetail": "Packing the order",
-    "assignedTo": "USR456",
-    "isActive": true,
-    "taskType": "PROCESSING"
+    "fulfilmentId": "FUL123",
+    "amountPaid": 450,
+    "paymentReferenceId": "TXN999",
+    "paymentMode": "Bank Transfer",
+    "remarks": "Settled"
   }
   ```
-
-- **Response**:
+- **Response** (`200 OK`):
   ```json
   {
     "success": true,
-    "message": "PROCESSING is created successfully",
-    "taskId": "TASK4567"
+    "message": "Payment updated successfully"
+  }
+  ```
+
+### 5.3 Reject Seller Payment
+- **Method**: `POST`
+- **Endpoint**: `/rejectSellerPayment/:fulfilmentId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('REJECT_SELLER_PAYMENT')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "rejectReason": "Invalid Bank Details"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Seller payment rejected successfully (user refunded)",
+    "data": {
+       "fulfilmentId": "FUL123",
+       "sellerPaymentStatus": "Not Applicable",
+       "rejectReason": "Invalid Bank Details"
+    }
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Seller payment record not found"
+  }
+  ```
+
+### 5.4 Initiate Order Refund (Razorpay)
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/razorpay/orderRefund/:fulfilmentId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('INITIATE_REFUND')`
+- **Headers**: `gentoken: <token>`
+- **Request Body**:
+  ```json
+  {
+    "amount": 100 // Optional: partial refund amount
+  }
+  ```
+- **Response** (**Example Success**):
+  ```json
+  {
+    "success": true,
+    "message": "Refund Initiated",
+    "data": { "id": "ref_12345", "status": "processed" }
+  }
+  ```
+
+### 5.5 Generate Invoice (Fulfilment)
+Generate and return the S3 URL of the invoice PDF.
+
+- **Method**: `GET`
+- **Endpoint**: `/fulfilments/:fulfilmentId/invoice`
+- **Middlewares**: `authenticateAdminToken`, `authorize('READ_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": "https://fitnearn-bucket.s3.ap-south-1.amazonaws.com/invoices/INV123.pdf"
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Fulfilment not found"
   }
   ```
 
 ---
 
-### 4. Close Task
+## 6. Miscellaneous
 
-- **Method**: `PATCH`
-- **Endpoint**: `/api/fitnearn/web/admin/store/closeTask/:taskId`
-- **Authentication**: `authenticateAdminToken`
-- **Authorization**: `CLOSE_TASK`
-
-- **Response**:
+### 6.1 Upload Size Guide
+- **Method**: `POST`
+- **Endpoint**: `/uploadSizeGuide`
+- **Middlewares**:
+  - `authenticateAdminToken`
+  - `authorize('UPLOAD_SIZE_GUIDE')`
+  - `idGenerationMiddleware('SIZEID')`
+  - `upload.single('image')`
+- **Headers**:
+  - `gentoken`: `<token>`
+  - `Content-Type`: `multipart/form-data`
+- **Request Body**:
+  - `productType` (Text): "T-Shirt"
+  - `image` (File): The image file.
+  - `key` (Text, optional): "s3-key"
+- **Response** (`201 Created`):
   ```json
   {
     "success": true,
-    "message": "Task TASK1234 is closed successfully"
+    "data": {
+      "productType": "T-Shirt",
+      "image": "https://s3...",
+      "sizeGuideId": "SIZEID123"
+    }
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Product Type is missing"
   }
   ```
 
----
+### 6.2 Get Size Guide
+- **Method**: `GET`
+- **Endpoint**: `/getSizeGuide`
+- **Middlewares**: `authenticateAdminToken`, `authorize('VIEW_SIZE_GUIDE')`
+- **Headers**: `gentoken: <token>`
+- **Query Params**: `productType`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "productType": "T-Shirt", "image": "https://s3..." }
+    ]
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Size Guide not avialable for : <productType>"
+  }
+  ```
+
+### 6.3 Get Admin List
+Used for dropdowns (e.g., assigning tasks).
+
+- **Method**: `GET`
+- **Endpoint**: `/getAdmins`
+- **Middlewares**: `authenticateAdminToken`, `authorize('VIEW_ADMINS')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "name": "Admin One", "USR_ID": "USR001", "role": "SUBADMIN2" }
+    ]
+  }
+  ```
+
+### 6.4 Get Query Details
+Get support queries related to a reference ID.
+
+- **Method**: `GET`
+- **Endpoint**: `/queryDetails/:referenceId`
+- **Middlewares**: `authenticateAdminToken`, `authorize('READ_ORDER')`
+- **Headers**: `gentoken: <token>`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Query details fetched successfully",
+    "queries": [
+      { "queryId": "QRY001", "message": "Where is my order?" }
+    ]
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "No query found for this referenceId"
+  }
+  ```
