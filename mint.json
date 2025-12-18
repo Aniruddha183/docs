@@ -251,7 +251,8 @@
                 "backend/User/user-live-session-api-doc",
                 "backend/User/user-coach-booking-api-doc",
                 "backend/User/user-studio-api-doc",
-                "backend/User/store-api-doc"
+                "backend/User/store-api-doc",
+                "backend/User/api-doc-workout"
 
               ]
             },
