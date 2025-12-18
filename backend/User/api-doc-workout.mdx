@@ -1,0 +1,642 @@
+# Workout Management API Documentation
+
+This document outlines the API endpoints for Workout Access, Equipment, and User Interactions of the FitEarn application.
+
+## Base URL
+```
+/api/fitnearn/web
+```
+_(All endpoints are relative to this base URL unless otherwise specified)_
+
+## Authentication
+
+The API uses Bearer Token authentication for specific protected endpoints (e.g., video playback). Most browsing endpoints are public.
+
+- **Header Key**: `Authorization`
+- **Header Value**: `Bearer [your_jwt_token]`
+
+> **Note**: Only required for endpoints marked with **Headers** section.
+
+---
+
+## 1. Workout Access & Management
+
+### 1.1 Get All Workouts
+Retrieve a list of all available workout videos.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/videos`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "title": "Full Body HIIT",
+        "duration": 45,
+        "views": 150,
+        "WORKOUT_ID": "VID00001"
+      }
+    ]
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.2 Get Workouts by Category
+Retrieve workouts filtered by a specific category.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/videos/:category`
+- **Path Params**: `category`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "title": "Morning Yoga",
+        "category": "Yoga",
+        "WORKOUT_ID": "VID00005"
+      }
+    ]
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.3 Get Workout Details (Public)
+Fetch details of a workout video by its ID. Includes view increment logic.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/video/:videoId`
+- **Path Params**: `videoId`
+- **Query Params**:
+  - `userId` (Optional): ID of the user to check 'isLiked' status.
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "title": "Core Strength",
+      "views": 120,
+      "WORKOUT_ID": "VID00010"
+    },
+    "isLiked": false
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Video not found"
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.4 Get Workout Details (Authenticated)
+Play a video with access check.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/video/details/:videoId/:userId`
+- **Middlewares**: `checkVideoAccess`
+- **Headers**:
+  - `Authorization`: `Bearer [token]`
+- **Path Params**: `videoId`, `userId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "title": "Premium Cardio Session",
+      "videoUrl": "https://signed-url...",
+      "isLiked": true
+    }
+  }
+  ```
+- **Error Response** (`401 Unauthorized`):
+  ```json
+  {
+    "success": false,
+    "message": "Authentication failed"
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Video not found"
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.5 Filter Workouts
+Retrieve workout videos based on multiple filter criteria.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/videos-filter`
+- **Query Params**:
+  - `contentType` (Optional): "Free" or "Premium".
+  - `workoutCategory` (Optional): Filter by category (e.g., "Cardio").
+  - `postedAt` (Optional): "TODAY", "WEEK", or "MONTH".
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Workout videos retrieved successfully",
+    "data": []
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error: [error]"
+  }
+  ```
+
+### 1.6 Get Workouts & Live Sessions
+Fetch a combined list of published workout videos and live sessions.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout-live-sessions`
+- **Query Params**:
+  - `page` (Optional): Page number for pagination.
+  - `contentType` (Optional): "Free" or "Premium".
+  - `searchQuery` (Optional): Search text.
+  - `equipment` (Optional): Array of equipment names.
+  - `level` (Optional): Difficulty level.
+  - `duration` (Optional): Duration range.
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "paginatedContent": [],
+      "metadata": { "currentPage": 1, "totalPages": 5 }
+    }
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.7 Get Similar Workouts
+Fetch workouts from the same category as the specified video.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/video/:videoId/similar`
+- **Path Params**: `videoId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "title": "Similar Yoga Flow", "WORKOUT_ID": "VID00055" }
+    ]
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Workout not found"
+  }
+  ```
+- **Error Response** (`501 Not Implemented`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.8 Get Recommended Workouts
+Fetch top 9 recommended workout videos.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/recommended`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "title": "Trending Workout", "views": 5000 }
+    ]
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error"
+  }
+  ```
+
+### 1.9 Get Workouts by Coach
+Retrieve all published videos for a specific coach.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/by-coach`
+- **Query Params**:
+  - `publisherId` (Required): The ID of the coach/publisher.
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "videos": [
+        { "title": "Coach's Special", "WORKOUT_ID": "VID999" }
+      ]
+    }
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "message": "publisherId is required"
+  }
+  ```
+  _OR_
+  ```json
+  {
+    "success": false,
+    "message": "Data not found"
+  }
+  ```
+- **Logical Error Response** (`200 OK`):
+  ```json
+  {
+    "success": false,
+    "message": "Coach not found or inactive"
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Internal server error."
+  }
+  ```
+
+### 1.10 Report Workout
+Report a workout video for inappropriate content.
+
+- **Method**: `POST`
+- **Endpoint**: `/users/workout/videos/report`
+- **Middlewares**: `idGenerationMiddleware('RPTABUSE')`
+- **Headers**:
+  - `Content-Type`: `application/json`
+- **Query Params**:
+  - `userId`: ID of the user reporting.
+- **Request Body**:
+  ```json
+  {
+    "videoId": "VID12345",
+    "reason": "Inappropriate content"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Workout video reported successfully"
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "message": "Missing required fields",
+    "success": false
+  }
+  ```
+  _OR_
+  ```json
+  {
+    "message": "Workout video already reported",
+    "success": false
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "message": "User not found",
+    "success": false
+  }
+  ```
+  _OR_
+  ```json
+  {
+    "message": "Workout video not found",
+    "success": false
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Error reporting workout video: [details]",
+    "success": false
+  }
+  ```
+
+---
+
+## 2. Interaction & Metrics
+
+### 2.1 Like/Unlike Workout
+Toggle the like status of a workout video.
+
+- **Method**: `POST`
+- **Endpoint**: `/users/workout/videos/likes/:userId`
+- **Headers**:
+  - `Content-Type`: `application/json`
+- **Path Params**: `userId`
+- **Request Body**:
+  ```json
+  { "videoId": "VID12345" }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Workout liked successfully",
+    "data": ["VID12345", "VID67890"]
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "success": false,
+    "message": "Invalid parameters"
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "Workout not found"
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "message": "Internal server error: [details]"
+  }
+  ```
+
+### 2.2 Get Liked Workouts
+Retrieve full details of all videos liked by a user.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/videos/get/likes/:userId`
+- **Path Params**: `userId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "User liked workout videos are:",
+    "data": [
+      { "title": "Liked Video 1", "WORKOUT_ID": "VID12345" }
+    ]
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "success": false,
+    "message": "No liked videos found"
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "success": false,
+    "error": "Failed to fetch liked workout videos."
+  }
+  ```
+
+### 2.3 Increment Share Count
+Increment the share count for a specific workout.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/users/workout/increment-share/:workoutId`
+- **Path Params**: `workoutId`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Share count incremented successfully",
+    "shares": 56
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "message": "Workout not found",
+    "success": false
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Internal Server Error: [details]",
+    "success": false,
+    "error": true
+  }
+  ```
+
+### 2.4 Increment View Count
+Increment the view count for a specific workout.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/users/workout/increment-view/:workoutId`
+- **Headers**:
+  - `Content-Type`: `application/json`
+- **Path Params**: `workoutId`
+- **Request Body**:
+  ```json
+  { "USR_ID": "USR001" }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "success": true,
+    "message": "Workout view incremented successfully",
+    "views": 151
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "message": "Workout not found",
+    "success": false
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Internal Server Error: [details]",
+    "success": false,
+    "error": true
+  }
+  ```
+
+---
+
+## 3. Equipment Management
+
+### 3.1 Add Equipment
+Add new equipment to the system.
+
+- **Method**: `POST`
+- **Endpoint**: `/users/workout/equipment/add`
+- **Headers**:
+  - `Content-Type`: `application/json`
+- **Request Body**:
+  ```json
+  {
+    "description": "A pair of 5kg dumbbells",
+    "equipment": "Dumbbells"
+  }
+  ```
+- **Response** (`201 Created`):
+  ```json
+  {
+    "message": "Equipment added successfully",
+    "data": { "_id": "EQ123", "equipment": "Dumbbells" }
+  }
+  ```
+- **Error Response** (`400 Bad Request`):
+  ```json
+  {
+    "message": "Description and equipment are required."
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Server error, please try again later."
+  }
+  ```
+
+### 3.2 Get Equipment
+Fetch all available equipment.
+
+- **Method**: `GET`
+- **Endpoint**: `/users/workout/equipment/get`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "message": "Equipment fetched successfully",
+    "data": [
+      { "_id": "EQ123", "equipment": "Dumbbells", "description": "..." }
+    ]
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Server error, please try again later."
+  }
+  ```
+
+---
+
+## 4. Notifications
+
+### 4.1 Get Notifications
+Retrieve all notifications for a specific user.
+
+- **Method**: `GET`
+- **Endpoint**: `/notifications/:userId`
+- **Path Params**: `userId`
+- **Response** (`200 OK`):
+  ```json
+  [
+    {
+      "notificationId": "NOTIF001",
+      "title": "Welcome",
+      "body": "Welcome to FitEarn...",
+      "isRead": false,
+      "timestamp": "2024-01-01T10:00:00Z"
+    }
+  ]
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "message": "No notifications found for the user."
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Internal server error."
+  }
+  ```
+
+### 4.2 Mark Notification as Read
+Mark a specific notification as read.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/notifications/mark-as-read`
+- **Headers**:
+  - `Content-Type`: `application/json`
+- **Request Body**:
+  ```json
+  {
+    "userId": "USR001",
+    "notificationId": "NOTIF001"
+  }
+  ```
+- **Response** (`200 OK`):
+  ```json
+  {
+    "message": "Notification marked as read.",
+    "notification": { "notificationId": "NOTIF001", "isRead": true }
+  }
+  ```
+- **Error Response** (`404 Not Found`):
+  ```json
+  {
+    "message": "User not found."
+  }
+  ```
+  _OR_
+  ```json
+  {
+    "message": "Notification not found."
+  }
+  ```
+- **Error Response** (`500 Internal Server Error`):
+  ```json
+  {
+    "message": "Internal server error."
+  }
+  ```
