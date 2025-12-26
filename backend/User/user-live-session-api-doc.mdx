@@ -1,434 +1,320 @@
 ---
-title: "User Live Session Api Documentation "
-description: "REST API reference for User Live Session."
+
+title: "User Live Session (Public Session) API Documentation"
+description: "REST API reference for user-facing Public Live Session endpoints (bookings, seats, attendance, like/share/report, meetlink and refunds)."
 ---
 
-# User Live Session API
+# User Live Session (Public Session)
 
-This document outlines the API endpoints available to **Users** in website: 'fitnearn.com'
+This document describes **only** the public-session routes you supplied. Each endpoint lists required headers, params, example request body (when applicable), a short functioning description (what it does and how), example success shape and common errors.
 
 ---
 
 ## Base URL
 
+Routes use full paths as defined in the router. Example base segments used here:
+
 ```
-/api/fitnearn/web
+/api/fitnearn/web/users/session
+/api/fitnearn/web/user/session
+/api/fitnearn/web/user/seats
+/api/fitnearn/web/users
 ```
 
 ---
+
+## Required headers
+
+* `Authorization: Bearer <token>` — required for endpoints that need the authenticated user (likes, attend, add-participant, cancel, refunds, upcoming/past/get). Some listing endpoints (getAllPublicSessions) work without auth but will return fewer personalized fields.
+* `Content-Type: application/json` for JSON bodies.
+
 ---
 
-## Middleware
+## Models referenced (selected)
 
-### `idGenerationMiddleware('BID')`
-- **Purpose**: Generates a unique Booking ID (`BIDxxxxx`) for new session bookings by user, acting as payment receipt.
-- **Usage**: Applied to the booking creation endpoint.
+* `PublicSession` — session metadata: `sessionId`, `title`, `description`, `coachId`, `date`, `startTime`, `endTime`, `seats`, `bookedSeats`, `meetingLink`, `status`.
+* `UserBooking` / `UserBookedSession` — per-user booking record with `sessionId`, `bookingId`, `userId`, `orderId`, `paymentId`, `status`.
+* `BookedSlot` — used by seat/time availability checks.
 
 ---
 
 ## Endpoints
 
-### 1. Fetch All Published Live Sessions & Workouts
+### 1) Cancel User Public Session
 
-Fetches all published workout videos and live sessions, with filtering and pagination.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/session/public/cancel`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body (example)**
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/workout-live-sessions`
-- **Controller**: `displayWorkoutAndLiveSessions`
-- **Query Params** (all optional):
-  - `showLiveSessions` (`true`/`false`)
-  - `outerFilter`, `internalFilter` (category filters, comma-separated)
-  - `postedAt` (`TODAY`, `WEEK`, `MONTH`)
-  - `equipment`, `level`, `intensityLevel`, `duration`, `focusArea`, `calories` (comma-separated)
-  - `searchQuery` (string)
-  - `contentType` (`Free`, `Premium`)
-  - `page` (number, default: 1)
-- **Headers**: `Authorization` (optional, for like status)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "videos": [ ...workoutVideoObjects ],
-      "liveSessions": [ ...liveSessionObjects ]
-    },
-    "metadata": {
-      "currentPage": 1,
-      "totalPages": 5,
-      "hasNextPage": true,
-      "categoryCounts": {
-        "freeVideos": 10,
-        "liveSessions": 5,
-        "premiumVideos": 8
-      },
-      "totalLiveSessions": 5
-    }
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+```json
+{ "sessionId": "LIV00045", "userId": "USR00123", "cancelReason": "Emergency" }
+```
+
+**Functioning**
+
+* Validates booking belongs to the `userId`.
+* Updates booking record status to `cancelled`, decrements `PublicSession.bookedSeats` and optionally triggers refund eligibility / refund job.
+* Returns cancellation confirmation and refund eligibility summary.
+
+**Example success**
+
+```json
+{ "success": true, "message": "Session cancelled", "refundEligible": true }
+```
+
+**Common errors**: `400` too late to cancel, `404` booking not found, `500` server error.
 
 ---
 
-### 2. Book a Live Session
+### 2) Like & Dislike Session
 
-Books a public live session for a user (creates a booking/receipt).
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/like/:sessionId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `sessionId`
+* **Body (example)**
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/booking/add`
-- **Middleware**: `idGenerationMiddleware('BID')`
-- **Controller**: `confirmBooking`
-- **Request Body**:
-  - `paymentId`, `userId`, `grandTotal`, `payment_mode`, `seats`, `note`, `currency`, `sessionId`, `orderId`, `sessionType` (must be `Live Session`)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": { ...bookingObject }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing required fields.
-  - `404 Not Found`: Session not found.
-  - `409 Conflict`: Duplicate booking.
-  - `500 Internal Server Error`
+```json
+{ "action": "add" } // or "remove"
+```
+
+**Functioning**
+
+* Adds or removes the authenticated user's id from `PublicSession.likedUsers`, increments/decrements `PublicSession.likes`.
+* Returns `{ isLiked, likes }` for current state.
+
+**Common errors**: `400` invalid action, `404` session not found.
 
 ---
 
-### 3. Add User to Public Session (Register)
+### 3) Add Participants to a Public Session
 
-Registers a user for a public live session.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/users/session/add-participant`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body (example)**
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/session/add-participant`
-- **Controller**: `addParticipantsToSession`
-- **Request Body**:
-  - `sessionId`, `userId`, `sessionType` (`public`)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Participants added successfully",
-    "session": { ...publicSessionObject }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session not found.
-  - `400 Bad Request`: User already registered.
-  - `500 Internal Server Error`
+```json
+{ "sessionId": "LIV00045", "participants": ["a@b.com","c@d.com"], "userId": "USR00123" }
+```
+
+**Functioning**
+
+* For each email: validate format, check registration (optional), add to `PublicSession.participantEmail` using `$addToSet`, and increment `bookedSeats` accordingly.
+* If seats are insufficient, operation fails with `409` and no partial adds (controller may be transactional or rollbacks applied).
+* Sends invites/notifications with meeting link if session has `meetingLink`.
+
+**Common errors**: `409` insufficient seats, `404` session not found.
 
 ---
 
-### 4. Check Public Live Session Seats & Registration
+### 4) Share Session
 
-Checks if a user is registered for a public session and if seats are available.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/share/:sessionId`
+* **Headers**: optional `Authorization`
+* **URL Params**: `sessionId`
+  **Functioning**
+* Increments `PublicSession.shareCount` or logs a share event for analytics. If authenticated, also logs who shared.
+* Lightweight endpoint; returns updated `shareCount`.
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/session/check-seats/:sessionId`
-- **Controller**: `checkPublicLiveSessionSeats`
-- **Headers**: `Authorization` (for userId)
-- **Params**:
-  - `sessionId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Seats available",
-    "success": true,
-    "isRegistered": false,
-    "isStarted": false
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session not found.
-  - `400 Bad Request`: Already registered or no seats available.
-  - `500 Internal Server Error`
+**Common errors**: `404` session not found.
 
 ---
 
-### 5. Cancel User's Public Session Registration
+### 5) Report Session (abuse)
 
-Cancels a user's registration for a public live session.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/report/:sessionId`
+* **Middleware**: `idGenerationMiddleware('RPTABUSE')` (report id generator)
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `sessionId`
+* **Body (example)**
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/session/cancel`
-- **Controller**: `cancelUserPublicSession`
-- **Request Body**:
-  - `userId`, `sessionId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Unsubscribed Public session"
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Already unsubscribed.
-  - `404 Not Found`: Session not found.
-  - `500 Internal Server Error`
+```json
+{ "reporterId": "USR00123", "reason": "inappropriate content", "details": "..." }
+```
 
----
+**Functioning**
 
-### 6. Like/Dislike a Live Session
+* Creates a report record with generated id, stores reason and reporter metadata, flags the session for moderation.
+* Returns report id and confirmation.
 
-Likes or dislikes a public live session for a user.
-
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/session/:sessionId/like`
-- **Controller**: `likeAndDislikeSession`
-- **Params**:
-  - `sessionId`
-- **Request Body**:
-  - `userId`, `action` (`like` or `dislike`)
-- **Success Response**:
-  ```json
-  {
-    "message": "Session liked successfully"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session or user not found.
-  - `400 Bad Request`: Already liked/disliked or invalid action.
-  - `500 Internal Server Error`
+**Common errors**: `400` missing reason, `404` session not found.
 
 ---
 
-### 7. Report a Live Session
+### 6) Check Session MeetLink & Refund Flow
 
-Reports a public live session for inappropriate content.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/meetlink/:sessionId`
+* **Headers**: optional `Authorization`
+* **URL Params**: `sessionId`
+* **Body (example)**
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/session/:sessionId/report`
-- **Controller**: `reportSession`
-- **Params**:
-  - `sessionId`
-- **Request Body**:
-  - `userId`, `reason`
-- **Success Response**:
-  ```json
-  {
-    "message": "Session reported successfully"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session or user not found.
-  - `400 Bad Request`: Already reported.
-  - `500 Internal Server Error`
+```json
+{ "userId":"USR00123", "meetingLink": "https://meet.example/abc123" }
+```
+
+**Functioning**
+
+* Validates the provided `meetingLink` against stored `PublicSession.meetingLink` and checks access rights.
+* If link invalid or session not started, may mark user booking for refund eligibility depending on business rules. Returns `{ valid: boolean, refundEligible: boolean }`.
+
+**Common errors**: `403` access denied, `404` session not found.
 
 ---
 
-### 8. Get User's Upcoming Public Sessions
+### 7) Attend Session (increment attendance)
 
-Fetches all upcoming public sessions for a user.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/attend/:sessionId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `sessionId`
+* **Body (optional)**
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/session/upcoming/:userId`
-- **Controller**: `getUserUpcomingSessions`
-- **Params**:
-  - `userId`
-- **Success Response**:
-  ```json
-  {
-    "publicSession": [ ...publicSessionObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+```json
+{ "userId": "USR00123" }
+```
 
----
+**Functioning**
 
-### 9. Get User's Past Public Sessions
+* Marks the user's attendance for the session and increments attendance metrics. Useful for rewards or analytics.
+* Typically guarded by time window checks (only increment during session or within X minutes after start).
 
-Fetches all past public sessions for a user.
-
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/session/past/:userId`
-- **Controller**: `getUserPastSessions`
-- **Params**:
-  - `userId`
-- **Success Response**:
-  ```json
-  {
-    "publicSession": [ ...publicSessionObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+**Common errors**: `400` outside attendance window, `404` session not found.
 
 ---
 
-### 10. Get Public Session Details
+### 8) Check Refund Eligibility
 
-Fetches details of a specific public session, including like status, registration, and recommendations.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/session/refund/:sessionId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `sessionId`
+  **Functioning**
+* Returns refund eligibility and amount (full/partial/none) based on cancellation policy, session time vs cutoff, and booking/payment state.
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/session/:sessionId`
-- **Controller**: `getSessionBySessionId`
-- **Params**:
-  - `sessionId`
-- **Query Params**:
-  - `userId` (optional, for like/registration status)
-- **Success Response**:
-  ```json
-  {
-    "data": {
-      "session": { ...publicSessionObject },
-      "bookingDetails": [ ...bookingObjects ],
-      "isLiked": true,
-      "isGroupSession": false,
-      "coachData": { "coachProfile": "...", "coachLevel": "..." },
-      "participantCount": 5,
-      "recommendedSessions": [ ...publicSessionObjects ]
-    },
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session not found.
-  - `500 Internal Server Error`
+**Example success**
+
+```json
+{ "eligible": true, "refundAmount": 150.0 }
+```
+
+**Common errors**: `404` booking/session not found.
 
 ---
 
-### 11. Get All Bookings (Receipts) for a User
+### 9) Get User Upcoming Sessions
 
-Fetches all payment receipts/bookings for a user.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/session/upcoming/:userId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `userId`
+* **Query params (optional)**: `page`, `limit`
+  **Functioning**
+* Returns upcoming sessions for the user (both public & private) including session meta and booking info. Enriches with `canJoin`, `meetingLink` (if allowed), and `isBooked` flags.
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/bookings/all/:userId`
-- **Controller**: `getAllBookingsByUserId`
-- **Params**:
-  - `userId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": [ ...bookingObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: No bookings found.
-  - `500 Internal Server Error`
+**Common errors**: `403` when token user mismatch, `404` none found.
 
 ---
 
-### 12. Get Booking by Booking ID
+### 10) Get User Past Sessions
 
-Fetches a payment receipt/booking by bookingId.
-
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/bookings/:bookingId`
-- **Controller**: `getBookingByBookingId`
-- **Params**:
-  - `bookingId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": { ...bookingObject }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Booking not found.
-  - `500 Internal Server Error`
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/session/past/:userId`
+* **Headers**: `Authorization`
+* **URL Params**: `userId`
+  **Functioning**
+* Returns completed or cancelled sessions for the user with attendance and payment summaries.
 
 ---
 
-### 13. Get All Bookings for a Session
+### 11) Get All User Bookings
 
-Fetches all payment receipts/bookings for a session.
-
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/bookings/session/:sessionId`
-- **Controller**: `getBookingsBySessionId`
-- **Params**:
-  - `sessionId`
-- **Query Params**:
-  - `userId` (optional)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": [ ...bookingObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: No bookings found.
-  - `500 Internal Server Error`
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/session/get/:userId`
+* **Headers**: `Authorization`
+* **URL Params**: `userId`
+  **Functioning**
+* Aggregates all bookings for the user (upcoming, past, cancelled) and returns minimal per-booking fields for lists.
 
 ---
 
-### 14. Get Discount Percent for User
+### 12) Get Session By SessionId
 
-Fetches the discount percent for a user based on their subscription plan.
-
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/subscription/get/:userId`
-- **Controller**: `getDiscountPercent`
-- **Params**:
-  - `userId`
-- **Success Response**:
-  ```json
-  {
-    "discountPercent": 10,
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: User or subscription not found.
-  - `500 Internal Server Error`
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/session/:sessionId`
+* **Headers**: optional `Authorization` — when present, returns user-specific flags
+* **URL Params**: `sessionId`
+  **Functioning**
+* Returns full session details including coach info, seat counts, booking status for caller (if booked), `isLiked` (if auth), and whether user can join.
 
 ---
 
-### 15. Check Refund Eligibility for a Session
+### 13) Check Public Live Session Seats (availability)
 
-Checks if a session is eligible for refund (must be more than 24 hours before session start).
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/user/seats/:sessionId`
+* **Headers**: optional `Authorization`
+* **URL Params**: `sessionId`
+* **Query params**: `date` (DD-MM-YYYY), `timeSlot` (HH:mm-HH:mm) — depends on implementation
+  **Functioning**
+* Returns seat availability and whether the requested timeslot is free. Uses `BookedSlot` and current `PublicSession.bookedSeats` to compute availability.
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/session/check-refund/:sessionId`
-- **Controller**: `checkRefundEligibility`
-- **Params**:
-  - `sessionId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Refund allowed",
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session not found.
-  - `400 Bad Request`: No refund allowed within 24 hours.
-  - `500 Internal Server Error`
+**Common errors**: `400` invalid params.
 
 ---
 
-## Notes
+### 14) Get User Cancelled Sessions
 
-- All endpoints are for Public Live Sessions only (no PrivateSession or Studio).
-- Most endpoints require user authentication via JWT in the `Authorization` header.
-- Only the correct user can access or modify their own bookings/sessions.
-- File upload is not required for live session APIs.
-- Notification and email utilities are used for confirmations and reminders.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/cancelled-sessions/:userId`
+* **Headers**: `Authorization`
+* **URL Params**: `userId`
+  **Functioning**
+* Returns sessions the user had cancelled or that were cancelled for them, with `cancelReason` and `refundStatus`.
+
+---
+
+### 15) Get All Public Sessions (listing)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/user/session/public/get`
+* **Headers**: optional `Authorization`
+* **Query params**: `page`, `limit`, `category`, `from`, `to`, `sort`
+  **Functioning**
+* Returns paginated list of public sessions available for booking. If `Authorization` present, includes personalized flags (`isBooked`, `isLiked`).
+
+---
+
+## Notes & Implementation considerations
+
+* All authenticated endpoints must verify the token maps to the `userId` in the request when present — return `403` on mismatch.
+* Seat/availability checks must be consistent with `BookedSlot` to avoid overbooking — use DB-level atomic ops or transactions on check-and-reserve flows.
+* Refund eligibility and meetlink validation rules are business-specific; controllers return clear `reason` fields on rejection.
 
 ---
 
 ## Summary Table
 
-| Method | Endpoint                                              | Description                                 | Required Headers                |
-|--------|-------------------------------------------------------|---------------------------------------------|---------------------------------|
-| GET    | `/api/fitnearn/web/users/workout-live-sessions`       | Fetch all published live sessions & workouts| Authorization (optional)        |
-| POST   | `/api/fitnearn/web/users/booking/add`                 | Book a live session                        |                                 |
-| PATCH  | `/api/fitnearn/web/users/session/add-participant`     | Register user for public session            |                                 |
-| GET    | `/api/fitnearn/web/users/session/check-seats/:sessionId` | Check session seats & registration      | Authorization                   |
-| POST   | `/api/fitnearn/web/users/session/cancel`              | Cancel user's public session registration   |                                 |
-| PATCH  | `/api/fitnearn/web/users/session/:sessionId/like`     | Like/dislike a live session                 |                                 |
-| PATCH  | `/api/fitnearn/web/users/session/:sessionId/report`   | Report a live session                       |                                 |
-| GET    | `/api/fitnearn/web/users/session/upcoming/:userId`    | Get user's upcoming public sessions         |                                 |
-| GET    | `/api/fitnearn/web/users/session/past/:userId`        | Get user's past public sessions             |                                 |
-| GET    | `/api/fitnearn/web/users/session/:sessionId`          | Get public session details                  |                                 |
-| GET    | `/api/fitnearn/web/users/bookings/all/:userId`        | Get all bookings for a user                 |                                 |
-| GET    | `/api/fitnearn/web/users/bookings/:bookingId`         | Get booking by bookingId                    |                                 |
-| GET    | `/api/fitnearn/web/users/bookings/session/:sessionId` | Get all bookings for a session              |                                 |
-| GET    | `/api/fitnearn/web/users/subscription/get/:userId`    | Get discount percent for user               |                                 |
-| GET    | `/api/fitnearn/web/users/session/check-refund/:sessionId` | Check refund eligibility               |                                 |
+| Method | Endpoint                            | Purpose                          |
+| ------ | ----------------------------------- | -------------------------------- |
+| POST   | `/public/cancel`                    | Cancel a user's public booking   |
+| PATCH  | `/user/session/like/:sessionId`     | Like/dislike session             |
+| PATCH  | `/users/session/add-participant`    | Add participants to session      |
+| PATCH  | `/user/session/share/:sessionId`    | Share session (analytics)        |
+| PATCH  | `/user/session/report/:sessionId`   | Report session (abuse)           |
+| PATCH  | `/user/session/meetlink/:sessionId` | Validate meetLink / refund check |
+| PATCH  | `/user/session/attend/:sessionId`   | Increment attendance             |
+| GET    | `/users/session/refund/:sessionId`  | Check refund eligibility         |
+| GET    | `/users/session/upcoming/:userId`   | Get user's upcoming sessions     |
+| GET    | `/users/session/past/:userId`       | Get user's past sessions         |
+| GET    | `/users/session/get/:userId`        | Get all bookings for user        |
+| GET    | `/users/session/:sessionId`         | Get session details              |
+| GET    | `/user/seats/:sessionId`            | Check seats / timeslot           |
+| GET    | `/users/cancelled-sessions/:userId` | Get user's cancelled sessions    |
+| GET    | `/user/session/public/get`          | List public sessions             |
 
 ---

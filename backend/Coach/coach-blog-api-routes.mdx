@@ -1,254 +1,275 @@
 ---
-title: "Coach Blog Api Documentation "
-description: "REST API reference for Coach Blog."
+
+title: "Coach Blog API Documentation"
+description: "REST API reference for Coach Blog module (coach-side blog creation, image uploads, versioning and submit-for-review flows)."
 ---
 
-# Coach Blog API
+# Coach Blog
 
-This document outlines the API endpoints available to **Coaches** in Blog feature
+APIs used by **coaches** to create, edit, version, upload images for, and submit blog posts for review. This file documents only the routes and controllers present in the coach blog route file and explains how the presigned upload flow and the `saveBlogPost` image-cleanup logic work.
 
 ---
 
 ## Base URL
 
 ```
-/api/fitnearn/web/coach
+/api/fitnearn/web/coach/blog
 ```
 
 ---
 
----
+## Shared middleware & utilities (remembered)
 
-## Authentication & Token Requirements
-
-Most endpoints require a valid **JWT identity token** in the `Authorization` header (format: `Bearer <token>`), especially for file/image upload and blog creation. Some endpoints also require `x-refresh-token` and `x-username` headers for AWS credential refresh.
-
----
-
-## Middleware
-
-### `multer.memoryStorage()`
-- **Purpose**: Handles file uploads in memory for image and thumbnail uploads.
-- **Usage**: Used in endpoints that upload images or thumbnails (e.g., `upload-file`, `create-blog`).
+* `authenticateAdminToken` / `authenticateCoachToken` — (auth middleware exists in project; coach endpoints should check coach identity).
+* `authorize(...)` — permission checks when applicable.
+* `upload.single('image')` (from `imageHandler`) — used for server-side uploads.
+* `getPresignedUploadUrl`, `uploadImage`, `deleteImageFromS3` — S3 helpers from `imageHandler` used across upload and cleanup flows.
+* `generateUniqueSequence` — used to build blog IDs and version IDs.
+* `Blog`, `BlogImage`, `ProfileModel`, `AdminBlogReview` — primary models used by these controllers.
 
 ---
 
-## Utility Functions
+## Models used (selected from `index.d.ts` — only what the controller imports)
 
-### `uploadImage`
-- **Purpose**: Uploads an image buffer to AWS S3, handling token verification and credential refresh if needed.
-- **Inputs**: `buffer`, `mimeType`, `userId`, `identityToken`, `uploadContext`, `refreshToken`, `username`, `folderName`, `contentId?`
-- **Returns**: `{ location, key }` (S3 URL and object key)
-- **Notes**: Handles token expiration and AWS credential retrieval.
+### `IBlog` (`Blog`)
 
-### `deleteImageFromS3`
-- **Purpose**: Deletes an image from AWS S3 using its object key.
-- **Inputs**: `key` (S3 object key)
-- **Returns**: None (throws error on failure)
+* `blogId`, `_id` — identifiers
+* `title`, `content` (rich-text / delta or HTML), `thumbnail` (string url)
+* `authorId`, `authorName`
+* `stage`, `status` (draft | under_review | approved | published)
+* `version`, `previousVersionId`, `isVersioned`
+* `tags`, `category`, `images` (array refs)
+
+### `IBlogImage` (`BlogImage`)
+
+* `blogId`, `images[]` — array of `{ url, key, imageId, uploadedBy }` records that track coach uploads
+* Used to track images uploaded while composing a blog so unused images can be cleared later.
+
+### `IAdminBlogReview` (`AdminBlogReview`)
+
+* Stores review records when a blog is sent to admin for review.
 
 ---
 
-## Endpoints
+## Routes (exact routes from `coachBlogRoutes.ts`)
+
+* `POST /api/fitnearn/web/coach/blog/create-blog` — Create Draft Blog (controller: `createDraftBlog`)
+* `POST /api/fitnearn/web/coach/blog/upload-file` — Server-side image upload (controller: `uploadFile`)
+* `POST /api/fitnearn/web/coach/blog/upload-file` — (there is also a pre-signed flow: `preSignedUploadFile` controller used by the route file)
+* `POST /api/fitnearn/web/coach/blog/delete-blog` — Delete Blog (controller: `deleteBlog`)
+* `POST /api/fitnearn/web/coach/blog/version-blog/:blogId` — Create new Blog Version (controller: `versionBlog`)
+* `PATCH /api/fitnearn/web/coach/blog/save-blog` — Save (finalize) blog and send for review (controller: `saveBlogPost`)
+* `PATCH /api/fitnearn/web/coach/blog/update-blog` — Update blog draft/content (controller: `updateBlog`)
+* `GET /api/fitnearn/web/coach/blog/coach-blog/:coachId` — Get blogs by coach (controller: `getBlogsByCoach`)
+* `GET /api/fitnearn/web/coach/blog/get/:blogId` — Get blog by id (controller: `getBlogByBlogId`)
+
+---
+
+## Endpoints & Functioning (detailed)
 
 ### 1. Create Draft Blog
-Creates a new draft blog or updates an existing one.
-- **Method**: `POST`
-- **URL**: `/create-blog`
-- **Middleware**: `multer.memoryStorage()` (for `thumbnail` upload)
-- **Controller**: `createDraftBlog`
-- **Headers**: `Authorization: Bearer <token>`, `x-refresh-token`, `x-username`
-- **Request Body**:
-  - `title`, `category`, `readTime`, `coachId`, `blogHeading`, `blogId?`, `tags?`, `thumbnail` (file)
-- **Success Response**:
-  ```json
-  { "success": true, "message": "Blog created successfully", "blogId": "BLG00001" }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing coachId or required fields
-  - `401 Unauthorized`: Missing or invalid token
-  - `404 Not Found`: Coach not found
-  - `500 Internal Server Error`
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/blog/create-blog`
+* **Controller**: `createDraftBlog`
+
+**Functioning**
+
+* Accepts coach-provided draft data (title, summary, content, category, tags, optional thumbnail) and minimal metadata required to persist a draft.
+* If no `blogId` exists, a new `blogId` is generated using `generateUniqueSequence`.
+* Saves a `Blog` document with `stage: 'draft'` and `status: 'draft'` and returns the saved draft for later editing.
+* Note: images uploaded while drafting are tracked separately in `BlogImage`; the draft save does not immediately remove any uploaded images.
+
+**Success**: `200` with created/updated draft object.
 
 ---
 
-### 2. Upload Image File
-Uploads an image file to S3 for use in a blog.
-- **Method**: `POST`
-- **URL**: `/upload-file`
-- **Middleware**: `multer.memoryStorage()` (for `image` upload)
-- **Controller**: `uploadFile`
-- **Headers**: `Authorization: Bearer <token>`, `x-refresh-token`, `x-username`
-- **Request Body**:
-  - `coachId`, `blogId`, `image` (file)
-- **Success Response**:
-  ```json
-  { "success": true, "file": { "url": "<s3_url>" } }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing coachId or file
-  - `401 Unauthorized`: Missing or invalid token
-  - `500 Internal Server Error`
+### 2. Presigned Upload — Generate Upload URL (preSignedUploadFile)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/blog/upload-file` (used for both pre-signed and direct server uploads; the controller `preSignedUploadFile` creates presigned URLs)
+* **Controller**: `preSignedUploadFile`
+* **Request Body**: `coachId` (required), `blogId` (optional), `mimeType` (recommended)
+
+**Functioning (presigned flow)**
+
+1. **Request**: Client asks server for a presigned upload URL, supplying `coachId` (and `blogId` if available) and the file `mimeType`.
+2. **Server generates a key & signed URL**: the controller calls `getPresignedUploadUrl` (in `imageHandler`) which:
+
+   * generates a unique S3 key (often namespaced by `coachId` and timestamp),
+   * prepares a `PutObject` command for S3, and
+   * uses AWS SDK's `getSignedUrl` to return a presigned URL that allows a direct client `PUT` to S3 for a limited time.
+3. **Save tracking entry**: the controller creates or updates a `BlogImage` record for `blogId` (or a temporary working record) that includes a placeholder entry for the image with its expected `url` and `key`. This lets the backend later reconcile which uploaded images are actually referenced in the blog content.
+4. **Response**: server returns the presigned URL, the S3 `key` and the `url` the client will use after upload.
+
+**Client-side next step (must be performed by frontend)**
+
+* The client performs an HTTP `PUT` to the returned presigned URL with the raw file bytes and proper `Content-Type` header.
+* After successful `PUT`, the image is available in the S3 bucket at the returned object key.
+* Optionally the client may call a server endpoint (or rely on `saveBlogPost`) so the server ensures the `BlogImage` record references a successful upload (the controller design in this project tracks the placeholder earlier, so explicit confirmation may not be required).
+
+**Why use presigned URLs?**
+
+* Offloads binary upload bandwidth from your servers to S3 and avoids passing large files through the backend.
+* Allows the client to upload directly to S3 with limited-time credentials.
+
+**Security notes**
+
+* The presigned URL is time-limited. The controller sets an expiry (e.g., 5–15 minutes). If upload fails, request a new presigned URL.
+* The server should validate `coachId` and ensure the generated key namespace prevents accidental overwrites.
 
 ---
 
-### 3. Delete Blog
-Deletes a blog by its ID.
-- **Method**: `POST`
-- **URL**: `/delete-blog`
-- **Controller**: `deleteBlog`
-- **Request Body**:
-  - `blogId`
-- **Success Response**:
-  ```json
-  { "message": "Blog deleted successfully" }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found
-  - `500 Internal Server Error`
+### 3. Server-side Upload (uploadFile)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/blog/upload-file`
+* **Controller**: `uploadFile` (handles multipart/server-forwarded uploads)
+* **Request**: multipart/form-data with `image` file and `coachId`, `blogId` in the body
+
+**Functioning (server upload flow)**
+
+* The controller accepts file bytes in `req.file` (via multer memory storage), calls `uploadImage` in `imageHandler` to write the object to S3, and then persists a `BlogImage` entry recording `url`, `key`, `uploadedBy`, and timestamps.
+* Returns the S3 `location` (public `url`) and metadata so the client can immediately reference the image in the draft content.
+
+**When to use**
+
+* When direct client-to-S3 upload is not possible (legacy clients) or the application wants the server to validate or transform images before persist.
 
 ---
 
-### 4. Create Blog Version
-Creates a new version of a blog.
-- **Method**: `POST`
-- **URL**: `/version-blog/:blogId`
-- **Controller**: `versionBlog`
-- **Params**: `blogId`
-- **Success Response**:
-  ```json
-  { "message": "Blog version created successfully", "data": { ...blogObject }, "success": true }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found
-  - `400 Bad Request`: Version already exists in review
-  - `500 Internal Server Error`
+### 4. Update Blog (draft edits)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/coach/blog/update-blog`
+* **Controller**: `updateBlog`
+* **Request Body**: `blogId`, updated fields (title, content, thumbnail, tags, etc.)
+
+**Functioning**
+
+* Applies allowed updates to the `Blog` draft, saves `updatedAt`, and returns the updated draft.
+* Does not perform image cleanup — that is handled by `saveBlogPost` when the coach finalizes the blog for review.
 
 ---
 
-### 5. Save Blog Post (Send for Review)
-Removes deleted images from S3 and sends blog for review.
-- **Method**: `PATCH`
-- **URL**: `/save-blog`
-- **Controller**: `saveBlogPost`
-- **Request Body**:
-  - `blogId`, `outputData` (array of content blocks)
-- **Success Response**:
-  ```json
-  { "message": "Blog post saved successfully", "data": { ...blogObject }, "success": true }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Invalid outputData
-  - `500 Internal Server Error`
+### 5. Save Blog Post (finalize & send for admin review)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/coach/blog/save-blog`
+* **Controller**: `saveBlogPost`
+* **Request Body**: `blogId`, `content` (finalized rich-text / delta), `thumbnail` (string) and any final metadata
+
+**Functioning (key steps & image cleanup logic)**
+
+1. **Fetch tracked uploads**: The controller fetches the `BlogImage` record for the `blogId`. That document contains an array of uploaded images (each with `url` and `key`) that the coach uploaded during drafting.
+2. **Parse final content for used images**:
+
+   * The controller parses the submitted `content` (commonly a Quill Delta or HTML) and extracts all image `url`s referenced inside the content blocks.
+   * It also includes the `thumbnail` URL (the primary cover image) in the list of in-use images.
+3. **Compare & find redundant images**:
+
+   * Build `currentImageUrls` = list of all image URLs tracked in `BlogImage.images`.
+   * Build `newImageUrls` = list of image URLs referenced in the final `content` plus the `thumbnail`.
+   * Compute `urlsToDelete = currentImageUrls - newImageUrls` (images tracked as uploaded but not referenced in final content).
+4. **Delete redundant images from S3**:
+
+   * For each URL/key found in `urlsToDelete`, the controller calls `deleteImageFromS3(key)` (via `imageHandler`) to remove the object from S3.
+   * It also removes the reference from `BlogImage.images` so the DB state matches S3.
+5. **Keep in-use images**:
+
+   * Images present in `newImageUrls` are retained and their DB records remain associated with the `Blog`.
+6. **Finalize blog stage & review record**:
+
+   * After cleaning up unused uploads, the controller updates the `Blog` record: sets `stage` to `under_review` (or whatever workflow state your app uses) and stores the `content`, `thumbnail`, and any final metadata.
+   * Optionally creates an `AdminBlogReview` entry to notify reviewer/approver flows.
+7. **Return**: Sends success response telling the coach the blog is submitted and the unused images were removed.
+
+**Why this matters**
+
+* Coaches often upload many images while composing. Without cleanup, unused images accumulate and waste S3 storage and budgets.
+* This controller ensures only images actually used in the final blog (and the thumbnail) remain in storage.
+
+**Failure modes & safeguards**
+
+* If an image deletion fails, the controller should log the error and continue (or retry) — the implementation logs errors via `logger` and surfaces a 500 if necessary.
+* The controller should only delete images whose keys it can deterministically map from the stored `BlogImage` entries to avoid accidental deletion of shared assets.
 
 ---
 
-### 6. Update Blog Content
-Updates the content of a blog post.
-- **Method**: `PATCH`
-- **URL**: `/update-blog`
-- **Controller**: `updateBlog`
-- **Request Body**:
-  - `content`, `blogId`
-- **Success Response**:
-  ```json
-  { "data": { ...blogObject }, "success": true, "message": "Blog updated successfully" }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found
-  - `500 Internal Server Error`
+### 6. Get Blog By ID
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/blog/get/:blogId`
+* **Controller**: `getBlogByBlogId`
+
+**Functioning**
+
+* Fetches the `Blog` document by `blogId` with populated `author` info and attached `BlogImage` entries.
+* Returns full draft or published blog depending on `stage`/`status` and access rules.
 
 ---
 
-### 7. Get Blogs by Coach
-Fetches all blogs by a specific coach.
-- **Method**: `GET`
-- **URL**: `/coach-blog/:coachId`
-- **Controller**: `getBlogsByCoach`
-- **Params**: `coachId`
-- **Success Response**:
-  ```json
-  { "success": true, "message": "Blogs retrieved successfully", "data": [ ...blogObjects ] }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found
-  - `500 Internal Server Error`
+### 7. Get Blogs By Coach
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/blog/coach-blog/:coachId`
+* **Controller**: `getBlogsByCoach`
+
+**Functioning**
+
+* Returns a list of blogs authored by the supplied `coachId`, with filters for `stage`, `status`, pagination and sorting as needed.
 
 ---
 
-### 8. Get Blog by Blog ID
-Fetches a blog by its ID.
-- **Method**: `GET`
-- **URL**: `/get/:blogId`
-- **Controller**: `getBlogByBlogId`
-- **Params**: `blogId`
-- **Success Response**:
-  ```json
-  { "message": "Blog fetched successfully", "data": { ...blogObject }, "success": true }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found
-  - `500 Internal Server Error`
+### 8. Version Blog
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/blog/version-blog/:blogId`
+* **Controller**: `versionBlog`
+
+**Functioning**
+
+* Creates a new version snapshot of the specified `blogId` (clones content and image refs), persists it as a new `Blog` record with `previousVersionId` pointing to the original, and increments `version`.
+* Useful for restoring previous drafts or preserving history before major changes.
 
 ---
 
-## 📦 Models
+### 9. Delete Blog
 
-### `Blog`
-- **Description**: Stores all blog post details created by coaches.
-- **Fields**:
-  - `blogId` (string): Unique blog identifier (e.g., `BLG00001`)
-  - `title` (string): Blog title
-  - `thumbnail` (string): S3 URL of the thumbnail image
-  - `category` (string): Blog category
-  - `blogHeading` (string): Blog heading
-  - `content` (mixed): Blog content (array of blocks or rich text)
-  - `userType` (string): 'COACH' (for coach blogs)
-  - `status` (string): Blog status (`draft`, `under review`, `published`, etc.)
-  - `authorId` (string): Coach ID
-  - `author` (string): Coach name
-  - `readTime` (string): Estimated read time
-  - `tags` (string[]): Tags for the blog
-  - `report`, `raiseEditRequest`, `deleteRequest`, `editRequest` (boolean): Various flags
-  - `likes`, `share`, `views` (number): Engagement metrics
-  - `profileImage` (string): Coach profile image
-  - `reviewer`, `approver` (string): Admins involved in review
-  - `state` (string): 'Active' or 'Inactive'
-  - `version` (number): Blog version
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/blog/delete-blog`
+* **Controller**: `deleteBlog`
+* **Request Body**: `blogId`, `coachId` (for verification)
 
-### `BlogImage`
-- **Description**: Stores S3 image URLs and keys associated with a blog.
-- **Fields**:
-  - `blogId` (string): Blog identifier
-  - `images` (array): List of images with:
-    - `url` (string): S3 URL
-    - `key` (string): S3 object key
+**Functioning**
 
-### `ProfileModel`
-- **Description**: Stores coach profile details (used for author/coach lookup).
-- **Fields**:
-  - `coach_id` (string): Unique coach identifier
-  - `name` (string): Coach name
-  - `email` (string): Coach email
-  - `profileImage` (string): Profile image URL
-  - `bio` (string): Coach bio
-  - `category` (string): Coach category
-  - `status` (string): Profile status
-  - ... (other fields for demographics, experience, etc.)
+* Performs a soft or hard delete depending on implementation details (controller may remove blog and related `BlogImage` entries and/or mark `status: 'deleted'`).
+* If hard delete: removes S3 images via `deleteImageFromS3` and deletes DB records.
 
 ---
+
+## Implementation considerations & best practices
+
+* **Track uploaded images**: Always record each generated presigned URL (or server-side upload) into a `BlogImage` collection with the S3 key and expected URL. This is the single source of truth for cleanup.
+* **Deterministic keys**: Use predictable, namespaced S3 keys (e.g., `coach/{coachId}/blogs/{blogId}/{timestamp}_{random}.jpg`) so you can map URLs to keys for safe deletion.
+* **Idempotent cleanup**: Deletion should be idempotent — repeated calls to delete the same key should be safe.
+* **Logging & alerting**: Log all failed deletions and unusual discrepancies between `BlogImage` and S3.
+* **Security**: Ensure presigned URLs are short-lived and that creation is authorized for the requesting coach only.
+* **Race conditions**: If multiple clients / tabs are uploading images and saving simultaneously, ensure the `BlogImage` record updates are atomic and that cleanup only removes images not present in the final content at the moment of `saveBlogPost`.
+
 ---
 
-## 📋 API Summary Table
+## Summary table
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/create-blog` | POST | Create or update a draft blog (with thumbnail upload) |
-| `/upload-file` | POST | Upload an image file to S3 for use in a blog |
-| `/delete-blog` | POST | Delete a blog by its ID |
-| `/version-blog/:blogId` | POST | Create a new version of a blog |
-| `/save-blog` | PATCH | Remove deleted images and send blog for review |
-| `/update-blog` | PATCH | Update the content of a blog post |
-| `/coach-blog/:coachId` | GET | Fetch all blogs by a specific coach |
-| `/get/:blogId` | GET | Fetch a blog by its ID |
+| Method | Endpoint                | Description                                                         |
+| ------ | ----------------------- | ------------------------------------------------------------------- |
+| POST   | `/create-blog`          | Create or update a draft blog                                       |
+| POST   | `/upload-file`          | Get presigned upload URL OR upload file through server              |
+| PATCH  | `/save-blog`            | Finalize blog, remove unused uploaded images, send for admin review |
+| PATCH  | `/update-blog`          | Update draft fields                                                 |
+| GET    | `/coach-blog/:coachId`  | Get blogs authored by a coach                                       |
+| GET    | `/get/:blogId`          | Get single blog by id                                               |
+| POST   | `/version-blog/:blogId` | Create a version snapshot                                           |
+| POST   | `/delete-blog`          | Delete a blog                                                       |
 
 ---

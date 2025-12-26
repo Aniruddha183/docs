@@ -1,11 +1,12 @@
 ---
-title: "Coach Live Session and Coach Bookings Api Documentation"
-description: "REST API reference for Coach Live Session and Private Bookings."
+
+title: "Coach Booking and Live Session API Documentation"
+description: "REST API reference for Coach Booking and Live Session module."
 ---
 
-# Coach Live Session and Bookings API
+# Coach Booking and Live Session
 
-This document outlines the API endpoints available to **Coaches** in Live Session and Bookings feature
+This document describes **coach-facing APIs** used to create, schedule, update, cancel, and fetch public and private live sessions. Every endpoint explicitly lists **required headers, URL params, query params, and request bodies**, and explains how the **date-time conflict algorithm** prevents overlapping sessions.
 
 ---
 
@@ -17,375 +18,276 @@ This document outlines the API endpoints available to **Coaches** in Live Sessio
 
 ---
 
+## Required Headers (all endpoints)
+
+| Header          | Type   | Description                                               |
+| --------------- | ------ | --------------------------------------------------------- |
+| `Authorization` | string | Bearer JWT token identifying the coach                    |
+| `Content-Type`  | string | `application/json` (or `multipart/form-data` for uploads) |
 
 ---
 
-## Authentication & Token Requirements
+## Shared middleware & utilities
 
-Most endpoints do **not** require explicit authentication middleware in the route file, but you should ensure that only the correct coach can access or modify their own sessions/bookings (typically handled in the controller or via session).
-
-Some endpoints (notably file/image upload and session creation) require additional tokens/headers for AWS S3 upload:
-- `Authorization` (Bearer token): Cognito Identity/Access token for AWS S3 upload.
-- `x-refresh-token`: Cognito refresh token (for auto-refreshing AWS credentials).
-- `x-username`: Username for Cognito token refresh.
-
-**Example headers for file/image upload:**
-
-
-
----
-
-## Middleware
-
-### `multer.single('thumbnail')`
-- **Purpose**: Handles file uploads (e.g., `thumbnail`) in multipart/form-data requests.
-
-### `idGenerationMiddleware('LIV')`
-- **Purpose**: Generates a unique Live Session ID (`LIVxxxxx`) for new live sessions.
-- **Usage**: Applied to the public live session creation endpoint.
-
----
-
-## Utility Functions
-
-### `uploadImage`
-- **Purpose**: Uploads an image buffer to AWS S3 and returns the file location and key.
-- **Usage**: Used in public live session creation for uploading session thumbnails.
-
-### `parseDateTime`
-- **Purpose**: Parses a date string (DD-MM-YYYY) and time string (hh:mmAM/PM) into a JavaScript `Date` object.
-- **Usage**: Used for time calculations and slot conflict checks.
-
-### `removeUserBookedSession`
-- **Purpose**: Removes a session from a user's booked sessions and optionally adds it to their cancelled sessions.
-- **Usage**: Used when cancelling public or private sessions.
+* `idGenerationMiddleware('LIV')` — generates unique live-session IDs
+* `parseDateTime(date, time)` — converts date + time strings into JS `Date`
+* `BookedSlot` — stores all booked time ranges per coach
 
 ---
 
 ## Endpoints
 
 ### 1. Create Public Live Session
-Creates a new public live session for the coach.
 
-- **Method**: `POST`
-- **URL**: `/public/create`
-- **Middleware**: `multer.single('thumbnail')`, `idGenerationMiddleware('LIV')`
-- **Controller**: `createPublicLiveSession`
-- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
-- **Request Body** (multipart/form-data):
-  - `coachId` (String, required)
-  - `title` (String, required)
-  - `date` (String, required, format: DD-MM-YYYY)
-  - `startTime` (String, required, format: hh:mmAM/PM)
-  - `duration` (String, required, e.g., 30min, 60min)
-  - `description` (String, required)
-  - `category` (String, required)
-  - `level` (String, required)
-  - `focusArea` (Array[String], optional)
-  - `equipment` (String, optional)
-  - `intensityLevel` (String, optional)
-  - `calories` (String, optional)
-  - File: `thumbnail` (image, optional)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Public Live Session created successfully",
-    "data": { /* PublicSession object */ }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing required fields, invalid time/duration, or time slot unavailable.
-  - `404 Not Found`: Coach not found.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `POST`
+* **URL**: `/public/create`
+* **Middleware**: `authenticateCoachToken`, `idGenerationMiddleware('LIV')`
+* **Controller**: `createPublicLiveSession`
+
+**Request Body**
+
+```json
+{
+  "coachId": "COH00012",
+  "title": "Yoga Flow",
+  "description": "Morning yoga session",
+  "date": "22-10-2025",
+  "startTime": "08:00 AM",
+  "duration": 60,
+  "category": "Yoga"
+}
+```
+
+**Functioning**
+
+* Parses `date` and `startTime` into `newStartTime`
+* Computes `newEndTime = newStartTime + duration`
+* Runs conflict check against existing `BookedSlot` entries
+* Creates `PublicSession` and writes slot if no conflict exists
 
 ---
 
-### 2. Cancel Public Live Session
-Cancels a public live session.
+### 2. Create Draft Public Session
 
-- **Method**: `PATCH`
-- **URL**: `/cancel/public`
-- **Controller**: `cancelPublicSession`
-- **Request Body** (JSON):
-  - `sessionId` (String, required)
-  - `coachId` (String, required)
-  - `cancelReason` (String, required)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Live session cancelled"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session or coach not found.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `POST`
+* **URL**: `/public/create-draft`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `createDraftSession`
 
----
+**Request Body**
 
-### 3. Coach Request Payment
-Coach requests payout for a completed session.
+```json
+{
+  "coachId": "COH00012",
+  "title": "Draft Session",
+  "category": "Strength"
+}
+```
 
-- **Method**: `PATCH`
-- **URL**: `/coach/request-payment`
-- **Controller**: `coachRequestPayment`
-- **Request Body** (JSON):
-  - `sessionId` (String, required)
-  - `coachId` (String, required)
-  - `sessionType` (String, required, 'public' or 'private')
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Payment request sent successfully"
-  }
-  ```
-- **Error Responses**:
-  - `401 Unauthorized`: Coach not found or KYC not verified, or session not found.
-  - `402 Payment Required`: Session is not completed yet.
-  - `400 Bad Request`: Invalid session type.
-  - `500 Internal Server Error`: Unexpected error.
+**Functioning**
+
+* Saves a session with `stage: draft`
+* No time conflict checks occur at this stage
 
 ---
 
-### 4. Get Session Details
-Fetches details of a specific session (public or private).
+### 3. Add Session Time (Conflict-Checked)
 
-- **Method**: `GET`
-- **URL**: `/get/session-details/:sessionId`
-- **Controller**: `getSessionById`
-- **Params**:
-  - `sessionId` (String, required)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": { /* PublicSession or PrivateSession object */ }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session not found.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `PATCH`
+* **URL**: `/public/update-draft`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `addSessionTime`
 
----
+**Request Body**
 
-### 5. Get Coach Bookings
-Fetches all bookings for a specific coach (Live Sessions and Private Bookings).
+```json
+{
+  "sessionId": "LIV00045",
+  "date": "25-10-2025",
+  "startTime": "10:30 AM",
+  "duration": 90
+}
+```
 
-- **Method**: `GET`
-- **URL**: `/get/bookings/:coachId`
-- **Controller**: `getCoachBookings`
-- **Params**:
-  - `coachId` (String, required)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "publicSessions": {
-        "upcomingLiveSessions": [ /* PublicSession objects */ ],
-        "pastLiveSessions": [ /* PublicSession objects */ ]
-      },
-      "privateSessions": {
-        "upcomingCoachBookings": [ /* PrivateSession objects */ ],
-        "pastCoachBookings": [ /* PrivateSession objects */ ]
-      }
-    }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: No bookings found.
-  - `500 Internal Server Error`: Unexpected error.
+**Functioning**
+
+* Converts `date` + `startTime` using `parseDateTime`
+* Computes end time from duration
+* Ensures session is scheduled at least **48 hours in advance**
+* Performs overlap check using:
+
+  * `existing.start < newEnd && existing.end > newStart`
+* Writes slot only if no conflict exists
 
 ---
 
-### 6. Cancel Private Booking
-Cancels a private session booking.
+### 4. Send Session for Admin Review
 
-- **Method**: `PATCH`
-- **URL**: `/cancel/private`
-- **Controller**: `cancelPrivateBookings`
-- **Request Body** (JSON):
-  - `sessionId` (String, required)
-  - `coachId` (String, required)
-  - `cancelReason` (String, required)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "session cancelled successfully"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Session or coach not found.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `PATCH`
+* **URL**: `/public/send-review/:sessionId`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `sendSessionForReview`
+
+**URL Params**
+
+| Param       | Type   | Description             |
+| ----------- | ------ | ----------------------- |
+| `sessionId` | string | Live session identifier |
+
+**Functioning**
+
+* Revalidates time conflicts
+* Locks session schedule and moves stage to `UNDER_REVIEW`
 
 ---
 
-### 7. Check Conflicting Session Slot
-Checks if a given time slot is available for booking (no conflicts).
+### 5. Update Session State
 
-- **Method**: `GET`
-- **URL**: `/conflict/:coachId?date=DD-MM-YYYY&timeSlot=hh:mmAM-hh:mmAM&sessionType=public|private`
-- **Controller**: `checkConflictingSession`
-- **Params**:
-  - `coachId` (String, required)
-- **Query**:
-  - `date` (String, required)
-  - `timeSlot` (String, required, e.g., "10:00AM-11:00AM")
-  - `sessionType` (String, optional, 'public' or 'private')
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "No conflicting time"
-  }
-  ```
-- **Error Response**:
-  ```json
-  {
-    "success": false,
-    "message": "conflicting time"
-  }
-  ```
-  - `404 Not Found`: Arguments missing or booking time is too close.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `PATCH`
+* **URL**: `/public/update-state/:sessionId`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `updateState`
+
+**URL Params**
+
+| Param       | Type   | Description |
+| ----------- | ------ | ----------- |
+| `sessionId` | string | Session ID  |
+
+**Request Body**
+
+```json
+{
+  "state": "COMPLETED"
+}
+```
+
+**Functioning**
+
+* Updates lifecycle state
+* Used after session completion or cancellation
 
 ---
 
-### 8. Get Booked Slots
-Fetches all booked slots for a coach.
+### 6. Cancel Public Session
 
-- **Method**: `GET`
-- **URL**: `/slot-get/:coachId`
-- **Controller**: `getBookedSlot`
-- **Params**:
-  - `coachId` (String, required)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Booked Slot found",
-    "data": { /* BookedSlot object */ }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Booked slot not found.
-  - `500 Internal Server Error`: Unexpected error.
+* **Method**: `PATCH`
+* **URL**: `/cancel/public`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `cancelPublicSession`
 
----
+**Request Body**
 
-## 📦 Models
+```json
+{
+  "sessionId": "LIV00045",
+  "cancelReason": "Coach unavailable"
+}
+```
 
-### `PublicSession` (Live Session)
-- **Description**: Stores all public live session details created by coaches.
-- **Key Fields**:
-  - `sessionId` (String): Unique identifier for the session (e.g., `LIV00001`)
-  - `coachId` (String): Reference to the coach who owns the session
-  - `coachName` (String): Name of the coach
-  - `title` (String): Title of the session
-  - `description` (String): Session description
-  - `category` (String): Category of the session
-  - `level` (String): Difficulty level
-  - `focusArea` (Array[String]): Focus areas
-  - `thumbnailURL` (String): S3 URL for the session thumbnail
-  - `thumbnailKey` (String): S3 key for the thumbnail
-  - `date` (String): Date of the session (format: `DD-MM-YYYY`)
-  - `startTime` (String): Start time (format: `hh:mmA`)
-  - `endTime` (String): End time (format: `hh:mmA`)
-  - `dateTime` (Date): Start datetime
-  - `endDateTime` (Date): End datetime
-  - `duration` (String): Duration label (e.g., `30min`)
-  - `meetLink` (String): Meeting link for the session
-  - `participants` (Array[String]): User IDs of participants
-  - `status` (String): Status (`under review`, `approved`, `cancelled`, etc.)
-  - `state` (String): State (`Active`, `Inactive`)
-  - `seats` (Number): Total seats
-  - `bookedSeats` (Number): Booked seats
-  - `attendance` (Number): Number of attendees
-  - `likes` (Number): Number of likes
-  - `price` (Number): Price for the session
-  - `discountPercentage` (Number): Discount percentage
-  - `equipment` (String): Equipment required
-  - `calories` (String): Estimated calories burned
-  - `intensityLevel` (String): Intensity level
-  - `isFree` (Boolean): Is the session free?
-  - `report` (Boolean): Is the session reported?
-  - `isEnded` (Boolean): Has the session ended?
-  - `isDeleted` (Boolean): Is the session deleted?
-  - `sessionReminder` (Date): Reminder time
-  - `reviewer` (String): Reviewer admin
-  - `approver` (String): Approver admin
-  - `requestPayment` (Boolean): Payment requested
-  - `version` (Number): Version of the session
-  - `timestamp` (Object): Created/updated timestamps
+**Functioning**
+
+* Marks session cancelled
+* Removes corresponding `BookedSlot`
+* Triggers notifications and refunds if applicable
 
 ---
 
-### `PrivateSession` (Coach Booking)
-- **Description**: Stores all private session bookings between a coach and a user.
-- **Key Fields**:
-  - `sessionId` (String): Unique identifier for the session
-  - `coachId` (String): Reference to the coach
-  - `userId` (String): Reference to the user
-  - `coachName` (String): Name of the coach
-  - `title` (String): Title of the session
-  - `category` (String): Category of the session
-  - `dateTime` (Date): Start datetime
-  - `endDateTime` (Date): End datetime
-  - `date` (String): Date of the session
-  - `seats` (Number): Total seats
-  - `bookedSeats` (Number): Booked seats
-  - `timeSlot` (String): Time slot string
-  - `startTime` (String): Start time
-  - `endTime` (String): End time
-  - `participantEmail` (Array[String]): Participant emails
-  - `invitedEmail` (Array[String]): Invited emails
-  - `meetLink` (String): Meeting link
-  - `status` (String): Status
-  - `price` (Number): Price
-  - `cancelReason` (String): Reason for cancellation
-  - `sessionReminder` (Date): Reminder time
-  - `reviewer` (String): Reviewer admin
-  - `approver` (String): Approver admin
-  - `requestPayment` (Boolean): Payment requested
+### 7. Cancel Private Booking
+
+* **Method**: `PATCH`
+* **URL**: `/cancel/private`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `cancelPrivateBookings`
+
+**Request Body**
+
+```json
+{
+  "sessionId": "PRV00031",
+  "cancelReason": "Emergency"
+}
+```
+
+**Functioning**
+
+* Cancels private booking
+* Frees booked time slot
+* Notifies participants
 
 ---
 
-### `BookedSlot`
-- **Description**: Tracks all booked time slots for a coach.
-- **Key Fields**:
-  - `coachId` (String): Reference to the coach
-  - `slots` (Array[Object]):
-    - `date` (Date): Date of the slot
-    - `startTime` (Date): Start time
-    - `endTime` (Date): End time
-    - `sessionId` (String): Reference to the session
+### 8. Get Session Details
+
+* **Method**: `GET`
+* **URL**: `/get/session-details/:sessionId`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `getSessionById`
+
+**URL Params**
+
+| Param       | Type   | Description |
+| ----------- | ------ | ----------- |
+| `sessionId` | string | Session ID  |
+
+**Functioning**
+
+* Returns full session details
+* Auto-updates expired sessions
 
 ---
 
-### `CanceledSession`
-- **Description**: Tracks all cancelled sessions for a coach.
-- **Key Fields**:
-  - `coachId` (String): Reference to the coach
-  - `sessions` (Array[Object]):
-    - `sessionId` (String): Session ID
-    - `sessionType` (String): 'public' or 'private'
+### 9. Get Coach Bookings
+
+* **Method**: `GET`
+* **URL**: `/get/bookings/:coachId`
+* **Middleware**: `authenticateCoachToken`
+* **Controller**: `getCoachBookings`
+
+**URL Params**
+
+| Param     | Type   | Description      |
+| --------- | ------ | ---------------- |
+| `coachId` | string | Coach identifier |
+
+**Query Params (optional)**
+
+| Param  | Type   | Description           |
+| ------ | ------ | --------------------- |
+| `type` | string | `public` or `private` |
+
+**Functioning**
+
+* Fetches all public and private sessions for a coach
+
+---
+
+## Conflict Detection Algorithm (Summary)
+
+* All session times are converted into `Date` objects
+* Conflict exists if:
+
+```text
+existing.startTime < newEndTime AND existing.endTime > newStartTime
+```
+
+* Some controllers apply a **10-minute buffer** to both ends
+* A minimum **48-hour advance rule** is enforced
 
 ---
 
 ## Summary Table
 
-| Method | Endpoint                                 | Description                              | Required Headers                |
-|--------|------------------------------------------|------------------------------------------|---------------------------------|
-| POST   | `/public/create`                         | Create public live session               | Authorization, x-refresh-token, x-username |
-| PATCH  | `/cancel/public`                         | Cancel public live session               |                                 |
-| PATCH  | `/coach/request-payment`                 | Coach requests session payout            |                                 |
-| GET    | `/get/session-details/:sessionId`        | Get session details                      |                                 |
-| GET    | `/get/bookings/:coachId`                 | Get coach bookings (public/private)      |                                 |
-| PATCH  | `/cancel/private`                        | Cancel private session booking           |                                 |
-| GET    | `/conflict/:coachId`                     | Check conflicting session slot           |                                 |
-| GET    | `/slot-get/:coachId`                     | Get all booked slots for a coach         |                                 |
+| Method | Endpoint                          | Description                         |
+| ------ | --------------------------------- | ----------------------------------- |
+| POST   | `/public/create`                  | Create public live session          |
+| POST   | `/public/create-draft`            | Create draft session                |
+| PATCH  | `/public/update-draft`            | Add session time (conflict checked) |
+| PATCH  | `/public/send-review/:sessionId`  | Send session for review             |
+| PATCH  | `/public/update-state/:sessionId` | Update session state                |
+| PATCH  | `/cancel/public`                  | Cancel public session               |
+| PATCH  | `/cancel/private`                 | Cancel private booking              |
+| GET    | `/get/session-details/:sessionId` | Get session details                 |
+| GET    | `/get/bookings/:coachId`          | Get coach bookings                  |
 
 ---
