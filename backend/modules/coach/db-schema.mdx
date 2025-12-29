@@ -1,0 +1,37 @@
+## 📦 Models
+
+### `IProfileModel` (Coach Profile)
+
+- **Description**: Stores coach profile and authentication information.
+- **Key Fields**:
+  - `coach_id` (string): Unique coach identifier (e.g., `COH00001`)
+  - `name` (string): Coach's name
+  - `awsUserName` (string): AWS username
+  - `email` (string): Coach's email address
+  - `age` (number): Age
+  - `gender` (string): Gender
+  - `licenseStatus` (string): License status
+  - `mobileNumber` (string): Mobile number
+  - `countryCode` (string): Country code
+  - `clientCount` (number): Number of clients coached
+  - `category` (string): Coaching category
+  - `categoryLevel` (string): Category level
+  - `peopleCoached` (number): Number of people coached
+  - `experience` (string): Experience description
+  - `bio` (string): Coach's biography
+  - `images` (string[]): Array of image URLs
+  - `profileImage` (string): Profile image URL
+  - `coverImage` (string): Cover image URL
+  - `appType` (string): App type
+  - `status` (string): Profile/account status
+  - `isVerified` (boolean): Whether the coach is verified
+  - `onBoardingComplete` (boolean): Onboarding completion status
+  - `lastLogin` (Date, optional): Last login timestamp
+  - `stage` (enum): `"VERIFIED" | "UNVERIFIED" | "UNDER REVIEW" | "SUSPENDED" | "STUDIO" | "DRAFT"`
+  - `connectedDevice` (string[]): Connected device IDs
+  - `liveSessionPrice` (number): Price for live sessions
+  - `bookingPrice` (number): Price for bookings
+  - `kycVerified` (boolean): KYC verification status
+  - `firstLiveSessionCreated` (boolean): Whether the first live session is created
+  - `firstWorkoutPlanCreated` (boolean): Whether the first workout plan is created
+  - `authType` (string): Authentication type
