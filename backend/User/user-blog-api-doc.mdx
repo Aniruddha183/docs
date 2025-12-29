@@ -1,616 +1,508 @@
 ---
-title: "User Blog Api Documentation "
-description: "REST API reference for User Blog."
+
+title: "User Blog API Documentation"
+description: "REST API reference for User Blog module (create/update/search/blog details, presigned uploads, like/share, comments and image cleanup)."
 ---
 
-# User Blog API
+# User Blog
 
-This document outlines the API endpoints available to **Users** in website: 'fitnearn.com'
+APIs for end-users (and coaches/admins when acting as users) to create, edit and publish blogs, upload images (presigned + server flows), like/share blogs, search and fetch blog details. This doc explains request shapes (headers, params, query, body), the presigned S3 upload flow, the `saveBlogPost` image-cleanup logic, the `validateBlogStatus` middleware and how search/get endpoints compute the **author name**, **profile image**, and the **authenticated user’s like status** at runtime.
 
 ---
 
-## Base URL
+## Base URL (router prefixes)
+
+Primary user-blog routes live under:
 
 ```
-/api/fitnearn/web
+/api/fitnearn/web/users/blog    (create, save, update, delete, report, edit/delete requests)
+/api/fitnearn/web/user/blog     (search, fetch public lists, categories)
+/api/fitnearn/web/user/blog/popular|latest|trending  (popular endpoints)
+/api/fitnearn/web/users/blog/like  (like endpoint)
+/api/fitnearn/web/users/blog/comment  (comment endpoints)
 ```
 
 ---
----
 
-## Middleware
+## Required headers (most endpoints)
 
-### `multer.single(field)`
-
-- **Purpose**: Handles file uploads (e.g., `thumbnail`, `file`) in multipart/form-data requests.
-
-### `idGenerationMiddleware('CMT')`
-
-- **Purpose**: Generates a unique Comment ID (`CMTxxxxx`) for new blog comments or replies.
-- **Usage**: Applied to the comment creation endpoint.
+* `Authorization: Bearer <token>` — required for user-authenticated actions (create, save, like, comment, get personalized fields). If missing, endpoints that can run anonymously will still work but will not return `isLiked` or `isCommentLiked` for the visitor.
+* `Content-Type: application/json` or `multipart/form-data` (for server-side uploads)
+* Optional headers used by upload helpers: `x-refresh-token`, `x-username` (when client chooses to forward refresh tokens for temporary creds)
 
 ---
 
-## Endpoints
+## Important shared utilities (referenced)
 
-### 1. Create Draft Blog
-
-Creates a new draft blog for the user.
-
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/create-blog`
-- **Middleware**: `multer.single('thumbnail')`
-- **Controller**: `createDraftBlog`
-- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
-- **Request Body**:  
-  - `title`, `category`, `readTime`, `userId`, `blogHeading`, `tags`
-  - File: `thumbnail` (image, optional)
-- **Success Response**:
-  ```json
-  {
-    "data": "BLG00001",
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing required fields.
-  - `404 Not Found`: User not found.
-  - `500 Internal Server Error`
+* `getPresignedUploadUrl(mimeType,userId,UploadContext.USER,'Blog',blogId)` — returns `{ uploadUrl, key, bucket, publicUrl }` to enable direct client `PUT` to S3. Implemented in `imageHandler`.
+* `uploadImage(buffer,mimeType,userId,...)` — server-side helper which uploads buffer to S3 and returns `{ location, key }`.
+* `deleteImageFromS3(key)` — safely deletes an object by key (used during cleanup).
+* `BlogImage` collection — tracks *all* images uploaded while composing a blog: stored as `{ blogId, images: [{ url, key, uploadedBy }] }`. This is the single source of truth used by cleanup.
+* `validateBlogStatus` middleware — normalizes `status` values in `req.body`/`req.query` (see section below).
+* `BlogComment` collection — stores comments with fields such as `commentId`, `blogId`, `userId`, `text`, `parentId`, `likes`, `status`, `createdAt`, `updatedAt`.
 
 ---
 
-### 2. Upload Blog Image File
+## Middleware: `validateBlogStatus`
 
-Uploads an image file to S3 for a blog.
+**Purpose:** ensure blog `status` parameter uses allowed values and convert ambiguous values coming from the client.
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/upload-file`
-- **Middleware**: `multer.single('file')`
-- **Controller**: `uploadFile`
-- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
-- **Request Body**:  
-  - `userId`, `blogId`
-  - File: `file` (image)
-- **Success Response**:
-  ```json
-  {
-    "success": 1,
-    "file": { "url": "https://..." }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing userId or upload error.
-  - `401 Unauthorized`: Missing/invalid token.
+**What it does (exact behavior)**
+
+* If `req.body.status === 'Under Review'` it converts it to `'Inactive'` and logs a warning.
+* If `req.query.status === 'Under Review'` it converts it to `'Inactive'` in query parameters.
+* If any unexpected error occurs, it returns 500 with `Internal server error in status validation`.
+
+**Why:** The system treats `Under Review` as an internal workflow state; externally submitted `status` should be `'Active'` or `'Inactive'`.
 
 ---
 
-### 3. Upload Blog Image from URL
+## Models referenced (short)
 
-Uploads an image to S3 from a provided URL.
-
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/upload-url`
-- **Controller**: `uploadUrl`
-- **Headers**: `Authorization`, `x-refresh-token`, `x-username`
-- **Request Body**:  
-  - `userId`, `blogId`, `url`
-- **Success Response**:
-  ```json
-  {
-    "success": 1,
-    "file": { "url": "https://..." }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing userId or upload error.
-  - `401 Unauthorized`: Missing/invalid token.
+* `Blog` — primary blog document (fields used: `blogId`, `title`, `content`, `thumbnail`, `authorId`, `userType`, `state`, `stage`, `status`, `likes` etc.)
+* `BlogImage` — stores all uploaded images for a blog draft: `{ blogId, images: [ { url, key, uploadedBy } ] }`
+* `UserLike` — per-user liked blog list `{ userId, likedBlogs: [blogId] }`
+* `User`, `ProfileModel`, `UserModel`, `UserProfileImage` — user/coach/admin profile sources used to resolve author name and profile image.
+* `BlogComment` — comment model with fields: `commentId`, `blogId`, `userId`, `text`, `parentId` (nullable), `likes` (number), `likedBy` (userId[]), `status` (active|deleted|flagged), `createdAt`, `updatedAt`.
 
 ---
 
-### 4. Delete Blog
+## Routes & request parameters
 
-Deletes a blog and its associated images.
+Below are the actual routes present in the project and the exact request parameters they accept (body/params/query/headers). For each endpoint I include a short functioning description focused on how the controller behaves.
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/delete-blog/:blogId`
-- **Controller**: `deleteBlog`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Blog and associated images deleted successfully",
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `500 Internal Server Error`
+### 1) Create Draft Blog
 
----
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/create-blog`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body** (example):
 
-### 5. Delete All Blogs
+```json
+{
+  "userId": "USR00012",
+  "title": "My training log",
+  "content": [ /* rich-text blocks or delta */ ],
+  "category": "Fitness",
+  "tags": ["strength","mobility"],
+  "thumbnail": "https://.../thumb.jpg"
+}
+```
 
-Deletes all blogs and their images (admin/dev use).
+**Functioning**
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/delete`
-- **Controller**: `deleteAllBlogs`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "All blogs deleted successfully"
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+* Saves/creates a draft blog (`state: Draft`, `stage: Create`, `status: Inactive` by convention).
+* Does not remove or touch uploaded images — images uploaded during drafting are tracked in `BlogImage` and cleaned only when the coach/user finalizes and calls `saveBlogPost`.
+
+**Success**: `200` with created blog object.
 
 ---
 
-### 6. Create/Edit User Bio
+### 2) Get presigned upload URL (direct client → S3)
 
-Creates or edits the user's bio.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/upload-file`
+* **Headers**: `Authorization: Bearer <token>`, optional `x-refresh-token`, `x-username`
+* **Body** (example):
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/create-bio`
-- **Controller**: `createBio`
-- **Request Body**:  
-  - `userId`, `bio`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Bio created/updated successfully"
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing fields.
-  - `500 Internal Server Error`
+```json
+{ "userId": "USR00012", "blogId": "BLG0009", "mimeType": "image/jpeg" }
+```
 
----
+**Functioning**
 
-### 7. Save Blog Post (Publish)
+1. Controller calls `getPresignedUploadUrl(mimeType, userId, UploadContext.USER, 'Blog', blogId)` which:
 
-Removes deleted images from S3 and sends blog for review/publish.
+   * Generates a unique S3 key (namespaced by `UploadContext`, folderName (`Blog`), `userId`, optional `contentId` i.e. blogId, and a UUID).
+   * Creates a `PutObjectCommand` and uses AWS SDK `getSignedUrl` to produce a temporary `uploadUrl` (PUT) that the client can use directly.
+   * Returns `{ uploadUrl, key, bucket, publicUrl }` where `publicUrl` is the eventual S3 object URL.
+2. Controller returns the `uploadUrl` and associated metadata to the client. **The controller does not itself PUT the file** in this flow.
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/save-blog/:blogId`
-- **Controller**: `saveBlogPost`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Blog post saved successfully",
-    "blog": { ...blogObject },
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `400 Bad Request`: Blog already under review.
-  - `500 Internal Server Error`
+**Client next step**
+
+* The client must `PUT` the file bytes directly to `uploadUrl` with `Content-Type` set to the `mimeType` returned. On success, the object will be present at the `publicUrl`.
+* The backend already created an intent for this upload (the `key`) and `BlogImage` tracking is updated later when needed — either by `saveBlogPost` or explicit server-side confirmation flows.
+
+**Success**: `200` with `data: { uploadUrl, key, bucket, publicUrl }`.
 
 ---
 
-### 8. Update Blog Content
+### 3) Server-side upload / URL-to-S3 proxy
 
-Updates the content of a blog.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/upload-url`
+* **Headers**: `Authorization: Bearer <token>`, optional `x-refresh-token`, `x-username`
+* **Body** (example):
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/update-blog`
-- **Controller**: `updateBlog`
-- **Request Body**:  
-  - `content`, `blogId`
-- **Success Response**:
-  ```json
-  { ...updatedBlogObject }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `500 Internal Server Error`
+```json
+{ "userId": "USR00012", "blogId": "BLG0009", "url": "https://example.com/image.jpg" }
+```
 
----
+**Functioning**
 
-### 9. Request Blog Edit
+* Controller fetches the file from the provided `url` (via `axios`), obtains bytes and `Content-Type`, and calls `uploadImage(buffer, mimeType, userId, ...)` to upload the image to S3 server-side.
+* After successful upload it creates/updates the `BlogImage` doc: `BlogImage.findOne({ blogId })` → push `{ url: location, key }` into `images` (or create a new `BlogImage` document).
+* Returns the uploaded S3 `location` (public URL) and `key` back to client.
 
-Requests an edit for a blog under review.
-
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/edit-request/:blogId`
-- **Controller**: `editRequest`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Edit Request ticket raised successfully",
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+**Use when** direct client-to-S3 isn't possible (e.g., client supplies an external image URL).
 
 ---
 
-### 10. Request Blog Delete
+### 4) Save Blog Post (finalize & send for admin review)
 
-Requests deletion for a blog.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/users/blog/save-blog/:blogId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**:
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/delete-request/:blogId`
-- **Controller**: `deleteBlogRequest`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Blog deleted successfully"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `500 Internal Server Error`
+  * `blogId` — the blog being finalized
+* **Body**: typically none — the controller finalizes using the stored `Blog` document (it reads `blog.content` and `blog.thumbnail` from DB)
 
----
+**Functioning — step-by-step (image-cleanup logic)**
 
-### 11. Report Blog
+1. **Guard checks**
 
-Reports a blog for inappropriate content.
+   * Load blog (`Blog.findOne({ blogId })`). If not found → `404`.
+   * If `blog.state === 'In Review' || blog.state === 'New'` → `400` (`Blog already under review`). This prevents re-submission while a previous request is in-flight.
+2. **Collect tracked images**
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/report/:blogId`
-- **Controller**: `reportBlog`
-- **Params**:  
-  - `blogId`
-- **Request Body**:  
-  - `reason`, `userId`
-- **Success Response**:
-  ```json
-  {
-    "message": "Blog reported successfully",
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog or user not found.
-  - `400 Bad Request`: Blog already reported.
-  - `500 Internal Server Error`
+   * Load `BlogImage.findOne({ blogId })` — this returns the array `blogImage.images` of objects `{ url, key }` representing all images uploaded during composition.
+   * Build `currentImageUrls = blogImage?.images.map(i => i.url) || []`.
+3. **Parse final content and thumbnail**
 
----
+   * Read `blog.content` (the controller expects a block-array; image blocks have `type === 'image'` and the URL at `block.data.file.url`).
+   * Build `newImageUrls = [ ...imageUrlsFoundInContent, blog.thumbnail ]` (thumbnail is included so it is preserved even if not present as a content block).
+4. **Compute deletions**
 
-### 12. Get Blogs by User
+   * `urlsToDelete = currentImageUrls.filter(url => !newImageUrls.includes(url))` — these are images that were uploaded but are not referenced in the finalized content.
+5. **Delete redundant images**
 
-Fetches all blogs by a specific user.
+   * For each `url` in `urlsToDelete`:
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/blog/user-blog/:userId`
-- **Controller**: `getBlogsByUser`
-- **Params**:  
-  - `userId`
-- **Success Response**:
-  ```json
-  [ ...blogObjects ]
-  ```
-- **Error Responses**:
-  - `404 Not Found`: User or blogs not found.
-  - `500 Internal Server Error`
+     * Find matching image record in `blogImage.images` to extract its `key`.
+     * Call `deleteImageFromS3(key)` to remove the object from S3.
+     * Run `BlogImage.updateOne({ blogId }, { $pull: { images: { url } } })` to remove the DB reference.
+   * Errors deleting an image are logged; controller continues to attempt other deletions. If a critical failure occurs it logs and returns a 500.
+6. **Persist images actually used**
+
+   * For each `url` in `newImageUrls` that is not already in `currentImageUrls`:
+
+     * Extract `key = url.split('/').pop()` (the code uses the object name suffix) and `BlogImage.updateOne({ blogId }, { $push: { images: { url, key } } }, { upsert: true })`.
+   * This makes sure newly added images (uploaded via presigned flow) are tracked in the DB.
+7. **Update blog lifecycle**
+
+   * The controller updates the blog to move it into review: `Blog.findOneAndUpdate({ blogId }, { state: 'New', stage: 'Under Review', status: 'Inactive' })` and notifies the author.
+
+**Why this matters**
+
+* Prevents S3 from accumulating unused uploads (cost & clutter).
+* Keeps `BlogImage` as the single source of truth for stored files.
+
+**Important implementation notes**
+
+* Key extraction uses `url.split('/').pop()` — this assumes the S3 object key is the last segment of the `publicUrl`. Use deterministic keys to avoid accidental collisions.
+* Deletion is done one-by-one; heavy workloads could be batched for performance.
+* The controller treats `thumbnail` as an in-use image even if the final content doesn't reference it.
+
+**Success**: `200` with updated blog object and message `Blog post saved successfully`.
 
 ---
 
-### 13. Get Blog by Blog ID
+### 5) Update Blog (draft edits)
 
-Fetches a blog by its ID.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/users/blog/update-blog`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body** (example):
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/blog/:blogId`
-- **Controller**: `getBlogByBlogId`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "data": { "blog": { ...blogObject }, "bio": "..." },
-    "isLiked": false,
-    "success": true
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `500 Internal Server Error`
+```json
+{ "blogId": "BLG0009", "title": "New title", "content": [ ... ], "thumbnail": "https://..." }
+```
+
+**Functioning**
+
+* Updates fields on the draft blog. Does NOT perform cleanup. Cleanup is deferred until `save-blog`.
 
 ---
 
-### 14. Check Blog Eligibility
+### 6) Delete Blog
 
-Checks if a user is eligible to create a blog.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/delete-blog/:blogId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**: `blogId`
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/blog/user-blog-count/:userId`
-- **Controller**: `checkBlogEligibility`
-- **Params**:  
-  - `userId`
-- **Success Response**:
-  ```json
-  { "message": "Eligible" }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: User not found.
-  - `500 Internal Server Error`
+**Functioning**
+
+* Prevents deletion if blog is `Published` (controller returns `400` in that case).
+* If deletable, finds `BlogImage` and deletes associated images from S3, then removes the blog document (or marks deleted depending on implementation).
 
 ---
 
-### 15. Search Blogs
+### 7) Request Edit / Delete / Report / Edit-Request
 
-Searches published blogs by text.
+* **Method**: `PATCH`
+* **URLs**:
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/user/blog/search`
-- **Controller**: `searchBlogs`
-- **Query Params**:  
-  - `searchText`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "blogs": [ ...blogObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing search text.
-  - `500 Internal Server Error`
+  * `/api/fitnearn/web/users/blog/edit-request/:blogId` — request an edit when blog is under review
+  * `/api/fitnearn/web/users/blog/delete-request/:blogId`
+  * `/api/fitnearn/web/users/blog/report/:blogId` — report abuse
+* **Middleware**: `validateBlogStatus` is applied to these routes to normalize any incoming `status` values.
+
+**Functioning**
+
+* These are controlled flows that create audit entries (reports or requests). The `report` route also uses an `idGenerationMiddleware('RPTABUSE')` to add a generated report id.
 
 ---
 
-### 16. Fetch All Blogs
+### 8) Search Blogs (public)
 
-Fetches all published and active blogs.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/user/blog/search`
+* **Query params**:
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/user/blog/fetch-all`
-- **Controller**: `fetchAllBlogs`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "blogs": [ ...blogObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+  * `searchText` (required) — string used to search title, category, author, blogHeading, tags (case-insensitive / partial)
+* **Headers**: `Authorization` optional — used to compute `isLiked` per viewer
 
----
+**Functioning**
 
-### 17. Get User Blog Activity
+1. Controller builds a case-insensitive regex from `searchText` and queries `Blog` where `{ state: 'Published', status: 'Active', $or: [...] }`.
+2. It excludes heavy fields (`-history -content -likeEngagementTarget -likeEngagementNotification`) to keep responses small.
+3. For each blog it **resolves author name and profile image at runtime** using `blog.userType`:
 
-Fetches a user's blog-related activity (likes, comments, reports).
+   * `USER`: lookup `User.findOne({ USR_ID: authorId }).select('name')` and `UserProfileImage.findOne({ userId })` for `user_image_url`.
+   * `COACH`: lookup `ProfileModel.findOne({ coach_id: authorId })` for `name` and `profileImage`.
+   * `ADMIN`: lookup `UserModel.findOne({ USR_ID: authorId })` for `name` and `imageUrl`.
+   * When no profile image is available, a default avatar URL is used.
+4. If the request carries a valid `Authorization` JWT, the controller decodes to `userId` and fetches `UserLike.findOne({ userId }).select('likedBlogs')` and then sets `blog.isLiked = likedSet.has(blog.blogId)` for each blog. If the visitor is anonymous, `isLiked` is omitted or set to `false`.
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/blog/user-activity/:userId`
-- **Controller**: `getUserActivity`
-- **Params**:  
-  - `userId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "likes": [ ...likeObjects ],
-    "comments": [ ...commentObjects ],
-    "reports": { ...reportObject }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: User not found.
-  - `500 Internal Server Error`
+**Success**: `200` with `blogs` array where each item includes `author` (name), `profileImage`, and `isLiked` (true/false when applicable).
 
 ---
 
-### 18. Add Comment or Reply
+### 9) Get Blog By ID (full details)
 
-Adds a comment or reply to a blog.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/blog/:blogId`
+* **Headers**: `Authorization` optional — used to compute `isLiked`
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/comment/add`
-- **Middleware**: `idGenerationMiddleware('CMT')`
-- **Controller**: `addCommentOrReply`
-- **Request Body**:  
-  - `blogId`, `userId`, `comment`, `parentCommentId` (optional)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Comment added successfully",
-    "data": { ...commentObject }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: User not found.
-  - `404 Not Found`: Parent comment not found.
-  - `500 Internal Server Error`
+**Functioning**
+
+* Retrieves the full `Blog` document (including `content`).
+* Resolves author name and `profileImage` exactly like the `search` endpoint based on `userType` (USER/COACH/ADMIN) for display in the UI.
+* If `Authorization` token present and valid, verifies it and sets `isLiked` for the requesting user by checking `UserLike`.
+* Also aggregates recent admin review comments (if any) and reviewer/approver metadata to show status to the author.
+
+**Success**: `200` with full blog object enriched with `author`, `profileImage`, `isLiked`.
 
 ---
 
-### 19. Delete Comment or Reply
+### 10) Get Blogs By User (author feed)
 
-Deletes a comment or reply.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/blog/user-blog/:userId`
+* **Query params (optional)**: pagination, `stage`, `status`
 
-- **Method**: `POST`
-- **URL**: `/api/fitnearn/web/users/blog/comment/delete/:commentId`
-- **Controller**: `deleteCommentOrReply`
-- **Params**:  
-  - `commentId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Root comment and all related replies deleted successfully"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Comment or reply not found.
-  - `500 Internal Server Error`
+**Functioning**
+
+* Fetches all blogs for a given author id and adds `author` and `profileImage` (from the same user/coach/admin model lookup) to each item.
 
 ---
 
-### 20. Get Blog Comments
+### 11) Fetch all / categories / tags / latest / popular / trending
 
-Fetches all comments (and replies) for a blog.
+* **Endpoints**:
 
-- **Method**: `GET`
-- **URL**: `/api/fitnearn/web/users/blog/comment/get/:blogId`
-- **Controller**: `getBlogComments`
-- **Params**:  
-  - `blogId`
-- **Query Params**:  
-  - `userId` (optional, for like status)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "data": [ ...commentObjects ]
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+  * `GET /api/fitnearn/web/user/blog/fetch-all` — returns a limited list of published active blogs
+  * `GET /api/fitnearn/web/user/blog/get-category` — returns blog categories
+  * `GET /api/fitnearn/web/user/blog/search-tag` — search tags
+  * `GET /api/fitnearn/web/user/blog/popular` / `.../latest` / `.../trending` — implemented in `popularBlogController`
+
+**Functioning**
+
+* These endpoints return lists with `author` and `profileImage` enriched per blog (same runtime resolution), and if an `Authorization` header is present, they also compute `isLiked` using `UserLike` for that visitor.
 
 ---
 
-### 21. Like/Dislike Comment or Reply
+### 12) Like / Share endpoints
 
-Likes or dislikes a comment or reply.
+* **Like**
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/comment/like/:commentId`
-- **Controller**: `likeCommentOrReply`
-- **Params**:  
-  - `commentId`
-- **Request Body**:  
-  - `action` (`like` or `dislike`), `userId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Comment liked"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Comment not found.
-  - `400 Bad Request`: Already liked/disliked or invalid action.
-  - `500 Internal Server Error`
+  * **Method**: `PATCH`
+  * **URL**: `/api/fitnearn/web/users/blog/like`
+  * **Headers**: `Authorization: Bearer <token>`
+  * **Body**: `{ "blogId": "BLG0009", "action": "add" }` or `"remove"`
+  * **Functioning**: controller checks the user from JWT, maintains the `UserLike` document per user (push/pull from `likedBlogs`) and increments/decrements `Blog.likes` as well as `Blog.likedUsers`.
+* **Share counter**
+
+  * **Method**: `PATCH`
+  * **URL**: `/api/fitnearn/web/users/blog/share/:blogId`
+  * **Functioning**: increments blog share counter and may trigger analytics/notifications.
 
 ---
 
-### 22. Report Comment or Reply
+## Blog Comments (routes & controllers)
 
-Reports a comment or reply.
+> This section documents the comment-related routes and controllers attached to the blog module. All comment endpoints require `Authorization` unless explicitly noted.
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/comment/report/:commentId`
-- **Controller**: `reportCommentOrReply`
-- **Params**:  
-  - `commentId`
-- **Request Body**:  
-  - `reason`, `userId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Comment reported",
-    "data": { ...commentObject }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Comment not found.
-  - `400 Bad Request`: Already reported.
-  - `500 Internal Server Error`
+### Comment model (quick)
+
+`BlogComment` documents have the following important fields:
+
+* `commentId` (string) — unique identifier for the comment
+* `blogId` (string) — which blog the comment belongs to
+* `userId` (string) — author of the comment
+* `text` (string) — comment body
+* `parentId` (string|null) — if present, this comment is a reply to another comment
+* `likes` (number) — cached likes count
+* `likedBy` (string[]) — array of userIds who liked the comment (used to compute `isCommentLiked`)
+* `status` (string) — `active` | `deleted` | `flagged`
+* `createdAt`, `updatedAt`
 
 ---
 
-### 23. Like/Unlike Blog
+### 13) Add Comment / Reply
 
-Likes or unlikes a blog.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/comment/add`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body**:
 
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/:userId/blog/:blogId/like`
-- **Controller**: `handleUserBlogLike`
-- **Params**:  
-  - `userId`, `blogId`
-- **Request Body**:  
-  - `action` (`add` or `remove`)
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Blog liked"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog or user not found.
-  - `400 Bad Request`: Already liked/unliked or invalid action.
-  - `500 Internal Server Error`
+```json
+{
+  "blogId": "BLG0009",
+  "userId": "USR00012",
+  "text": "Great post!",
+  "parentId": null
+}
+```
 
----
+**Functioning**
 
-### 24. Share Blog
+* Validates `blogId` exists and is published (or that commenting is allowed on drafts for owners).
+* Generates a `commentId` (via `idGenerationMiddleware('CMT')` if applied) and creates a `BlogComment` entry.
+* Increments `Blog.commentCount` atomically.
+* Returns the created comment object.
 
-Increments the share counter for a blog.
-
-- **Method**: `PATCH`
-- **URL**: `/api/fitnearn/web/users/blog/share/:blogId`
-- **Controller**: `shareBlogCounter`
-- **Params**:  
-  - `blogId`
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "blog shared"
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Blog not found.
-  - `500 Internal Server Error`
+**Success**: `201` created comment.
 
 ---
 
-## Notes
+### 14) Edit Comment
 
-- File upload endpoints require Cognito tokens for AWS S3 access.
-- Most endpoints require user authentication via JWT in the `Authorization` header.
-- Only the blog author can edit or delete their own blogs.
-- Some endpoints (delete all blogs, update user type) are for admin/developer use only.
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/users/blog/comment/edit`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body**:
+
+```json
+{ "commentId": "CMT0005", "userId": "USR00012", "text": "Updated comment text" }
+```
+
+**Functioning**
+
+* Verifies the `userId` matches the comment owner or user has moderation permission.
+* Updates the comment `text` and `updatedAt` timestamp.
+* Returns the updated comment.
 
 ---
 
-## Summary Table
+### 15) Delete Comment (soft delete)
 
-| Method | Endpoint                                             | Description                        | Required Headers                |
-|--------|------------------------------------------------------|------------------------------------|---------------------------------|
-| POST   | `/api/fitnearn/web/users/blog/create-blog`           | Create draft blog                  | Authorization, x-refresh-token, x-username |
-| POST   | `/api/fitnearn/web/users/blog/upload-file`           | Upload blog image file             | Authorization, x-refresh-token, x-username |
-| POST   | `/api/fitnearn/web/users/blog/upload-url`            | Upload blog image from URL         | Authorization, x-refresh-token, x-username |
-| POST   | `/api/fitnearn/web/users/blog/delete-blog/:blogId`   | Delete blog                        |                                 |
-| POST   | `/api/fitnearn/web/users/blog/delete`                | Delete all blogs                   |                                 |
-| POST   | `/api/fitnearn/web/users/blog/create-bio`            | Create/edit user bio               |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/save-blog/:blogId`     | Save/publish blog                  |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/update-blog`           | Update blog content                |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/edit-request/:blogId`  | Request blog edit                  |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/delete-request/:blogId`| Request blog delete                |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/report/:blogId`        | Report blog                        |                                 |
-| GET    | `/api/fitnearn/web/users/blog/user-blog/:userId`     | Get blogs by user                  |                                 |
-| GET    | `/api/fitnearn/web/users/blog/:blogId`               | Get blog by ID                     |                                 |
-| GET    | `/api/fitnearn/web/users/blog/user-blog-count/:userId`| Check blog eligibility            |                                 |
-| GET    | `/api/fitnearn/web/user/blog/search`                 | Search blogs                       |                                 |
-| GET    | `/api/fitnearn/web/user/blog/fetch-all`              | Fetch all blogs                    |                                 |
-| GET    | `/api/fitnearn/web/users/blog/user-activity/:userId` | Get user blog activity             |                                 |
-| POST   | `/api/fitnearn/web/users/blog/comment/add`           | Add comment or reply               |                                 |
-| POST   | `/api/fitnearn/web/users/blog/comment/delete/:commentId` | Delete comment or reply         |                                 |
-| GET    | `/api/fitnearn/web/users/blog/comment/get/:blogId`   | Get blog comments                  |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/comment/like/:commentId` | Like/dislike comment or reply    |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/comment/report/:commentId` | Report comment or reply         |                                 |
-| PATCH  | `/api/fitnearn/web/users/:userId/blog/:blogId/like`  | Like/unlike blog                   |                                 |
-| PATCH  | `/api/fitnearn/web/users/blog/share/:blogId`         | Share blog                         |                                 |
+* **Method**: `DELETE`
+* **URL**: `/api/fitnearn/web/users/blog/comment/delete/:commentId`
+* **Headers**: `Authorization: Bearer <token>`
+* **URL Params**:
+
+  * `commentId` — comment to delete
+* **Functioning**
+* Verifies ownership or moderation rights.
+* Marks `status` = `deleted` and decrements `Blog.commentCount`.
+* Replies remain intact but are flagged or may be hidden in the UI.
+
+---
+
+### 16) Fetch Comments (paginated, threaded)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/users/blog/comment/get/:blogId`
+* **Headers**: `Authorization` optional — used to compute `isCommentLiked` for the requester
+* **Query Params**: `page`, `limit`, `sort` (e.g., newest, top)
+
+**Functioning**
+
+1. Fetches top-level comments for `blogId` where `status: 'active'` with pagination.
+2. For each top-level comment, fetches a limited set of replies (or counts) depending on `limit`.
+3. If `Authorization` header present, the controller fetches the requesting `userId` and resolves `isCommentLiked` by checking `likedBy` (or a `CommentLike` collection) for each comment and reply — sets `isCommentLiked: true/false`.
+4. Each comment object returned includes: `{ commentId, userId, text, likes, isCommentLiked, createdAt, repliesCount }` and optionally `replies: [...]` when requested.
+
+**Success**: `200` paginated list of comments with reply counts and personalization flags.
+
+---
+
+### 17) Like / Unlike Comment
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/users/blog/comment/like`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body**:
+
+```json
+{ "commentId": "CMT0005", "userId": "USR00012", "action": "add" }
+```
+
+**Functioning**
+
+* Adds or removes `userId` from `BlogComment.likedBy` using `$addToSet` or `$pull` and increments/decrements `BlogComment.likes`.
+* Returns updated like count and `isCommentLiked`.
+
+---
+
+### 18) Report Comment
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/users/blog/comment/report`
+* **Headers**: `Authorization: Bearer <token>`
+* **Body**:
+
+```json
+{ "commentId": "CMT0005", "reporterId": "USR00099", "reason": "spam" }
+```
+
+**Functioning**
+
+* Creates a `Report` entry linked to the comment for moderation.
+* Optionally increments `BlogComment.reportCount`.
+
+---
+
+## How comment personalization is computed at runtime
+
+When returning blogs or comment lists, the controllers compute personalization flags per-request:
+
+* `isLiked` (for blogs): If the requester provides a valid JWT, we fetch `UserLike` for the `userId` and check membership in `likedBlogs`.
+* `isCommentLiked` (for comments): If the requester is authenticated, for the set of returned commentIds we fetch the `likedBy` arrays (or a `CommentLike` collection) and mark which comments the current user has liked. This is done in bulk (one query for all returned commentIds) to avoid N+1 queries.
+* `profileImage` for commenters: The controller resolves each commenter's profile image using `UserProfileImage`, `ProfileModel` or `UserModel` depending on `userType` and attaches `commenterName` and `commenterImage` to each comment node.
+
+---
+
+## Implementation notes & best practices (for devs)
+
+* **Presigned upload vs server upload**: prefer presigned for large files (offload bandwidth). Use server-side proxy (`upload-url`) for convenience or when external URLs are used.
+* **BlogImage as source-of-truth**: always write to `BlogImage` when an image is uploaded (either at upload time or at save-time). Never infer S3 contents without DB tracking.
+* **Deterministic S3 keys**: create keys with a predictable namespace: `USER/Blog/{userId}/{blogId}/{uuid}.{ext}` so extracting the key from URL (split last segment) is safe.
+* **Atomicity**: `saveBlogPost` and comment mutations do multiple operations (delete objects from S3 and update DB). Prefer wrapping DB writes in a transaction if your MongoDB deployment supports it; otherwise log deletions and reconcile failed operations later.
+* **Auth & personalization**: `isLiked` and `isCommentLiked` are computed on-the-fly per request using the viewer's `userId` from JWT. This avoids caching stale personalization but adds a small DB lookup. Cache `UserLike` per-request where multiple blog items are enriched in one response.
+* **validateBlogStatus**: document and expose to frontend that clients should not submit `Under Review` as a status — it will be converted to `Inactive` by the middleware.
+* **Comment rate-limiting & moderation**: implement rate-limiting for comment creation to avoid spam, and surface reports to a moderator queue when `reportCount` crosses thresholds.
+
+---
+
+## Example: presigned upload + finalize flow (sequence)
+
+1. Client calls `POST /users/blog/upload-file` with `{ userId, blogId, mimeType }` → server returns `{ uploadUrl, key, publicUrl }`.
+2. Client `PUT` file bytes to `uploadUrl` (direct S3). On success the object is available at `publicUrl`.
+3. Client inserts the `publicUrl` into the blog `content` while composing.
+4. Client calls `PATCH /users/blog/save-blog/:blogId` → server runs the cleanup algorithm, removes unused images from S3, tracks newly used images into `BlogImage`, and moves blog into review.
 
 ---

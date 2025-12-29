@@ -1,0 +1,528 @@
+---
+
+title: "Admin Live Session Management API Documentation"
+description: "REST API reference for Admin Live Session Management module (create/edit/review/cancel/analyze live sessions)."
+
+---
+
+# Admin Live Session Management
+
+This document outlines the Admin APIs for managing live sessions (create, draft, edit, review, approve, cancel, analytics, booking management and refunds).
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/live-session
+```
+
+(Other related admin booking endpoints live under `/api/fitnearn/web/admin/bookings`.)
+
+---
+
+## Important shared middleware & utilities (remembered for future modules)
+
+> Note: you told me these helper files will be reused across modules — I have them noted for future docs and will not ask you to resend them.
+
+* `authenticateAdminToken` — validates admin JWT and attaches admin context to `req`.
+* `authorize(permission | permissionArray)` — checks admin permissions/roles (e.g. `CREATE_LIVE_SESSION`, `READ_LIVE_SESSION`).
+* `upload.single('thumbnail')` (from `imageHandler`) — accepts a thumbnail upload and attaches `req.file` with upload metadata.
+* `generateUniqueSequence` (from `generateUniqueID.ts`) — used to create `sessionId` / unique identifiers.
+* `helperFunctionVerifyUserGenTempCre` — exposes `UploadContext` and helper functions used for temp credentials and verification flows.
+* `presignedUrl` utilities — used for temporary image access and signed URLs.
+
+---
+
+## Models used (selected from `index.d.ts` — only the interfaces imported/used by this controller)
+
+> I selected the models that the controller imports and uses. For each model I list key fields (not exhaustive) needed to understand the API payloads and responses.
+
+### `IPublicSession` (public/live session)
+
+* `coachId` — reference to coach (`IProfileModel['coach_id']`)
+* `sessionId` — unique session identifier
+* `title`, `description`, `category`, `level`, `focusArea` (string[])
+* `thumbnailURL`, `thumbnailMediaId`, `thumbnailKey`
+* `date`, `startTime`, `duration`, `durationRange`
+* `seats`, `price`, `bookingPrice`, `liveSessionPrice`
+* `state`, `stage`, `status` (used for review and lifecycle)
+* `isRefunded`, `bookingId`, `orderId`, `paymentId`
+
+### `IPrivateSession` (private sessions / paid booking types)
+
+* `sessionId`, `coachId`, `userId`, `date`, `startTime`, `duration`
+* `seats`, `price`, `status` (payment/booking status)
+
+### `IBookedSlot` / `IUserBookedSession` (bookings)
+
+* `sessionId`, `userId`, `bookingId`, `orderId`, `paymentId`
+* `status` ("success" | "failed" | "pending")
+* `transactionId`, `currency`, `grandTotal`, `gstAmount`
+
+### `IProfileModel` (coach profile)
+
+* `coach_id`, `name`, `email`, `awsUserName`, `mobileNumber`, `category`, `experience`, `profileImage`
+
+### `IAdminLiveSession` / `IAdminLiveSessionReview` (admin review records)
+
+* Review records store `sessionId`, `adminId`, `comment`, `stage`, `action`, `status`
+* Tracks reviewer and approver comments, timestamps, and decisions
+
+### `IReportModel` / `ISlot` / `IPayment` / `IBooking` (auxiliary)
+
+* `IReportModel` — report entries related to sessions
+* `ISlot` — time slot metadata for sessions
+* `IPayment` / `IBooking` — payment and booking records referenced when issuing refunds
+
+---
+
+## Middleware (applied across endpoints)
+
+* `authenticateAdminToken` — required for any action that must be performed by an authenticated admin.
+* `authorize('PERMISSION')` — permission checks applied per-route. Examples used in this module: `CREATE_LIVE_SESSION`, `READ_LIVE_SESSION`, `DELETE_LIVE_SESSION`, `UPDATE_LIVE_SESSION`, `ADD_REVIEWER_COMMENT_LIVE_SESSION`, `ADD_APPROVER_COMMENT_LIVE_SESSION`, `READ_COMMENTS`, `READ_LIVE_SESSION`.
+* `upload.single('thumbnail')` — used for endpoints that accept a thumbnail image.
+
+---
+
+## Endpoints
+
+> Each endpoint below contains: method, path, middleware, controller, request shape, short functioning description (what it does and how), example success response, and common error cases.
+
+### 1. Create Public Live Session
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/live-session/create`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_LIVE_SESSION')`, `upload.single('thumbnail')`
+* **Controller**: `adminCreatePublicLiveSession`
+* **Request Body (typical)**:
+
+  * `adminId` (string) — admin creating the session
+  * `coachId` (string) — coach owning the session
+  * `title` (string), `description` (string)
+  * `date` (string), `startTime` (string), `duration` / `durationRange`
+  * `category` (string), `level` (string), `focusArea` (string[])
+  * `thumbnailURL`, `thumbnailKey`, `mediaId` (strings) — optional if file uploaded
+  * pricing: `seats`, `price`, `bookingPrice`, `liveSessionPrice`
+
+**Functioning**
+
+* Validates admin identity and `coachId` existence.
+* Parses and normalizes date/time (`date` + `startTime`) and computes end time.
+* If a file was uploaded, uses `imageHandler` to upload to S3 and attaches keys/URL.
+* Uses `generateUniqueSequence` to create a unique `sessionId`.
+* Creates a `PublicSession` record with initial lifecycle fields (e.g. `state`, `stage`, `status`) and pricing/seat info.
+* Triggers side-effects like sending notifications or creating initial reports when applicable.
+
+**Success Response** (example):
+
+```json
+{ "success": true, "message": "Session created successfully", "data": { /* session object */ } }
+```
+
+**Common Errors**:
+
+* `400 Bad Request`: missing required fields (title/date/coachId)
+* `404 Not Found`: provided `coachId` not found
+* `500 Internal Server Error`: DB or S3 upload failure
+
+---
+
+### 2. Save Live Session (Save Draft)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/live-session/save-draft`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_LIVE_SESSION')`, `upload.single('thumbnail')`
+* **Controller**: `saveLiveSession`
+* **Request Body**:
+
+  * Draft fields: `date`, `startTime`, `duration`, `durationRange`, `title`, `description`, etc.
+  * `req.file` possible for thumbnail
+
+**Functioning**
+
+* Accepts a partial session payload and stores it as a draft (no full validation of all fields required for publish).
+* If a thumbnail is uploaded, uses `imageHandler` to upload and store references.
+* Returns the saved draft session for later edit/publish.
+
+**Success Response**:
+
+```json
+{ "success": true, "message": "Draft saved", "data": { /* draft object */ } }
+```
+
+**Common Errors**: `500 Internal Server Error` on DB or S3 failures.
+
+---
+
+### 3. Duplicate Session
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/live-session/copy/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_LIVE_SESSION')`
+* **Controller**: `duplicateSession`
+* **URL Params**:
+
+  * `sessionId` — id of session to duplicate
+
+**Functioning**
+
+* Fetches the existing session by `sessionId`.
+* Copies core fields into a new `PublicSession` record (title, description, schedule, thumbnail references, pricing), and generates a fresh `sessionId`.
+* Keeps original session’s media keys (or duplicates assets if required by policy).
+* Returns the newly created session object.
+
+**Success Response**:
+
+```json
+{ "success": true, "message": "Session duplicated", "data": { /* new session */ } }
+```
+
+**Errors**: `404 Not Found` if source session missing; `500` for DB errors.
+
+---
+
+### 4. Reviewer — Add Reviewer Comment (Stage 1)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/live-session/review/stage1`
+* **Middleware**: `authenticateAdminToken`, `authorizeMultiple([... , 'ADD_REVIEWER_COMMENT_LIVE_SESSION'])` (controller expects reviewer permission)
+* **Controller**: `reviewerAdminReview`
+* **Request Body**:
+
+  * `sessionId`, `adminId`, `comment`, `action` (e.g. 'save', 'request_changes', 'pass_to_approver')
+
+**Functioning**
+
+* Validates reviewer admin permissions and ensures the session exists.
+* Fetches or creates the reviewer’s review record for the given `sessionId`.
+* If the review **lock is false**, the reviewer can:
+
+  * save a comment without progressing the workflow (draft review), or
+  * amend an existing saved comment.
+* Once the reviewer submits the review with an action that progresses the workflow, the review lock is set to **true**, preventing further edits.
+* Updates the session’s review `stage` only when the reviewer explicitly proceeds forward (e.g. sends to approver).
+* All reviewer actions are timestamped and stored for audit and traceability.
+
+**Success**: `200 OK` with updated review and session state.
+
+---
+
+### 5. Approver — Stage 2 Review / Approve
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/review/stage2`
+* **Middleware**: `authenticateAdminToken`, `authorizeMultiple([... , 'ADD_APPROVER_COMMENT_LIVE_SESSION'])`
+* **Controller**: `approverAdminReview`
+* **Request Body**:
+
+  * `sessionId`, `approverAdminId`, `comment`, `action` (e.g. `save`, `approve`, `reject`)
+
+**Functioning**
+
+* Validates approver permissions and confirms the session is in the correct review stage.
+* If approving then the admin has to mandatorily add the **meeting link**, **session seats**, **price** and additionally can add **discount percentage** to be applied from the base price.
+* Retrieves the approver’s review record for the session.
+* If the approver review **lock is false**, the approver can:
+
+  * save a comment without finalizing approval (draft approval comment), or
+  * edit a previously saved comment.
+* When the approver chooses a final action (`approve` or `reject`), the review lock is set to **true**, disallowing further edits.
+* On approval, the session lifecycle is advanced (e.g. state becomes `Approved`, bookings may be enabled).
+* On rejection, the session is moved back or marked with the appropriate rejection state, along with the approver’s final comment.
+* All actions are persisted with timestamps for compliance and auditing.
+
+**Success**: updated session and review objects returned.
+
+---
+
+### 6. Delete Live Session
+
+* **Method**: `DELETE`
+* **URL**: `/api/fitnearn/web/admin/live-session/delete/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('DELETE_LIVE_SESSION')`
+* **Controller**: `deleteLiveSession`
+* **URL Params**: `sessionId`
+
+**Functioning**
+
+* Validates admin permission.
+* Finds and removes the `PublicSession` document; cleans up associated assets (thumbnail S3 key via `deleteImageFromS3`) and related admin review records.
+* If bookings/payments exist, function either prevents deletion or records them and triggers refund/report flows depending on business rules.
+
+**Success**: `200` when deletion completed.
+**Errors**: `404` session not found; `500` on S3/DB failures.
+
+---
+
+### 7. Delete Admin Review Comment
+
+* **Method**: `DELETE`
+* **URL**: `/api/fitnearn/web/admin/live-session/review-comment/delete`
+* **Middleware**: `authenticateAdminToken`, `authorize('LIVE_SESSION_DELETE_COMMENT')`
+* **Controller**: `deleteAdminComment`
+* **Request Body**: `sessionId`, `commentId`, `adminType`
+
+**Functioning**
+
+* Removes or flags a specific admin review comment, updates review history and session review counters.
+
+**Success**: `200 OK` with updated review list.
+
+---
+
+### 8. Edit Live Session
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/edit`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_LIVE_SESSION')`, `upload.single('thumbnail')` (when updating media)
+* **Controller**: `editLiveSession`
+* **Request Body**: session payload to update including `sessionId`, scheduling changes, pricing, `thumbnail` metadata, etc.
+
+**Functioning**
+
+* Validates the session exists.
+* Applies allowed updates; if thumbnail is updated, handles S3 upload and removes old thumbnail key.
+* Recomputes dependent fields if schedule/time changes (e.g., end time), and updates review state if required.
+
+**Success**: updated session object returned.
+
+---
+
+### 9. Edit Review Comment
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/review-comment/edit`
+* **Middleware**: `authenticateAdminToken`, `authorize('LIVE_SESSION_EDIT_COMMENT')`
+* **Controller**: `editComment`
+* **Request Body**: `commentId`, `comment`, `sessionId`, `adminId`
+
+**Functioning**
+
+* Edits the text of a reviewer/approver comment and timestamps the modification.
+
+---
+
+### 10. Add Meeting Link
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/meet-link`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_LIVE_SESSION')`
+* **Controller**: `addMeetingLink`
+* **Request Body**: `sessionId`, `meetingLink`
+
+**Functioning**
+
+* Stores/updates the meeting link for the session (used for attendees and hosts).
+* May update booking entries so users see the meeting link when allowed (post-session start or per policy).
+
+**Success**: updated session object with `meetingLink`.
+
+---
+
+### 11. Cancel Session
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/cancel`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_LIVE_SESSION')`
+* **Controller**: `cancelSession`
+* **Request Body**: `sessionId`, `cancelReason`, `adminId` (and optionally `refundNow` flags)
+
+**Functioning**
+
+* Marks the session status as `Cancelled`, records `cancelReason` and who cancelled it.
+* Triggers refund flows or creates refund tasks for bookings tied to the session (may call `sendBulkRefunds` or queue refunds via payment provider).
+
+**Success**: `200` with cancellation confirmation.
+
+---
+
+### 12. Edit Cancellation Reason
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/edit-cancel`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_LIVE_SESSION')`
+* **Controller**: `editCancelReason`
+* **Request Body**: `sessionId`, `cancelReason`
+
+**Functioning**
+
+* Updates recorded cancellation metadata; useful for audits and communicating reasons to users.
+
+---
+
+### 13. Assign Reviewer / Assign Approver
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/live-session/assign-reviewer` (and `/assign-approver`)
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_LIVE_SESSION')`
+* **Controller**: `assignReviewer`, `assignApprover`
+* **Request Body**: `sessionId`, `adminId` (reviewer/approver)
+
+**Functioning**
+
+* Associates an admin reviewer/approver with the session and updates workflow fields, so the UI can display assigned reviewers/approvers and lock/unlock actions accordingly.
+
+---
+
+### 14. Update Session Status (generic)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/session/status-update`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_LIVE_SESSION')`
+* **Controller**: `updateSessionStatus`
+* **Request Body**: `sessionId`, `status`, `state`, `stage`, `cancelReason`, `sessionType`, `coachPaymentNote`
+
+**Functioning**
+
+* Generic state machine step: updates lifecycle fields such as `state` (e.g. Draft → Under Review → Approved → Complete), `stage` (review/approval stage), and `status`.
+* If moving to certain states (e.g. Approved), triggers side-effects like enabling bookings and notifications.
+
+---
+
+### 15. User Attend Session (admin-side endpoint to mark attendance)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/user/session/attend/:sessionId`
+* **Controller**: `attendSession`
+* **URL Params**: `sessionId`
+
+**Functioning**
+
+* Marks a user's attendance for a session (used by admin or user flows), increments relevant attendance counters, and records timestamps.
+
+---
+
+### 16. Fetch Live Sessions (list)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/get`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_LIVE_SESSION')`
+* **Controller**: `fetchLiveSession`
+* **Query Params** (examples): `state`, `stage`, `status`, `date`, `from`, `to`, `category`, `sort`, `page`, `limit`
+
+**Functioning**
+
+* Updates expired sessions (moves sessions past their end time to `Complete`) before fetching.
+* Builds a dynamic filter from query parameters and paginates results.
+* Returns sessions along with minimal coach info (populated from `ProfileModel`) and recent booking counts.
+
+**Success**: paginated list with metadata `{ data: [...], page, total }`.
+
+---
+
+### 17. Fetch Sessions Under Review
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/under-review`
+* **Controller**: `fetchSessionUnderReview`
+
+**Functioning**
+
+* Returns sessions currently in review stages (filters by `stage` / `state`) with reviewer/approver assignments and review comments.
+
+---
+
+### 18. Fetch Cancelled Sessions
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/get-cancelled`
+* **Controller**: `fetchCancelledSessions`
+
+**Functioning**
+
+* Returns sessions flagged as cancelled, with cancellation reasons and booking/refund metadata.
+
+---
+
+### 19. Get Session By ID
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/get-session/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_LIVE_SESSION')`
+* **Controller**: `getSessionById`
+* **URL Params**: `sessionId`
+
+**Functioning**
+
+* Fetches full session details including populated coach profile fields, bookings and payment summaries, attached media references, and admin review entries.
+* Also computes agreement/payment split fields when required.
+
+**Success**: `{ success: true, data: { /* full session */ } }`.
+
+---
+
+### 20. Get Admin Review Comments
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/review-comments/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_COMMENTS')`
+* **Controller**: `getAdminComments`
+
+**Functioning**
+
+* Returns paginated/ordered list of reviewer and approver comments for the given session.
+
+---
+
+### 21. Live Session Analytics
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/live-session/analytics/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_LIVE_SESSION')`
+* **Controller**: `liveSessionAnalytics`
+
+**Functioning**
+
+* Aggregates bookings, payments, refunds, attendance, and revenue for the session.
+* Returns time-series or summary metrics used by the admin dashboard (total sales, refunds, net revenue, attendees).
+
+---
+
+### 22. Send Bulk Refunds
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/live-session/bulk-refund`
+* **Controller**: `sendBulkRefunds`
+* **Request Body**: `sessionId`, `reason` (and internally a list of booking/payment records to process)
+
+**Functioning**
+
+* Finds bookings/payments for `sessionId` that require refunds and iterates through them.
+* Calls payment provider (e.g. Razorpay via `razorpay` config) to issue refunds, marks payment/booking records as refunded, and logs refund transactions.
+* Sends notifications after refund completion and accumulates a summary result.
+
+**Success**: summary of processed refunds and failures.
+
+---
+
+
+## Notes & Implementation considerations
+
+* **Atomicity:** Operations that touch bookings + payments (cancellation + refunds) should either be transactional or have compensating operations (mark refund failed and surface to admin) — controller contains retryable behaviors and error logging.
+* **Media lifecycle:** When thumbnails are updated or sessions deleted, controller cleans up S3 keys via `deleteImageFromS3`.
+* **Permissions:** Reviewer and approver flows use different permission checks (`ADD_REVIEWER_COMMENT_LIVE_SESSION` vs `ADD_APPROVER_COMMENT_LIVE_SESSION`) — ensure permission matrix matches admin roles.
+* **Side effects & notifications:** Many flows trigger notifications using `notificationUtility`.
+* **Pagination & performance:** List endpoints support pagination and filters — prefer indexed fields (`sessionId`, `coachId`, `state`, `status`) for queries.
+
+---
+
+## Summary table
+
+| Method | Endpoint                  | Description                            |
+| ------ | ------------------------- | -------------------------------------- |
+| POST   | `/create`                 | Create & publish a public live session |
+| POST   | `/save-draft`             | Save a session draft                   |
+| POST   | `/copy/:sessionId`        | Duplicate an existing session          |
+| POST   | `/review/stage1`          | Reviewer adds comment / stage1 review  |
+| PATCH  | `/review/stage2`          | Approver stage2 review                 |
+| DELETE | `/delete/:sessionId`      | Delete session                         |
+| PATCH  | `/edit`                   | Edit session                           |
+| PATCH  | `/meet-link`              | Add/update meeting link                |
+| PATCH  | `/cancel`                 | Cancel session                         |
+| GET    | `/get`                    | List sessions                          |
+| GET    | `/get-session/:sessionId` | Get session details                    |
+| GET    | `/analytics/:sessionId`   | Session analytics                      |
+| POST   | `/bulk-refund`            | Issue refunds for a session            |
+
+---

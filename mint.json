@@ -258,9 +258,9 @@
                 "backend/report-abuse-api",
                 "backend/api-doc-Product-Management",
                 "backend/api-doc-Studio-Management",
-                "backend/api-doc-admin-coach-booking-management",
-                "backend/api-doc-admin-live-session-management",
-                "backend/api-doc-admin-blog-management",
+                "backend/admin-live-session-management",
+                "backend/admin-coach-booking-management",
+                "backend/admin-blog-management",
                 "backend/api-doc-admin-refund-management",
                 "backend/admin-coach-management"
               ]
@@ -279,7 +279,11 @@
                 "backend/User/user-blog-api-doc",
                 "backend/User/user-live-session-api-doc",
                 "backend/User/user-coach-booking-api-doc",
-                "backend/User/user-studio-api-doc"
+                "backend/User/  ",
+                "backend/User/user-studio-api-doc",
+                "backend/User/store-api-doc",
+                "backend/User/api-doc-workout"
+
               ]
             },
             {
