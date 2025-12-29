@@ -1,0 +1,280 @@
+---
+
+title: "Admin Coach Booking Management API Documentation"
+description: "REST API reference for Admin Coach Booking Management (private coach bookings)."
+---
+
+# Admin Coach Booking Management
+
+This document describes the admin-facing APIs used to manage **private coach bookings**. These APIs allow admins to list bookings, inspect booking details, add or remove participants, attach meeting links, cancel private sessions, and delete bookings.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/coach-bookings
+```
+
+---
+
+## Important shared middleware & utilities (remembered)
+
+* `authenticateAdminToken` — validates admin JWT and attaches admin context to `req`.
+* `authorize(permission)` — enforces admin permission checks (e.g. `GET_ALL_COACH_BOOKINGS`, `UPDATE_COACH_BOOKING`).
+* `helperFunctionVerifyUserGenTempCre` — shared helper utilities (stored for reuse).
+* `presignedUrl` utilities — used when temporary access to assets is required.
+
+---
+
+## Models used (selected from `index.d.ts`)
+
+> Only the models that are imported and used inside `bookingManagementController.ts` are listed here.
+
+### `IPrivateSession`
+
+Represents a private coach session booking.
+
+* `sessionId` — unique session identifier
+* `bookingId` — booking identifier
+* `coachId`, `userId`
+* `participantEmail` (string[])
+* `meetLink`
+* `state`, `stage`, `status`
+* `cancelReason`, `cancelledBy`
+* `startDateTime`, `endDateTime`
+
+### `IBookedSlot`
+
+Tracks coach slot allocations.
+
+* `coachId`
+* `slots.sessionId`
+
+### `IUserBooking`
+
+Stores user-side payment details for a session.
+
+* `sessionId`, `orderId`, `paymentId`
+* `status`, `amount`
+
+### `IUser`
+
+Used to resolve participant details.
+
+* `email`, `USR_ID`
+
+### `IRazorpayPayouts`
+
+Stores coach payout information.
+
+* `contentId` (sessionId)
+* `amount`, `status`
+
+### `ICanceledSession`
+
+Tracks cancelled sessions per coach.
+
+* `coachId`
+* `sessions[]` (sessionId, sessionType)
+
+### `IRefundModel`
+
+Used to fetch refund details for cancelled sessions.
+
+---
+
+## Middleware (applied across endpoints)
+
+* `authenticateAdminToken` — required for all endpoints.
+* `authorize('PERMISSION')` — route-level permission enforcement.
+
+---
+
+## Endpoints
+
+> The following endpoints are **exactly** those defined in `adminBookingManagementRoutes.ts`, with their corresponding controller logic.
+
+---
+
+### 1. Get All Coach Bookings
+
+* **Method**: `GET`
+* **URL**: `/get`
+* **Middleware**: `authenticateAdminToken`, `authorize('GET_ALL_COACH_BOOKINGS')`
+* **Controller**: `getallBookings`
+* **Query Params** (optional):
+
+  * `category`, `status`, `state`, `date`, `sort`
+
+**Functioning**
+
+* Dynamically builds a filter object based on query parameters.
+* Fetches private session bookings from `PrivateSession`.
+* Applies in-memory sorting (`a-z`, `z-a`) based on `sessionId`.
+* Returns all matching bookings.
+
+**Success Response**
+
+```json
+{ "success": true, "data": [ /* bookings */ ] }
+```
+
+---
+
+### 2. Get Booking Details by Session ID
+
+* **Method**: `GET`
+* **URL**: `/get-details/:sessionId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_COACH_BOOKING')`
+* **Controller**: `getBookingById`
+
+**Functioning**
+
+* Fetches a private session by `sessionId`.
+* If the session has ended and is still marked active, its `state`, `stage`, and `status` are auto-updated.
+* Resolves:
+
+  * participant user details via email
+  * user payment records
+  * coach payout details (when applicable)
+  * refund details if the session was cancelled
+* Admin receives a fully enriched booking object.
+
+---
+
+### 3. Get Coach-Specific Bookings
+
+* **Method**: `GET`
+* **URL**: `/get-coach/:coachId`
+* **Middleware**: `authenticateAdminToken`, `authorize('GET_COACH_BOOKINGS')`
+* **Controller**: `getCoachSpecificBooking`
+
+**Functioning**
+
+* Fetches all private bookings for a specific coach using `coachId`.
+* Used by admins to audit or manage coach-specific sessions.
+
+---
+
+### 4. Add Meeting Link to Booking
+
+* **Method**: `PATCH`
+* **URL**: `/add-link`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_COACH_BOOKING')`
+* **Controller**: `addMeetingLink`
+* **Request Body**:
+
+  * `sessionId`, `meetingLink`
+
+**Functioning**
+
+* Attaches or updates a meeting link for the private session.
+* Automatically sets:
+
+  * `status` → `Active`
+  * `stage` → `Confirmed`
+* Used when a coach/admin finalizes the session logistics.
+
+---
+
+### 5. Add Participant to Session
+
+* **Method**: `PATCH`
+* **URL**: `/add-participant`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_COACH_BOOKING')`
+* **Controller**: `addUserToSession`
+* **Request Body**:
+
+  * `sessionId`, `email[]`
+
+**Functioning**
+
+* Validates session existence.
+* Verifies which provided emails belong to registered users.
+* Adds only valid emails to `participantEmail` using `$addToSet`.
+* Prevents duplicate participant entries.
+
+---
+
+### 6. Remove Participant from Session
+
+* **Method**: `PATCH`
+* **URL**: `/remove-participant`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_COACH_BOOKING')`
+* **Controller**: `removeUserFromSession`
+* **Request Body**:
+
+  * `sessionId`, `email`
+
+**Functioning**
+
+* Removes the participant email from the session.
+* Decrements booked seat count.
+* Cleans up:
+
+  * user booked-session mapping
+  * invite tokens
+  * invited email records
+
+---
+
+### 7. Cancel Private Booking (Session-level)
+
+* **Method**: `PATCH`
+* **URL**: `/cancel-session`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_COACH_BOOKING')`
+* **Controller**: `cancelPrivateBookings`
+* **Request Body**:
+
+  * `sessionId`, `cancelReason`, `adminId`
+
+**Functioning**
+
+* Marks the session as cancelled and closed.
+* Records cancellation metadata (`cancelReason`, `cancelledBy`).
+* Frees the coach slot from `BookedSlot`.
+* Stores cancellation info in `CanceledSession`.
+* Sends FCM notifications to all participants.
+
+---
+
+### 8. Delete Booking
+
+* **Method**: `DELETE`
+* **URL**: `/delete/:bookingId`
+* **Middleware**: `authenticateAdminToken`, `authorize('DELETE_COACH_BOOKING')`
+* **Controller**: `deleteBooking`
+
+**Functioning**
+
+* Locates the booking via `bookingId`.
+* Frees the associated coach time-slot.
+* Permanently deletes the private session record.
+* Used for hard admin clean-up operations.
+
+---
+
+## Notes & Implementation considerations
+
+* **Auto state correction**: Expired sessions are auto-moved to payment-pending/complete states during fetch.
+* **Participant integrity**: Only registered users can be added to sessions.
+* **Cancellation side-effects**: Slot freeing, cancellation history, and push notifications are tightly coupled.
+* **Hard deletes**: `deleteBooking` permanently removes records — use cautiously.
+
+---
+
+## Summary table
+
+| Method | Endpoint                  | Description              |
+| ------ | ------------------------- | ------------------------ |
+| GET    | `/get`                    | Get all coach bookings   |
+| GET    | `/get-details/:sessionId` | Get booking details      |
+| GET    | `/get-coach/:coachId`     | Get bookings for a coach |
+| PATCH  | `/add-link`               | Add meeting link         |
+| PATCH  | `/add-participant`        | Add user to session      |
+| PATCH  | `/remove-participant`     | Remove user from session |
+| PATCH  | `/cancel-session`         | Cancel private session   |
+| DELETE | `/delete/:bookingId`      | Delete booking           |
+
+---

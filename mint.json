@@ -175,11 +175,39 @@
           ]
         },
         {
-          "group": "API",
+          "group": "Studio Module",
           "pages": [
-            "backend/api-integration-security",
-            "backend/api-doc-vidya",
-            "backend/report-abuse-api"
+            "backend/modules/studio/overview",
+            "backend/modules/studio/db-schema",
+            "backend/modules/studio/layers-breakdown",
+            "backend/modules/studio/shared-utilities",
+            {
+              "group": "Mobile App",
+              "pages": [
+                "modules/studio/mobile-app/architecture",
+                "modules/studio/mobile-app/api-documentation",
+                "modules/studio/mobile-app/business-logic",
+                "modules/studio/mobile-app/frontend-integration"
+              ]
+            },
+            {
+              "group": "Website",
+              "pages": [
+                "modules/studio/website/architecture",
+                "modules/studio/website/api-documentation",
+                "modules/studio/website/business-logic",
+                "modules/studio/website/frontend-integration"
+              ]
+            },
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "modules/studio/admin-panel/architecture",
+                "modules/studio/admin-panel/api-documentation",
+                "modules/studio/admin-panel/business-logic",
+                "modules/studio/admin-panel/frontend-integration"
+              ]
+            }
           ]
         },
         {
@@ -197,7 +225,6 @@
             "backend/newsletter-setup"
           ]
         },
-
         {
           "group": "Developer Tools",
           "pages": ["backend/git-flow-guide", "backend/backend-workflow"]
@@ -208,12 +235,14 @@
             {
               "group": "Admin",
               "pages": [
+                "backend/api-integration-security",
                 "backend/api-documentation-access",
                 "backend/api-doc-admin-content-management",
                 "backend/report-abuse-api",
                 "backend/api-doc-adminAuthAndSession",
                 "backend/api-doc-user_management",
                 "backend/api-doc-permissions",
+                "backend/api-doc-vidya",
                 "backend/api-doc-query",
                 "backend/api-doc-workout",
                 "backend/api-doc-subscriptions",
@@ -229,9 +258,9 @@
                 "backend/report-abuse-api",
                 "backend/api-doc-Product-Management",
                 "backend/api-doc-Studio-Management",
-                "backend/api-doc-admin-coach-booking-management",
-                "backend/api-doc-admin-live-session-management",
-                "backend/api-doc-admin-blog-management",
+                "backend/admin-live-session-management",
+                "backend/admin-coach-booking-management",
+                "backend/admin-blog-management",
                 "backend/api-doc-admin-refund-management",
                 "backend/admin-coach-management"
               ]
@@ -250,6 +279,7 @@
                 "backend/User/user-blog-api-doc",
                 "backend/User/user-live-session-api-doc",
                 "backend/User/user-coach-booking-api-doc",
+                "backend/User/  ",
                 "backend/User/user-studio-api-doc",
                 "backend/User/store-api-doc",
                 "backend/User/api-doc-workout"

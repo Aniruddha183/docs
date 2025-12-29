@@ -1,0 +1,442 @@
+---
+
+title: "Admin Blog Management API Documentation"
+description: "REST API reference for Admin Blog Management (create/edit/review/version, comment moderation, analytics, and deletions)."
+---
+
+# Admin Blog Management
+
+This document describes the admin-facing REST APIs for managing blogs: drafting, uploading images, reviewing (reviewer/approver flows), versioning, assigning reviewers/approvers, moderating comments, fetching analytics, and issuing deletions or edit approvals.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/blog
+```
+
+(Comment and booking related endpoints live under `/api/fitnearn/web/admin/blog-comment` and other admin namespaces.)
+
+---
+
+## Important shared middleware & utilities (remembered)
+
+* `authenticateAdminToken` — validates admin JWT and attaches admin context to `req`.
+* `authorize(permission | permissionArray)` / `authorizeMultiple(...)` — permission checks (e.g. `GET_BLOGS`, `EDIT_BLOG`, `DELETE_BLOG`, `ADD_REVIEWER_COMMENT_BLOG`, `ADD_APPROVER_COMMENT_BLOG`, `EDIT_COMMENT`, `DELETE_COMMENT`).
+* `upload.single('image')` (from `imageHandler`) — accepts image uploads in-memory and returns `req.file` for S3 upload.
+* `generateUniqueSequence` / `idGenerationMiddleware('CMT')` — generates unique IDs for comments or versioned objects.
+* `helperFunctionVerifyUserGenTempCre` — upload context helpers when generating temporary credentials or uploads.
+* `presignedUrl` utilities — temporary access to uploaded images.
+
+---
+
+## Models used (selected from `index.d.ts` — only the interfaces imported/used by this controller)
+
+> The controller imports and uses the following models. I list key fields (non-exhaustive) used in payloads and responses.
+
+### `IBlog` / `Blog`
+
+* `blogId` / `_id` — unique blog identifier
+* `title`, `slug`, `summary`, `meta`, `content` (rich text / blocks)
+* `authorId`, `authorName` (references to coach/profile)
+* `stage`, `status` (draft | under_review | approved | published | rejected)
+* `version`, `isVersioned`, `previousVersionId`
+* `tags`, `category`, `readingTime`, `thumbnail`, `images` (array of media refs)
+* `createdAt`, `updatedAt`
+
+### `IBlogComment` / `BlogComment`
+
+* `commentId` / `_id` — unique comment id
+* `blogId`, `userId`, `adminId` — references
+* `text`, `status` (active | deleted | flagged), `parentId` (for replies)
+* `createdAt`, `updatedAt`
+
+### `IBlogImage` / `BlogImage`
+
+* `imageId`, `key`, `url`, `altText`, `uploadedBy`, `uploadedAt`
+
+### `IAdminBlogReview` / `AdminBlog`
+
+* `blogId`, `reviewerAdminId`, `approverAdminId`, `comment`, `action` (save | request_changes | approve | reject), `lock` (boolean), `stage`
+* Timestamps and audit fields
+
+### `IReportModel` / `Report` (moderation)
+
+* `targetId` (blogId | commentId), `reporterId`, `reason`, `status`
+
+---
+
+## Middleware (applied across endpoints)
+
+* `authenticateAdminToken` — required for every admin action.
+* `authorize(...)` / `authorizeMultiple(...)` — specific permission gates per route (examples: `GET_BLOGS`, `CREATE_BLOG`, `EDIT_BLOG`, `DELETE_BLOG`, `EDIT_COMMENT`, `DELETE_COMMENT`, `ASSIGN_APPROVER`).
+* `upload.single('image')` — for image upload endpoints.
+* `validateBlogStatus` — route-level validator used on review/update flows to ensure blog is in a valid transitional state.
+* `idGenerationMiddleware('CMT')` — used for creating comment IDs when admin posts a comment.
+
+---
+
+## Endpoints
+
+> Each endpoint below lists: method, path, middleware, controller, request shape, a short **Functioning** section (what it does and how), example success response shape, and common error cases.
+
+### 1. Save Draft Blog (admin)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/blog/save-draft`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_BLOG')`
+* **Controller**: `adminCreateDraftBlog`
+* **Request Body (typical)**:
+
+  * `title`, `summary`, `content`, `authorId`, `tags`, `category`, `thumbnail` (optional)
+
+**Functioning**
+
+* Validates admin identity and minimal required fields for a draft.
+* Persists a `Blog` document with `stage: 'draft'` and `status: 'draft'`.
+* Generates a `blogId` if not provided using `generateUniqueSequence`.
+* Returns the created draft for later editing or submission.
+
+**Success**: `{ success: true, message: 'Draft saved', data: { /* blog object */ } }`
+
+**Errors**: `400` missing required title/content; `500` DB failure.
+
+---
+
+### 2. Upload File (image upload to S3)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/blog/upload-file`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_BLOG')`, `upload.single('image')`
+* **Controller**: `uploadFile`
+* **Request**: multipart form with `image` file and optional metadata (`altText`, `blogId`)
+
+**Functioning**
+
+* Receives file in `req.file`, uses `uploadImage` (imageHandler) to push to S3 and returns media metadata.
+* Stores a `BlogImage` record when needed, or returns signed URL/context for temporary use.
+* Used by the admin UI to attach images to blog drafts or edits.
+
+**Success**: `{ success: true, data: { url, key, imageId } }`
+
+**Errors**: `400` invalid file; `500` S3/upload failure.
+
+---
+
+### 3. Reviewer — Review Blog (stage1)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/blog/review-blog`
+* **Middleware**: `authenticateAdminToken`, `authorizeMultiple(['ADD_REVIEWER_COMMENT_BLOG','GET_BLOGS'])`, `validateBlogStatus`
+* **Controller**: `reviewerAdminReview`
+* **Request Body**:
+
+  * `blogId`, `adminId`, `comment`, `action` (e.g. `save` | `request_changes` | `send_to_approver`)
+
+**Functioning**
+
+* Validates reviewer permission and ensures blog exists and is in a valid reviewable state.
+* Fetches or creates an `AdminBlog` (review) record for `blogId` associated with this reviewer.
+* If the review **lock === false** the reviewer may:
+
+  * **save** a comment (draft) without progressing the workflow, and later edit it; or
+  * **request_changes** which keeps the blog in a reviewer-returned state.
+* If the reviewer chooses to **send_to_approver**, the reviewer’s review is finalized and the review `lock` is set to **true** — preventing further edits by that reviewer. The blog `stage` moves forward to approver review.
+* All actions are timestamped and recorded for audit.
+
+**Success**: updated review object and blog stage returned.
+
+**Errors**: `403` unauthorized; `400` invalid action; `500` DB errors.
+
+---
+
+### 4. Approver — Approve / Reject / Save (stage2)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/blog/approver-review`
+* **Middleware**: `authenticateAdminToken`, `authorizeMultiple(['ADD_APPROVER_COMMENT_BLOG','GET_BLOGS'])`, `validateBlogStatus`
+* **Controller**: `approverAdminReview`
+* **Request Body**:
+
+  * `blogId`, `approverAdminId`, `comment`, `action` (e.g. `save` | `approve` | `reject`)
+
+**Functioning**
+
+* Validates approver role and that blog is in approver-review stage.
+* If `lock === false`, approver may save/edit a draft comment.
+* When approver takes a final action (`approve` or `reject`):
+
+  * `lock` is set to **true** preventing further edits by approver.
+  * On `approve`, blog `status`/`stage` advances (may set `approvedAt`, enable publishing workflows).
+  * On `reject`, blog is marked `rejected` and reviewer/author is notified.
+* Actions trigger side-effects: notifications (email/SNS), update to versioning if needed.
+
+**Success**: updated blog object and review audit returned.
+
+**Errors**: `409` if review lock already true; `500` on processing failures.
+
+---
+
+### 5. Version Blog
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/blog/version-blog/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('VERSION_BLOG')`, `validateBlogStatus`
+* **Controller**: `versionBlog` (imported from coach controller but callable here)
+* **URL Params**: `blogId`
+
+**Functioning**
+
+* Creates a new version snapshot of the specified `blogId` (copies content, images, meta) and links it to the original via `previousVersionId`.
+* Marks `isVersioned` appropriately and returns a reference to the new version.
+
+**Success**: `{ success: true, message: 'Version created', data: { /* versioned blog */ } }`
+
+**Errors**: `404` blog not found; `500` DB errors.
+
+---
+
+### 6. Update Blog (admin edits)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/blog/update`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_BLOG')`, `validateBlogStatus`
+* **Controller**: `updateBlog`
+* **Request Body**: `blogId`, fields to update (title, content, tags, thumbnail updates, imagesToDelete[], etc.)
+
+**Functioning**
+
+* Validates admin permission and blog existence.
+* Applies allowed updates; if images are removed, calls `deleteImageFromS3` to cleanup S3 keys and `BlogImage` records.
+* If update moves the blog back into review, it may reset review locks or create a new review record depending on business rules.
+
+**Success**: updated blog returned.
+
+**Errors**: `400` invalid payload; `403` not allowed to edit; `500` on S3/DB failure.
+
+---
+
+### 7. Save Blog Post (send for review / publish flow)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/blog/save/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_BLOG')`, `validateBlogStatus`
+* **Controller**: `saveBlogPost`
+* **URL Params**: `blogId`
+
+**Functioning**
+
+* Finalizes edits for `blogId`, removes any deleted images from S3, and moves the blog into `under_review` or `ready_for_publish` state.
+* Creates/updates an `AdminBlog` review record depending on workflow and notifies assigned reviewer/approver.
+
+**Success**: blog moved to next stage with review entry.
+
+---
+
+### 8. Update Blog Status (publish / reject)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/blog/status-update`
+* **Middleware**: `authenticateAdminToken`, `authorize('PUBLISH_BLOG')`
+* **Controller**: `updateBlogStatus`
+* **Request Body**: `blogId`, `status`, `adminComments` (optional)
+
+**Functioning**
+
+* Updates the blog's `status` field (e.g., `published`, `rejected`) and records admin comments.
+* On publish, sets `publishedAt`, optionally triggers newsletter/email (via `shootMail`) and public cache invalidation.
+
+**Success**: updated blog returned.
+
+---
+
+### 9. Get All Blogs (with filters)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/blog/get`
+* **Middleware**: `authenticateAdminToken`, `authorize('GET_BLOGS')`
+* **Controller**: `getAllBlogs`
+* **Query Params (examples)**: `status`, `stage`, `authorId`, `tag`, `page`, `limit`, `sort`
+
+**Functioning**
+
+* Builds query filters from params, supports pagination and sorting, and returns blog list with minimal author info populated.
+* Used by admin UI to list drafts, under-review, published, and rejected blogs.
+
+**Success**: paginated list `{ data: [...], page, total }`.
+
+---
+
+### 10. Get Blog By ID
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/blog/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_BLOG')`
+* **Controller**: `getBlogByBlogId`
+* **URL Params**: `blogId`
+
+**Functioning**
+
+* Returns full blog payload with images, author profile, version history, and associated admin review records.
+* Computes derived fields such as `isEditable` based on current `stage` and `review.lock` values.
+
+**Success**: full blog object.
+
+---
+
+### 11. Get Blogs Under Review / Get Edit Requests / Get Delete Requests
+
+* **Method**: `GET`
+* **URL**:
+
+  * `/api/fitnearn/web/admin/blog/get/review` — get blogs currently under review
+  * `/api/fitnearn/web/admin/blog/get/edit` — get blogs for which edit access was requested
+  * `/api/fitnearn/web/admin/blog/get/delete` — get blogs requested for deletion
+* **Middleware**: `authenticateAdminToken`, `authorize('GET_BLOGS')`
+* **Controller**: `getBlogsUnderReview`, `getEditRequest`, `getDeleteRequestedBlogs`
+
+**Functioning**
+
+* Each endpoint filters by blog lifecycle `stage` or specific request flags and returns lists with reason/context, timestamps, and requester info.
+
+---
+
+### 12. Admin Commenting & Moderation
+
+* **Add Admin Comment**
+
+  * **Method**: `POST`
+  * **URL**: `/api/fitnearn/web/admin/blog-comment/add`
+  * **Middleware**: `authenticateAdminToken`, `authorize('EDIT_BLOG')`, `idGenerationMiddleware('CMT')`
+  * **Controller**: `adminBlogComment`
+  * **Request Body**: `blogId`, `adminId`, `text`, `parentId?`
+
+  **Functioning**
+
+  * Creates an admin comment on a blog (or reply). Generates a comment ID via middleware and persists a `BlogComment`.
+
+* **Edit Admin Comment**
+
+  * **Method**: `PATCH`
+  * **URL**: `/api/fitnearn/web/admin/blog/edit-comment`
+  * **Middleware**: `authenticateAdminToken`, `authorize('EDIT_COMMENT')`
+  * **Controller**: `editComment`
+  * **Request Body**: `commentId`, `text`, `adminId`
+
+  **Functioning**
+
+  * Edits an existing admin comment; updates `updatedAt` and audit fields.
+
+* **Delete Admin Comment / Reply**
+
+  * **Method**: `DELETE`
+  * **URL**: `/api/fitnearn/web/admin/blog-comment/delete/:commentId`
+  * **Middleware**: `authenticateAdminToken`, `authorize('DELETE_COMMENT')`
+  * **Controller**: `adminDeleteCommentOrReply`
+
+  **Functioning**
+
+  * Soft-deletes or removes a comment/reply and updates related counts on the blog.
+
+---
+
+### 13. Fetch Reported Blogs & Comments
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/blog/reported` and `/api/fitnearn/web/admin/blog/reported-comments`
+* **Middleware**: `authenticateAdminToken`, `authorize('GET_BLOGS')`
+* **Controller**: `fetchReportedBlogs`, `fetchReportedComments`
+
+**Functioning**
+
+* Returns reported items from `Report` model; used by moderators to triage and take action (delete, warn, request edits).
+
+---
+
+### 14. Assign Reviewer / Assign Approver
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/blog/assign-reviewer` and `/assign-approver`
+* **Middleware**: `authenticateAdminToken`, `authorize('ASSIGN_APPROVER')`, `validateBlogStatus`
+* **Controller**: `assignReviewer`, `assignApprover`
+* **Request Body**: `blogId`, `adminId`
+
+**Functioning**
+
+* Associates reviewer/approver admins with the blog, sets workflow fields and assignee metadata, and notifies the assigned admin.
+* Assigning may also reset locks if workflow requires a fresh review cycle.
+
+---
+
+### 15. Get Admin Review Comments for a Blog
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/blog/get-comments/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_COMMENTS')`
+* **Controller**: `getAdminComments`
+
+**Functioning**
+
+* Returns ordered/paginated admin review comments for the blog, including reviewer and approver entries and timestamps.
+
+---
+
+### 16. Blog Analytics
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/blog/get-blog-analytics/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('READ_BLOG')`
+* **Controller**: `getBlogAnalytics`
+
+**Functioning**
+
+* Aggregates metrics such as views, likes, shares, comments, reports, and reading time across versions. Returns summary and time-series for dashboard consumption.
+
+---
+
+### 17. Delete Blog (admin)
+
+* **Method**: `DELETE`
+* **URL**: `/api/fitnearn/web/admin/blog/delete/:blogId`
+* **Middleware**: `authenticateAdminToken`, `authorize('DELETE_BLOG')`
+* **Controller**: `adminDeleteBlog`
+
+**Functioning**
+
+* Soft-deletes or permanently deletes the blog depending on policy; removes associated images from S3 via `deleteImageFromS3`, clears comments or marks them deleted, and records an audit entry.
+
+---
+
+## Notes & Implementation considerations
+
+* **Review locks & drafts:** Reviewer and approver flows support draft comments that can be edited while `lock === false`. A finalizing action (e.g. `send_to_approver`, `approve`, `reject`) sets `lock` to true — comments become immutable. This allows reviewers/approvers to save interim notes and return later as long as the workflow remains unlocked.
+* **Image lifecycle:** Image uploads are pushed to S3 via `uploadImage` and stored as `BlogImage` entries. When images are removed from a blog, controllers call `deleteImageFromS3` to remove S3 keys and clear DB references.
+* **Versioning:** Version creation copies content and media refs into a new version document linked via `previousVersionId` for history and rollback.
+* **Notifications:** Publishing and approval actions trigger notifications (FCM/email) using `sendNotification`, `notifyViaSNS`, or `shootMail` (newsletter flows).
+* **Permissions:** Use the permission matrix to ensure only proper admins can approve, assign, edit, or delete.
+* **Moderation workflows:** Reported items surface in moderator lists for manual triage; controllers mark reports as `resolved` after action.
+
+---
+
+## Summary table
+
+| Method | Endpoint                      | Description                                                   |
+| ------ | ----------------------------- | ------------------------------------------------------------- |
+| POST   | `/save-draft`                 | Create or update admin draft blog                             |
+| POST   | `/upload-file`                | Upload image for blog (S3)                                    |
+| POST   | `/review-blog`                | Reviewer saves comment / requests changes / sends to approver |
+| PATCH  | `/approver-review`            | Approver saves / approves / rejects blog                      |
+| POST   | `/version-blog/:blogId`       | Create a versioned copy of a blog                             |
+| PATCH  | `/update`                     | Update blog content / metadata                                |
+| PATCH  | `/save/:blogId`               | Finalize edits and send for review                            |
+| PATCH  | `/status-update`              | Publish or reject blog                                        |
+| PATCH  | `/assign-reviewer`            | Assign reviewer admin                                         |
+| PATCH  | `/assign-approver`            | Assign approver admin                                         |
+| GET    | `/get`                        | List blogs (filters supported)                                |
+| GET    | `/:blogId`                    | Get full blog by id                                           |
+| GET    | `/get-comments/:blogId`       | Get admin review comments                                     |
+| GET    | `/get-blog-analytics/:blogId` | Blog analytics                                                |
+| DELETE | `/delete/:blogId`             | Delete blog                                                   |
+
+---
