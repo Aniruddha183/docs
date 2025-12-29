@@ -175,6 +175,107 @@
           ]
         },
         {
+          "group": "Coach Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/modules/coach/db-schema",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/modules/coach/admin-panel/layers-breakdown",
+                {
+                  "group": "Blog",
+                  "pages": [
+                    "backend/modules/coach/admin-panel/blog/architecture",
+                    "backend/modules/coach/admin-panel/blog/api-documentation",
+                    "backend/modules/coach/admin-panel/blog/business-logic"
+                  ]
+                },
+                {
+                  "group": "Booking",
+                  "pages": [
+                    "backend/modules/coach/admin-panel/booking/architecture",
+                    "backend/modules/coach/admin-panel/booking/api-documentation",
+                    "backend/modules/coach/admin-panel/booking/business-logic"
+                  ]
+                },
+                {
+                  "group": "Live Session",
+                  "pages": [
+                    "backend/modules/coach/admin-panel/live-session/architecture",
+                    "backend/modules/coach/admin-panel/live-session/api-documentation",
+                    "backend/modules/coach/admin-panel/live-session/business-logic"
+                  ]
+                }
+              ]
+            },
+
+            {
+              "group": "Mobile App",
+              "pages": [
+                "backend/modules/coach/mobile-app/layers-breakdown",
+                {
+                  "group": "Blog",
+                  "pages": [
+                    "backend/modules/coach/mobile-app/blog/architecture",
+                    "backend/modules/coach/mobile-app/blog/api-documentation",
+                    "backend/modules/coach/mobile-app/blog/business-logic"
+                  ]
+                },
+                {
+                  "group": "Booking",
+                  "pages": [
+                    "backend/modules/coach/mobile-app/booking/architecture",
+                    "backend/modules/coach/mobile-app/booking/api-documentation",
+                    "backend/modules/coach/mobile-app/booking/business-logic"
+                  ]
+                },
+                {
+                  "group": "Live Session",
+                  "pages": [
+                    "backend/modules/coach/mobile-app/live-session/architecture",
+                    "backend/modules/coach/mobile-app/live-session/api-documentation",
+                    "backend/modules/coach/mobile-app/live-session/business-logic"
+                  ]
+                }
+              ]
+            },
+
+            {
+              "group": "Website",
+              "pages": [
+                "backend/modules/coach/website/layers-breakdown",
+                {
+                  "group": "Blog",
+                  "pages": [
+                    "backend/modules/coach/website/blog/architecture",
+                    "backend/modules/coach/website/blog/api-documentation",
+                    "backend/modules/coach/website/blog/business-logic"
+                  ]
+                },
+                {
+                  "group": "Booking",
+                  "pages": [
+                    "backend/modules/coach/website/booking/architecture",
+                    "backend/modules/coach/website/booking/api-documentation",
+                    "backend/modules/coach/website/booking/business-logic"
+                  ]
+                },
+                {
+                  "group": "Live Session",
+                  "pages": [
+                    "backend/modules/coach/website/live-session/architecture",
+                    "backend/modules/coach/website/live-session/api-documentation",
+                    "backend/modules/coach/website/live-session/business-logic"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+
+        {
           "group": "Studio Module",
           "pages": [
             "backend/modules/studio/overview",
@@ -283,7 +384,6 @@
                 "backend/User/user-studio-api-doc",
                 "backend/User/store-api-doc",
                 "backend/User/api-doc-workout"
-
               ]
             },
             {
