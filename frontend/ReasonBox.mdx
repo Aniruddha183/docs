@@ -1,6 +1,6 @@
 ---
 title: "Reason Box Component"
-description: "A flexible and interactive Reason Box component for user input and visibility control."
+description: "A flexible and interactive Reason Box component for user input, visibility control, and review-only rendering."
 ---
 
 ### Reason Box Component
@@ -11,7 +11,12 @@ description: "A flexible and interactive Reason Box component for user input and
 
 #### Overview
 
-The `ReasonBox` component is a user-friendly interface for inputting and controlling the visibility of a comment. It is designed with flexibility in mind, allowing dynamic customization of its title, button label, and button icon. This component can be useful in scenarios where users need to provide justifications, feedback, or other types of input.
+The `ReasonBox` component provides a structured UI for capturing and displaying comments along with a visibility toggle. It supports **both controlled and uncontrolled usage**, making it suitable for create, edit, review, and read-only workflows across the admin panel.
+
+The component can be rendered in:
+
+- **Editable mode** (default)
+- **Fully read-only mode** for review and audit screens
 
 #### Features
 
@@ -19,8 +24,9 @@ The `ReasonBox` component is a user-friendly interface for inputting and control
 - **Textarea Input**: Provides a user input field for comments.
 - **Visibility Control**: A checkbox allows toggling comment visibility.
 - **Customizable Button**: The button label and optional icon can be customized.
-- **State Management**: Supports both local and parent-managed state.
-- **Read-Only Mode**: Allows rendering the component in a non-editable, view-only state.
+- **Hybrid State Management**: Works in both controlled and uncontrolled modes.
+- **Read-Only Mode**: Disables textarea, visibility checkbox, and action button.
+- **Safe Checkbox Handling**: Normalizes checkbox state to a boolean value.
 
 #### Usage
 
@@ -58,18 +64,33 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop              | Type                                             | Default            | Description                                                 |
-| ----------------- | ------------------------------------------------ | ------------------ | ----------------------------------------------------------- |
-| `title`           | `string`                                         | `""`               | The title displayed at the top of the component.            |
-| `buttonLabel`     | `string`                                         | `""`               | The label text for the button.                              |
-| `buttonIcon`      | `ReactNode`                                      | `undefined`        | An optional icon for the button.                            |
-| `onButtonClick`   | `(comment: string, visibility: boolean) => void` | `undefined`        | Callback function triggered when the button is clicked.     |
-| `textareaBgColor` | `string`                                         | `"bg-neutral-800"` | Background color for the textarea.                          |
-| `comment`         | `string`                                         | `""`               | The value of the comment input field.                       |
-| `setComment`      | `React.Dispatch<React.SetStateAction<string>>`   | `undefined`        | Function to update the comment state.                       |
-| `visibility`      | `boolean`                                        | `false`            | Whether the comment is visible to the user.                 |
-| `setVisibility`   | `React.Dispatch<React.SetStateAction<boolean>>`  | `undefined`        | Function to update the visibility state.                    |
-| `readOnly`        | `boolean`                                        | `false`            | If `true`, disables interaction with textarea and checkbox. |
+| Prop              | Type                                             | Default            | Description                                                           |
+| ----------------- | ------------------------------------------------ | ------------------ | --------------------------------------------------------------------- |
+| `title`           | `string`                                         | `""`               | The title displayed at the top of the component.                      |
+| `buttonLabel`     | `string`                                         | `""`               | The label text for the button.                                        |
+| `buttonIcon`      | `ReactNode`                                      | `undefined`        | An optional icon for the button.                                      |
+| `onButtonClick`   | `(comment: string, visibility: boolean) => void` | `undefined`        | Callback function triggered when the button is clicked.               |
+| `textareaBgColor` | `string`                                         | `"bg-neutral-800"` | Background color for the textarea.                                    |
+| `comment`         | `string`                                         | `""`               | The value of the comment input field.                                 |
+| `setComment`      | `React.Dispatch<React.SetStateAction<string>>`   | `undefined`        | Function to update the comment state.                                 |
+| `visibility`      | `boolean`                                        | `false`            | Whether the comment is visible to the user.                           |
+| `setVisibility`   | `React.Dispatch<React.SetStateAction<boolean>>`  | `undefined`        | Function to update the visibility state.                              |
+| `readOnly`        | `boolean`                                        | `false`            | If `true`, disables textarea, visibility checkbox, and action button. |
+
+#### State Management Behavior
+
+The `ReasonBox` component supports both **controlled** and **uncontrolled** usage:
+
+- If `comment` and `setComment` are provided, the textarea is fully controlled by the parent.
+- If `visibility` and `setVisibility` are provided, the visibility checkbox is controlled by the parent.
+- If these props are **not provided**, the component falls back to its own internal state.
+
+This allows the component to be reused safely across:
+
+- Create flows
+- Edit flows
+- Review / approval screens
+- Read-only audit views
 
 #### Anatomy
 
@@ -85,8 +106,16 @@ const ExampleComponent = () => {
    - Can be set to read-only.
 
 3. **Action Button**:
+
    - Customizable button with dynamic label and optional icon.
-   - Calls the `onButtonClick` callback when clicked.
+   - Disabled automatically when `readOnly` is `true`.
+   - Calls the `onButtonClick` callback with current comment and visibility state.
+
+#### Behavioral Notes
+
+- The visibility checkbox internally handles `boolean | "indeterminate"` values and always normalizes them to a boolean.
+- Clicking the action button does nothing if `onButtonClick` is not provided.
+- No validation is enforced internally; validation should be handled by the parent.
 
 #### Component Code
 
@@ -189,6 +218,7 @@ export default function ReasonBox({
               className="bg-neutral-600 text-white gap-2"
               size="lg"
               onClick={handleButtonClick}
+              disabled={readOnly}
             >
               {buttonIcon}
               {buttonLabel}
