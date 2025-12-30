@@ -1,0 +1,1113 @@
+---
+title: "Razorpay Integration Tab"
+description: "Admin component for managing Razorpay contact and fund account setup for payouts."
+---
+
+### Razorpay Integration Tab
+
+<Frame>
+  <img
+    src="/images/razorpay-integration-tab.png"
+    style={{ borderRadius: "0.5rem" }}
+  />
+</Frame>
+
+---
+
+## Overview
+
+The `RazorpayIntegrationTab` component is an admin-facing UI used to configure
+Razorpay payout readiness for an entity such as a **Coach** or **Studio**.
+
+It guides administrators through the required Razorpay setup steps in a
+controlled and sequential manner, ensuring payout eligibility is established
+safely and consistently.
+
+---
+
+## Workflow Summary
+
+1. **Create Razorpay Contact**
+2. **Add Fund Account**
+3. **Validate Fund Account**
+4. **Check Fund Account Status**
+
+Each step is enabled only when prerequisite steps are completed.
+
+---
+
+## Features
+
+- **Route or Prop Based Identification**  
+  Reads `referenceId` from props or route params.
+
+- **Entity Type Support**  
+  Works for both `Coach` and `Studio`.
+
+- **Sequential Action Enforcement**  
+  Prevents skipping required Razorpay steps.
+
+- **Pluggable API Handlers**  
+  Allows parent components to override default API behavior.
+
+- **Idempotent Operations**  
+  Gracefully handles “already exists” backend responses.
+
+- **Live Status Refresh**  
+  Optional manual refresh of fund account status.
+
+- **Data Normalization**  
+  Supports multiple backend response formats safely.
+
+- **User Feedback**  
+  Uses toast notifications for success, error, and info states.
+
+---
+
+## Usage
+
+### Basic Usage (Route-Driven)
+
+```tsx
+<RazorpayIntegrationTab />
+```
+
+The component will:
+
+- Read `referenceId` from route params
+- Default `userType` to `"Coach"`
+- Use built-in Razorpay API handlers
+
+---
+
+### Controlled Usage
+
+```tsx
+<RazorpayIntegrationTab
+  referenceId="COH00045"
+  userType="Coach"
+  contactData={contact}
+  fundAccountData={fundAccount}
+/>
+```
+
+---
+
+### Custom API Handlers
+
+```tsx
+<RazorpayIntegrationTab
+  referenceId="STU00012"
+  userType="Studio"
+  onCreateContact={createContact}
+  onAddFundAccount={addFundAccount}
+  onValidateAccount={validateAccount}
+  onStatusCheck={checkStatus}
+/>
+```
+
+---
+
+## Props
+
+| Prop                | Type                         | Default     | Description                                        |
+| ------------------- | ---------------------------- | ----------- | -------------------------------------------------- |
+| `referenceId`       | `string`                     | `undefined` | Reference identifier used for Razorpay operations. |
+| `userType`          | `"Coach" \| "Studio"`        | `"Coach"`   | Entity type for Razorpay payouts.                  |
+| `kycId`             | `string`                     | `undefined` | Optional KYC identifier.                           |
+| `contactData`       | `object`                     | `undefined` | Existing Razorpay contact data.                    |
+| `fundAccountData`   | `object`                     | `undefined` | Existing Razorpay fund account data.               |
+| `onCreateContact`   | `(id, type) => Promise<any>` | `undefined` | Override contact creation handler.                 |
+| `onAddFundAccount`  | `(id, type) => Promise<any>` | `undefined` | Override fund account creation handler.            |
+| `onValidateAccount` | `(id, type) => Promise<any>` | `undefined` | Override fund account validation handler.          |
+| `onStatusCheck`     | `(id, type) => Promise<any>` | `undefined` | Override fund account status check handler.        |
+| `showStatusRefresh` | `boolean`                    | `auto`      | Controls visibility of status refresh button.      |
+
+---
+
+## Data Normalization
+
+The component normalizes incoming `contactData` and `fundAccountData` to support
+multiple backend response formats.
+
+Supported variations include:
+
+- `contactId`, `razorpayContactId`, `contact_id`
+- `fundAccountId`, `razorpayFundAccountId`, `fund_account_id`
+
+This ensures backend changes do not break the UI.
+
+---
+
+## Action Lifecycle
+
+### Create Contact
+
+- Requires `referenceId`
+- Disabled once contact exists
+- Handles duplicate creation safely
+
+### Add Fund Account
+
+- Enabled only after contact creation
+- Displays masked account number
+- Handles duplicate fund accounts gracefully
+
+### Validate Account
+
+- Enabled only after fund account creation
+- Displays validation result via toast
+
+### Status Check
+
+- Optional manual refresh
+- Extracts status from multiple response formats
+
+---
+
+## Render States
+
+- **Pending**: Step not yet available
+- **Ready**: Step available for action
+- **Created / Added**: Step completed
+- **Loading**: API request in progress
+
+Status badges visually represent each state.
+
+---
+
+## Behavioral Notes
+
+- Actions are strictly sequential.
+- Local state updates immediately for responsiveness.
+- Errors do not clear previously successful steps.
+- Toast notifications are the primary feedback mechanism.
+
+---
+
+## Component Code
+
+```tsx
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import Cookies from "js-cookie";
+import { useToast } from "@/components/ui/toast/toast-context";
+import { useParams } from "next/navigation";
+
+export type UserType = "Coach" | "Studio";
+
+interface RazorpayIntegrationTabProps {
+  referenceId?: string; // optional: if not provided, will be read from route params
+  userType?: UserType; // defaults to "Coach"
+  kycId?: string;
+  // prop handlers may optionally be supplied; prefer them when present
+  onCreateContact?: (referenceId: string, userType: UserType) => Promise<any>;
+  onAddFundAccount?: (referenceId: string, userType: UserType) => Promise<any>;
+  onValidateAccount?: (referenceId: string, userType: UserType) => Promise<any>;
+  onStatusCheck?: (referenceId: string, userType: UserType) => Promise<any>;
+  showStatusRefresh?: boolean;
+  contactData?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  fundAccountData?: {
+    id?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+  };
+}
+
+export function RazorpayIntegrationTab(props: RazorpayIntegrationTabProps) {
+  const {
+    referenceId: referenceIdProp,
+    userType: userTypeProp,
+    kycId,
+    onCreateContact,
+    onAddFundAccount,
+    onValidateAccount,
+    contactData: contactDataProp,
+    fundAccountData: fundAccountDataProp,
+  } = props;
+
+  // read params from route (works in client component)
+  const params = useParams();
+  const routeId =
+    (params as any)?.referenceId ??
+    (params as any)?.id ??
+    (params as any)?.coachId ??
+    undefined;
+
+  // effective values: props override route
+  const effectiveReferenceId = referenceIdProp ?? routeId ?? undefined;
+  const effectiveUserType: UserType = (userTypeProp ?? "Coach") as UserType;
+
+  const [isCreatingContact, setIsCreatingContact] = useState(false);
+  const [isAddingFundAccount, setIsAddingFundAccount] = useState(false);
+  const [isValidatingAccount, setIsValidatingAccount] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [fundAccountStatus, setFundAccountStatus] = useState<string | null>(
+    null
+  );
+
+  // --- helper normalizers (put near top of component) ---
+  const normalizeContactProp = (c: any) => {
+    if (!c) return null;
+    return {
+      id:
+        c.id ??
+        c.contactId ??
+        c.razorpayContactId ??
+        c.razorpayContactId ??
+        c.razorpay_contact_id ??
+        undefined,
+      name: c.name ?? c.holderName ?? c.contactName ?? undefined,
+      email: c.email ?? undefined,
+      contact: c.contact ?? c.phoneNumber ?? undefined,
+    };
+  };
+
+  const normalizeFundProp = (f: any) => {
+    if (!f) return null;
+    return {
+      id:
+        f.id ??
+        f.fundAccountId ??
+        f.razorpayFundId ??
+        f.razorpayFundAccountId ??
+        f.razorpay_fund_id ??
+        undefined,
+      accountNumber:
+        f.accountNumber ?? f.account_number ?? f.accNo ?? undefined,
+      ifscCode: f.ifscCode ?? f.ifsc ?? undefined,
+    };
+  };
+
+  // --- use normalized initial state (replace your previous useState lines) ---
+  const [contactData, setContactData] = useState<any>(
+    normalizeContactProp(contactDataProp)
+  );
+  const [fundAccountData, setFundAccountData] = useState<any>(
+    normalizeFundProp(fundAccountDataProp)
+  );
+
+  // --- keep component responsive to prop updates: if parent changes props later, update state ---
+  useEffect(() => {
+    setContactData(normalizeContactProp(contactDataProp));
+  }, [contactDataProp]);
+
+  useEffect(() => {
+    setFundAccountData(normalizeFundProp(fundAccountDataProp));
+  }, [fundAccountDataProp]);
+
+  const { showToast } = useToast();
+
+  // --- Default API handlers (use effectiveReferenceId & effectiveUserType) ---
+  async function defaultCreateContact() {
+    if (!effectiveReferenceId) {
+      showToast?.({
+        type: "error",
+        title: "Missing referenceId",
+        description:
+          "referenceId is required to create a Razorpay contact. Provide it in the route or as a prop.",
+        actionText: "OK",
+      });
+      throw new Error("Missing referenceId");
+    }
+
+    const url = `${process.env.NEXT_PUBLIC_API_COACH}/razorpay/contact/create`;
+    const body = {
+      referenceId: effectiveReferenceId,
+      type: effectiveUserType,
+      notes: {
+        note1: `Contact created from admin UI for ${effectiveReferenceId}`,
+      },
+    };
+
+    try {
+      console.log("Calling create contact:", url, body);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          genToken: Cookies.get("genToken") || "",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      console.log("create contact response:", res.status, json);
+
+      if (!res.ok || json?.success === false) {
+        const msg = json?.message ?? `Create contact failed (${res.status})`;
+
+        // special-case: already added as beneficiary -> treat as "created"
+        if (
+          typeof json?.message === "string" &&
+          json.message.toLowerCase().includes("already added")
+        ) {
+          const created = json?.data ?? { contactId: effectiveReferenceId };
+          const mapped = {
+            id:
+              created?.contactId ??
+              created?.id ??
+              created?.razorpayContactId ??
+              effectiveReferenceId,
+            name: created?.name ?? `Beneficiary ${effectiveReferenceId}`,
+            email: created?.email ?? undefined,
+            contact: created?.contact ?? undefined,
+          };
+
+          setContactData(mapped);
+          showToast?.({
+            type: "draft",
+            title: "Contact already exists",
+            description: json.message,
+            actionText: "OK",
+          });
+
+          return mapped;
+        }
+
+        showToast?.({
+          type: "error",
+          title: "Create Contact Failed",
+          description: msg,
+          actionText: "OK",
+        });
+        throw new Error(msg);
+      }
+
+      // success
+      const created = json?.data ?? json;
+      const mapped = {
+        id:
+          created?.contactId ??
+          created?.id ??
+          created?.razorpayContactId ??
+          undefined,
+        name: created?.name ?? undefined,
+        email: created?.email ?? undefined,
+        contact: created?.contact ?? undefined,
+      };
+
+      setContactData(mapped);
+      showToast?.({
+        type: "success",
+        title: "Contact Created",
+        description: "Razorpay contact created successfully.",
+        actionText: "OK",
+      });
+      return mapped;
+    } catch (err) {
+      console.error("create contact network/error:", err);
+      showToast?.({
+        type: "error",
+        title: "Create Contact Error",
+        description: String((err as any)?.message ?? err),
+        actionText: "OK",
+      });
+      throw err;
+    }
+  }
+
+  async function defaultAddFundAccount() {
+    if (!effectiveReferenceId) {
+      showToast?.({
+        type: "error",
+        title: "Missing referenceId",
+        description:
+          "referenceId is required to add fund account. Provide it in the route or as a prop.",
+        actionText: "OK",
+      });
+      throw new Error("Missing referenceId");
+    }
+
+    const url = `${process.env.NEXT_PUBLIC_API_COACH}/razorpay/fund-account/add`;
+    const body = {
+      referenceId: effectiveReferenceId,
+      userType: effectiveUserType,
+    };
+
+    try {
+      console.log("Calling add fund account:", url, body);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          genToken: Cookies.get("genToken") || "",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      console.log("add fund account response:", res.status, json);
+
+      // Normalize message string for easier checks
+      const msg =
+        typeof json?.message === "string" ? json.message.toLowerCase() : "";
+
+      // special-case: if API says "already ..." treat as created (catch many variants)
+      if (!res.ok || json?.success === false) {
+        if (msg.includes("already")) {
+          // map whatever data is available (fallbacks)
+          const created = json?.data ?? { fundAccountId: undefined };
+          const mapped = {
+            id:
+              created?.fundAccountId ??
+              created?.id ??
+              created?.razorpayFundAccountId ??
+              // fallback to reference so UI treats this as 'exists'
+              effectiveReferenceId,
+            accountNumber:
+              created?.account_number ?? created?.accountNumber ?? undefined,
+            ifscCode: created?.ifsc ?? created?.ifscCode ?? undefined,
+          };
+
+          setFundAccountData(mapped);
+
+          // Use a gentle toast type — still inform the user but avoid alarm
+          showToast?.({
+            type: "draft",
+            title: "Fund account already present",
+            description: json?.message ?? "Fund account already exists.",
+            actionText: "OK",
+          });
+
+          return mapped;
+        }
+
+        // Not an 'already' message — show error toast and throw
+        const errMsg =
+          json?.message ?? `Add fund account failed (${res.status})`;
+        showToast?.({
+          type: "error",
+          title: "Add Fund Account Failed",
+          description: errMsg,
+          actionText: "OK",
+        });
+        throw new Error(errMsg);
+      }
+
+      // success path
+      const created = json?.data ?? json;
+      const mapped = {
+        id:
+          created?.fundAccountId ??
+          created?.id ??
+          created?.razorpayFundAccountId ??
+          // safe fallback so UI enables validate button even if API omitted id
+          effectiveReferenceId,
+        accountNumber:
+          created?.account_number ?? created?.accountNumber ?? undefined,
+        ifscCode: created?.ifsc ?? created?.ifscCode ?? undefined,
+      };
+
+      setFundAccountData(mapped);
+      showToast?.({
+        type: "success",
+        title: "Fund Account Added",
+        description: "Fund account added successfully.",
+        actionText: "OK",
+      });
+      return mapped;
+    } catch (err: any) {
+      console.error("add fund account network/error:", err);
+
+      // If the error message already indicated the "already" case, don't duplicate the toast
+      const errMsgLower = (err?.message ?? "").toLowerCase?.() ?? "";
+      if (errMsgLower.includes("already")) {
+        // already handled above — bail quietly (caller can decide to show message)
+        throw err;
+      }
+
+      showToast?.({
+        type: "error",
+        title: "Add Fund Account Error",
+        description: String(err?.message ?? err),
+        actionText: "OK",
+      });
+      throw err;
+    }
+  }
+
+  async function defaultValidateAccount() {
+    if (!effectiveReferenceId) {
+      showToast?.({
+        type: "error",
+        title: "Missing referenceId",
+        description:
+          "referenceId is required to validate fund account. Provide it in the route or as a prop.",
+        actionText: "OK",
+      });
+      throw new Error("Missing referenceId");
+    }
+
+    const url = `${process.env.NEXT_PUBLIC_API_COACH}/razorpay/fund-account/validate`;
+    const body = {
+      referenceId: effectiveReferenceId,
+      userType: effectiveUserType,
+    };
+
+    try {
+      console.log("Calling validate fund account (POST):", url, body);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          genToken: Cookies.get("genToken") || "",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      console.log("validate account (POST) response:", res.status, json);
+
+      if (json?.message) {
+        if (res.ok && json?.success !== false) {
+          showToast?.({
+            type: "success",
+            title: "Validation Result",
+            description: json.message,
+            actionText: "OK",
+          });
+        } else {
+          showToast?.({
+            type: "error",
+            title: "Validation Failed",
+            description: json.message,
+            actionText: "OK",
+          });
+        }
+      }
+
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message || `Validation failed (${res.status})`);
+      }
+
+      // Treat successful response payload consistently with other handlers
+      const created = json?.data ?? json;
+      // Optionally update fundAccountData if server returns fund-account details
+      if (created) {
+        const mapped = {
+          id:
+            created?.fundAccountId ??
+            created?.id ??
+            created?.razorpayFundAccountId ??
+            effectiveReferenceId,
+          accountNumber:
+            created?.account_number ?? created?.accountNumber ?? undefined,
+          ifscCode: created?.ifsc ?? created?.ifscCode ?? undefined,
+        };
+        setFundAccountData(mapped);
+      }
+
+      return json?.data ?? json;
+    } catch (err) {
+      console.error("validate account (POST) network/error:", err);
+      showToast?.({
+        type: "error",
+        title: "Validation Error",
+        description: String((err as any)?.message ?? err),
+        actionText: "OK",
+      });
+      throw err;
+    }
+  }
+
+  async function defaultStatusCheck() {
+    if (!effectiveReferenceId) {
+      showToast?.({
+        type: "error",
+        title: "Missing referenceId",
+        description:
+          "referenceId is required to check fund-account status. Provide it in the route or as a prop.",
+        actionText: "OK",
+      });
+      throw new Error("Missing referenceId");
+    }
+
+    const url = `${
+      process.env.NEXT_PUBLIC_API_COACH
+    }/razorpay/fund-account/status-check/${encodeURIComponent(
+      effectiveReferenceId
+    )}`;
+
+    try {
+      console.log("Calling fund-account status-check:", url);
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          genToken: Cookies.get("genToken") || "",
+        },
+      });
+
+      const json = await res.json().catch(() => ({}));
+      console.log("status-check response:", res.status, json);
+
+      // if API returned a message, show friendly toasts for non-fatal info
+      if (json?.message) {
+        // show success-like toast only when res.ok
+        showToast?.({
+          type: res.ok ? "success" : "error",
+          title: res.ok ? "Status Check" : "Status Check Failed",
+          description: json.message,
+          actionText: "OK",
+        });
+      }
+
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message ?? `Status check failed (${res.status})`);
+      }
+
+      return json?.data ?? json;
+    } catch (err: any) {
+      console.error("status-check network/error:", err);
+      showToast?.({
+        type: "error",
+        title: "Status Check Error",
+        description: String(err?.message ?? err),
+        actionText: "OK",
+      });
+      throw err;
+    }
+  }
+
+  // wrapper that prefers prop handler if provided
+  const handleStatusCheck = async () => {
+    if (props.onStatusCheck) {
+      return await props.onStatusCheck(
+        effectiveReferenceId ?? "",
+        effectiveUserType
+      );
+    } else {
+      return await defaultStatusCheck();
+    }
+  };
+
+  const handleRefreshStatus = async () => {
+    if (!effectiveReferenceId) {
+      showToast?.({
+        type: "error",
+        title: "Missing referenceId",
+        description: "Cannot check status: missing reference id.",
+        actionText: "OK",
+      });
+      return;
+    }
+
+    setIsCheckingStatus(true);
+    try {
+      // call wrapper which prefers prop handler if provided
+      const data = props.onStatusCheck
+        ? await props.onStatusCheck(effectiveReferenceId, effectiveUserType)
+        : await defaultStatusCheck();
+
+      // Try to extract a status string (robust fallbacks)
+      const statusString =
+        data?.status ??
+        data?.fundAccountStatus ??
+        data?.verificationStatus ??
+        data?.state ??
+        (typeof data === "string" ? data : null) ??
+        null;
+
+      if (statusString) {
+        setFundAccountStatus(String(statusString));
+      }
+
+      // If the status-check returned fund-account details, normalize and update fundAccountData
+      const created = data ?? {};
+      const mapped = {
+        id:
+          created?.fundAccountId ??
+          created?.id ??
+          created?.razorpayFundAccountId ??
+          fundAccountData?.id ??
+          effectiveReferenceId, // safe fallback so UI behaves correctly
+        accountNumber:
+          created?.account_number ??
+          created?.accountNumber ??
+          fundAccountData?.accountNumber ??
+          undefined,
+        ifscCode:
+          created?.ifsc ??
+          created?.ifscCode ??
+          fundAccountData?.ifscCode ??
+          undefined,
+      };
+
+      // Update only if there's some meaningful info (avoid stomping with empty)
+      if (mapped.id || mapped.accountNumber || mapped.ifscCode) {
+        setFundAccountData(mapped);
+      }
+
+      return data;
+    } catch (err) {
+      // defaultStatusCheck already shows a toast on error - avoid duplicate here
+      console.warn("Status check failed:", err);
+      throw err;
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  // wrappers that prefer prop handlers (now pass both referenceId and userType)
+  const handleCreateContact = async () => {
+    setIsCreatingContact(true);
+    try {
+      if (onCreateContact) {
+        await onCreateContact(effectiveReferenceId ?? "", effectiveUserType);
+      } else {
+        await defaultCreateContact();
+      }
+    } catch (err) {
+      // error toasts already shown inside handlers
+    } finally {
+      setIsCreatingContact(false);
+    }
+  };
+
+  const handleAddFundAccount = async () => {
+    setIsAddingFundAccount(true);
+    try {
+      if (onAddFundAccount) {
+        await onAddFundAccount(effectiveReferenceId ?? "", effectiveUserType);
+      } else {
+        await defaultAddFundAccount();
+      }
+    } catch (err) {
+      // handled in handler
+    } finally {
+      setIsAddingFundAccount(false);
+    }
+  };
+
+  const handleValidateAccount = async () => {
+    setIsValidatingAccount(true);
+    try {
+      if (onValidateAccount) {
+        const result = await onValidateAccount(
+          effectiveReferenceId ?? "",
+          effectiveUserType
+        );
+        // prop handler may show its own messages; also show friendly toast
+        showToast?.({
+          type: "success",
+          title: "Validation",
+          description: "Validation finished",
+          actionText: "OK",
+        });
+        return result;
+      } else {
+        return await defaultValidateAccount();
+      }
+    } catch (err: any) {
+      showToast?.({
+        type: "error",
+        title: "Validation Error",
+        description: err?.message ?? "Validation failed",
+        actionText: "OK",
+      });
+      throw err;
+    } finally {
+      setIsValidatingAccount(false);
+    }
+  };
+
+  const contactCreated = !!contactData?.id;
+  const fundAccountCreated = !!fundAccountData?.id;
+
+  return (
+    <div className="w-full space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-1">
+          Razorpay Integration
+        </h3>
+        <p className="text-sm text-neutral-300">
+          Manage Razorpay contact and fund account creation for this KYC (id:{" "}
+          {effectiveReferenceId ?? "—"}, type: {effectiveUserType})
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-32">
+        {/* Create Contact Card */}
+        <div className="border border-neutral-600 rounded-lg bg-neutral-800 p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"
+                    fill="#FAFAFA"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white">Create Contact</h4>
+                <p className="text-xs text-neutral-400">
+                  Initialize Razorpay contact
+                </p>
+              </div>
+            </div>
+
+            {contactCreated ? (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500 bg-opacity-20 border border-green-500">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-xs font-medium text-green-400">
+                  Created
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-700">
+                <div className="w-2 h-2 rounded-full bg-neutral-500" />
+                <span className="text-xs font-medium text-neutral-400">
+                  Pending
+                </span>
+              </div>
+            )}
+          </div>
+
+          {contactCreated && contactData && (
+            <div className="bg-neutral-900 rounded p-3 space-y-2 border border-neutral-700">
+              <div>
+                <p className="text-xs text-neutral-400">Contact ID</p>
+                <p className="text-sm font-mono text-neutral-100">
+                  {contactData.id}
+                </p>
+              </div>
+              {contactData.name && (
+                <div>
+                  <p className="text-xs text-neutral-400">Name</p>
+                  <p className="text-sm text-neutral-100">{contactData.name}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="text-sm text-neutral-300 leading-relaxed">
+            Creates a new contact entity in Razorpay for this reference id. This
+            is required before adding fund accounts.
+          </p>
+
+          <Button
+            onClick={handleCreateContact}
+            disabled={isCreatingContact || contactCreated}
+            className="w-full rounded-lg bg-[#FAFAFA] text-[#262626] hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-400"
+          >
+            {isCreatingContact
+              ? "Creating..."
+              : contactCreated
+              ? "Contact Created"
+              : "Create Contact"}
+          </Button>
+        </div>
+
+        {/* Add Fund Account Card */}
+        <div
+          className={`border rounded-lg p-6 space-y-4 ${
+            contactCreated
+              ? "border-neutral-600 bg-neutral-800"
+              : "border-neutral-700 bg-neutral-900"
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M20 8H4V6h16m0 12H4v-2h16m0-6H4v2h16z"
+                    fill="#FAFAFA"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white">Add Fund Account</h4>
+                <p className="text-xs text-neutral-400">
+                  Link bank account details
+                </p>
+              </div>
+            </div>
+            {/* Badge + optional refresh */}
+            <div className="flex items-center gap-2">
+              {fundAccountCreated ? (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500 bg-opacity-20 border border-green-500">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-xs font-medium text-green-400">
+                    {/* If the status was fetched, show it; else default to "Added" */}
+                    {fundAccountStatus ?? "Added"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-700">
+                  <div className="w-2 h-2 rounded-full bg-neutral-500" />
+                  <span className="text-xs font-medium text-neutral-400">
+                    {/* If status exists, show it; else show Ready/Pending */}
+                    {fundAccountStatus ??
+                      (contactCreated ? "Ready" : "Pending")}
+                  </span>
+                </div>
+              )}
+
+              {/* Refresh button visibility: prefer explicit prop; else show when fundAccountCreated */}
+              {((typeof props.showStatusRefresh === "boolean"
+                ? props.showStatusRefresh
+                : fundAccountCreated) && (
+                <button
+                  onClick={handleRefreshStatus}
+                  disabled={isCheckingStatus}
+                  title="Refresh fund account status"
+                  className={`ml-2 w-8 h-8 rounded-full flex items-center justify-center border ${
+                    isCheckingStatus
+                      ? "opacity-70 cursor-wait"
+                      : "hover:bg-neutral-800"
+                  }`}
+                >
+                  {/* spinner when checking */}
+                  <svg
+                    className={`w-4 h-4 ${
+                      isCheckingStatus ? "animate-spin" : ""
+                    }`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z" />
+                  </svg>
+                </button>
+              )) ||
+                null}
+            </div>
+          </div>
+
+          {fundAccountCreated && fundAccountData && (
+            <div className="bg-neutral-900 rounded p-3 space-y-2 border border-neutral-700">
+              <div>
+                <p className="text-xs text-neutral-400">Fund Account ID</p>
+                <p className="text-sm font-mono text-neutral-100">
+                  {fundAccountData.id}
+                </p>
+              </div>
+              {fundAccountData.accountNumber && (
+                <div>
+                  <p className="text-xs text-neutral-400">Account Number</p>
+                  <p className="text-sm font-mono text-neutral-100">
+                    {fundAccountData.accountNumber
+                      ?.slice(-4)
+                      .padStart(fundAccountData.accountNumber.length, "*")}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p
+            className={`text-sm leading-relaxed ${
+              contactCreated ? "text-neutral-300" : "text-neutral-500"
+            }`}
+          >
+            {contactCreated
+              ? "Add the bank account details linked to this contact for payouts."
+              : "Create a contact first before adding a fund account."}
+          </p>
+
+          <div className="space-y-3">
+            <Button
+              onClick={handleAddFundAccount}
+              disabled={
+                isAddingFundAccount || !contactCreated || fundAccountCreated
+              }
+              className="w-full rounded-lg bg-[#FAFAFA] text-[#262626] hover:bg-neutral-100 disabled:bg-neutral-700 disabled:text-neutral-400"
+            >
+              {isAddingFundAccount
+                ? "Adding..."
+                : fundAccountCreated
+                ? "Fund Account Added"
+                : "Add Fund Account"}
+            </Button>
+
+            <Button
+              onClick={handleValidateAccount}
+              disabled={isValidatingAccount || !fundAccountCreated}
+              className={`w-full rounded-lg ${
+                fundAccountCreated
+                  ? "bg-white text-black hover:bg-neutral-700"
+                  : "bg-neutral-700 text-neutral-400"
+              }`}
+            >
+              {isValidatingAccount ? "Validating..." : "Validate Account"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-neutral-700 rounded-lg bg-neutral-900 p-4 flex gap-3">
+        <div className="w-5 h-5 rounded-full bg-neutral-700 flex-shrink-0 flex items-center justify-center">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8 1.5C4.41 1.5 1.5 4.41 1.5 8C1.5 11.59 4.41 14.5 8 14.5C11.59 14.5 14.5 11.59 14.5 8C14.5 4.41 11.59 1.5 8 1.5ZM7.25 11H8.75V12.5H7.25V11ZM8 10C7.17 10 6.5 9.33 6.5 8.5C6.5 7.67 7.17 7 8 7C8.83 7 9.5 7.67 9.5 8.5C9.5 9.33 8.83 10 8 10Z"
+              fill="#FAFAFA"
+            />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm text-neutral-200">
+            <span className="font-semibold">Pro Tip:</span> Both actions must be
+            completed in order to enable payouts for this reference id via
+            Razorpay.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default RazorpayIntegrationTab;
+```
+
+---
+
+## Customization
+
+- **API Behavior**: Override handlers via props.
+- **Entity Type**: Switch between Coach and Studio.
+- **Status Refresh**: Control refresh visibility.
+- **Styling**: Wrap or theme externally as needed.
+
+---
+
+## Modification Guidelines
+
+- Do not bypass step sequencing.
+- Do not remove normalization logic.
+- Prefer prop handlers over editing default API calls.
+- Preserve idempotent handling of backend responses.
+- Avoid hardcoding API endpoints.
+
+---
+
+This component encapsulates Razorpay payout setup into a safe,
+reusable admin workflow.

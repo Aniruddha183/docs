@@ -8,28 +8,68 @@ description: "Integrate and customize a toast notification system in your Next.j
 #### Success Toast
 
 <Frame>
-  <img src="/images/success_toast.png" style={{ borderRadius: '0.5rem' }} />
+  <img src="/images/success_toast.png" style={{ borderRadius: "0.5rem" }} />
 </Frame>
 
 #### Error Toast
 
 <Frame>
-  <img src="/images/error_toast.png" style={{ borderRadius: '0.5rem' }} />
+  <img src="/images/error_toast.png" style={{ borderRadius: "0.5rem" }} />
 </Frame>
 
 #### Draft Toast
 
 <Frame>
-  <img src="/images/draft_toast.png" style={{ borderRadius: '0.5rem' }} />
+  <img src="/images/draft_toast.png" style={{ borderRadius: "0.5rem" }} />
 </Frame>
 
-This documentation outlines the implementation and usage of a toast notification system in your Next.js project. Below is the breakdown of the components involved and a step-by-step guide.
+#### Toast Lifecycle Rules
+
+Toast dismissal behavior depends on the presence of actions and duration:
+
+- **Toast with no action**
+
+  - Auto-dismisses after `duration` or **5000ms (default)**.
+
+- **Toast with `actionText` or `onAction`**
+
+  - Does **not auto-dismiss** by default.
+  - Stays visible until:
+    - Action is clicked, or
+    - User manually closes it.
+
+- **Toast with action + explicit `duration`**
+  - Auto-dismisses after the specified duration.
+
+These rules prevent users from missing important actionable messages.
+
+This documentation outlines the implementation and usage of a toast notification system in your Next.js project.
+
+The system supports **automatic dismissal**, **action-based persistence**, and
+**explicit duration control**, making it suitable for success messages,
+errors, and interactive notifications.
+
+#### Toast Object Structure
+
+The `showToast` function accepts the following object:
+
+| Field         | Type                              | Required | Description                               |
+| ------------- | --------------------------------- | -------- | ----------------------------------------- |
+| `type`        | `"success" \| "error" \| "draft"` | Yes      | Visual style of the toast.                |
+| `title`       | `string`                          | Yes      | Short heading for the toast.              |
+| `description` | `string`                          | Yes      | Detailed message content.                 |
+| `actionText`  | `string`                          | No       | Label for optional action button.         |
+| `onAction`    | `() => void`                      | No       | Callback executed when action is clicked. |
+| `duration`    | `number`                          | No       | Auto-dismiss time in milliseconds.        |
+
+> `id` is generated internally and should not be provided.
 
 #### Toast Component
 
 The `Toast` component displays a list of notifications with different types (success, error, draft). Each toast includes a title, description, and optional action.
 
 **Code Snippet:**
+
 ```tsx
 import React from "react";
 import { useToast } from "./toast-context";
@@ -53,8 +93,12 @@ const Toast = () => {
 
           {/* Content */}
           <div className="ml-3 flex-1">
-            <h3 className={`text-sm font-semibold ${getColor(type)}`}>{title}</h3>
-            <p className={`text-xs mt-1 ${getDescriptionColor(type)}`}>{description}</p>
+            <h3 className={`text-sm font-semibold ${getColor(type)}`}>
+              {title}
+            </h3>
+            <p className={`text-xs mt-1 ${getDescriptionColor(type)}`}>
+              {description}
+            </p>
 
             {actionText && (
               <button
@@ -86,9 +130,19 @@ export default Toast;
 
 #### Toast Context
 
-The `toast-context` file handles the state management for the toast system. It provides methods to show and remove toasts.
+The `toast-context` file manages toast state, lifecycle timing,
+and dismissal rules using a centralized provider.
+
+#### Behavioral Notes
+
+- Toasts are removed using timers managed by `useEffect`.
+- Multiple toasts can coexist simultaneously.
+- Toast IDs are generated using `Date.now()`.
+- Removing a toast clears its dismissal timer automatically.
+- Action-based toasts are intentionally persistent unless dismissed.
 
 **Code Snippet:**
+
 ```tsx
 import { createContext, useContext, useState } from "react";
 
@@ -124,6 +178,7 @@ export const useToast = () => {
 The `ToastLayout` component combines the `ToastProvider` and the `Toast` component. Wrap your app with this layout to enable toast notifications.
 
 **Code Snippet:**
+
 ```tsx
 import { ToastProvider } from "./toast-context";
 import Toast from "./Toast";
@@ -180,6 +235,55 @@ const MyComponent = () => {
 export default MyComponent;
 ```
 
+---
+
+#### Toast without Action (Auto-Dismiss)
+
+```tsx
+showToast({
+  type: "success",
+  title: "Saved",
+  description: "Changes saved successfully.",
+});
+```
+
+---
+
+#### Toast with Action (Persistent)
+
+```tsx
+showToast({
+  type: "error",
+  title: "Access Denied",
+  description: "You don’t have permission to perform this action.",
+  actionText: "OK",
+  onAction: () => console.log("Acknowledged"),
+});
+```
+
+---
+
+#### Toast with Action + Duration (Auto-Dismiss)
+
+```tsx
+showToast({
+  type: "draft",
+  title: "Draft Saved",
+  description: "Your work has been saved as a draft.",
+  actionText: "View",
+  onAction: () => console.log("Viewing draft"),
+  duration: 3000,
+});
+```
+
 ### Customization
 
 You can modify the `Toast` component to match your app's theme and requirements. Customize styles, icons, or actions as needed.
+
+#### Modification Guidelines
+
+- Do not auto-dismiss action-based toasts by default.
+- Preserve timer cleanup logic in `useEffect`.
+- Avoid mutating the toast array directly.
+- Keep `ToastProvider` mounted once at app root.
+- Add new toast types only with corresponding UI styles.
