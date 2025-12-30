@@ -1,0 +1,707 @@
+---
+title: "Certificate Slider Component"
+description: "A responsive certificate viewer with slider navigation, preview, download, and print support."
+---
+
+### Certificate Slider Component
+
+<Frame>
+  <img
+    src="/images/certificate-slider.png"
+    style={{ borderRadius: "0.5rem" }}
+  />
+</Frame>
+
+---
+
+## Overview
+
+The `CertificateSlider` component is a client-side UI component used to display,
+navigate, preview, download, and print certificates associated with an entity
+(e.g. Coach or Studio).
+
+It supports **multiple backend data shapes**, **controlled and uncontrolled
+navigation**, and provides a **full-screen preview experience** with safe
+fallbacks for missing or invalid certificate images.
+
+---
+
+## Features
+
+- **Slider Navigation**
+
+  - Navigate certificates using arrows or indicators.
+  - Wrap-around navigation for first/last items.
+
+- **Controlled & Uncontrolled Modes**
+
+  - Can manage active slide internally or via parent state.
+
+- **Backend Shape Compatibility**
+
+  - Supports legacy and new certificate URL formats.
+
+- **Full-Screen Preview**
+
+  - Click certificate to open modal preview.
+  - ESC key and backdrop click to close.
+
+- **Download Support**
+
+  - Downloads certificate with correct filename.
+  - Guards against duplicate downloads.
+
+- **Print Support**
+
+  - Prints images or PDFs via hidden iframe.
+  - Handles CORS and fallback scenarios.
+
+- **Safe Fallback Rendering**
+
+  - Displays inline SVG placeholder if image fails to load.
+
+- **Update File Action**
+  - Optional upload/update button for replacing certificates.
+
+---
+
+## Supported Certificate Shapes
+
+The component accepts certificates in multiple formats:
+
+```ts
+// Legacy
+{
+  certificateId: string;
+  certificateURL: string;
+}
+
+// New / Backend Variants
+{
+  certificateId: string;
+  certificateUrl?: string;
+  certificateURL?: string;
+  certificate_url?: string;
+  certificateUrlLarge?: string;
+}
+```
+
+The component automatically resolves the correct URL.
+
+---
+
+## Usage
+
+### Basic Usage (Uncontrolled)
+
+```tsx
+<CertificateSlider
+  certificates={certificates}
+  onUpdateFile={() => console.log("Upload new certificate")}
+/>
+```
+
+---
+
+### Controlled Usage
+
+```tsx
+const [index, setIndex] = useState(0);
+
+<CertificateSlider
+  certificates={certificates}
+  activeIndex={index}
+  onIndexChange={setIndex}
+/>;
+```
+
+---
+
+## Props
+
+| Prop            | Type                      | Default     | Description                                           |
+| --------------- | ------------------------- | ----------- | ----------------------------------------------------- |
+| `certificates`  | `Array<CertLike>`         | `[]`        | List of certificate objects.                          |
+| `onUpdateFile`  | `() => void`              | `undefined` | Callback for uploading or updating certificate files. |
+| `activeIndex`   | `number`                  | `undefined` | Controlled active slide index.                        |
+| `onIndexChange` | `(index: number) => void` | `undefined` | Callback when slide index changes.                    |
+
+---
+
+## Slider Behavior
+
+- Navigation wraps from last → first and first → last.
+- Indicators reflect the current active slide.
+- Counter displays `current / total` when multiple certificates exist.
+
+---
+
+## Preview Lifecycle
+
+1. User clicks certificate image.
+2. Full-screen preview modal opens.
+3. User may:
+
+   - Close preview
+   - Download certificate
+   - Print certificate
+
+4. Preview resources are cleaned up on close.
+
+---
+
+## Download Behavior
+
+- Fetches the certificate to create a local blob URL.
+- Ensures a **single download trigger per click**.
+- Falls back to direct download if fetch fails.
+- Automatically determines file extension.
+
+---
+
+## Print Behavior
+
+- Uses a hidden iframe to preserve user gesture context.
+- Supports both **PDF** and **image** certificates.
+- Falls back to opening in a new tab if CORS blocks printing.
+
+---
+
+## Render States
+
+- **Empty State**
+
+  - Shows placeholder and upload button when no certificates exist.
+
+- **Loaded State**
+
+  - Displays current certificate with navigation controls.
+
+- **Preview State**
+
+  - Full-screen modal with actions.
+
+---
+
+## Behavioral Notes
+
+- Component cleans up object URLs to prevent memory leaks.
+- ESC key closes preview modal.
+- Image load failures never trigger network retries.
+- Printing and downloading are guarded against double execution.
+
+---
+
+## Component Code
+
+```tsx
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Upload,
+  Download,
+  Printer,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// Old/legacy shape (current component API)
+type LegacyCertificate = {
+  certificateId: string;
+  certificateURL: string;
+};
+
+// New/backend shape you’re receiving
+type StudioCertificate = {
+  certificateId: string;
+  certificateUrl?: string; // note lowercase “Url”
+  certificateURL?: string; // sometimes BE may still return this
+  certificate_url?: string; // ultra-safe fallback
+  certificateUrlLarge?: string;
+};
+
+type CertLike = LegacyCertificate | StudioCertificate;
+
+interface CertificateSliderProps {
+  certificates: CertLike[];
+  onUpdateFile?: () => void;
+
+  // Optional controlled index (backward compatible; works uncontrolled too)
+  activeIndex?: number;
+  onIndexChange?: (idx: number) => void;
+}
+
+const SAFE_PLACEHOLDER_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns='http://www.w3.org/2000/svg' width='400' height='160' viewBox='0 0 400 160'>
+  <rect width='100%' height='100%' fill='#262626'/>
+  <text x='50%' y='50%' fill='#9CA3AF' font-family='Arial, sans-serif' font-size='14' dominant-baseline='middle' text-anchor='middle'>
+    No image
+  </text>
+</svg>`)}`;
+
+function getCertUrl(c: CertLike): string {
+  // Prefer any of these, in order
+  return (
+    (c as any)?.certificateURL ||
+    (c as any)?.certificateUrl ||
+    (c as any)?.certificate_url ||
+    (c as any)?.certificateUrlLarge ||
+    ""
+  );
+}
+
+function getCertId(c: CertLike): string {
+  return (c as any)?.certificateId || "";
+}
+
+export default function CertificateSlider({
+  certificates = [],
+  onUpdateFile,
+  activeIndex,
+  onIndexChange,
+}: CertificateSliderProps) {
+  // Support controlled OR uncontrolled mode
+  const isControlled = typeof activeIndex === "number";
+  const [internalIndex, setInternalIndex] = useState(0);
+  const currentIndex = isControlled ? activeIndex! : internalIndex;
+
+  // keep internal in sync if parent switches slides
+  useEffect(() => {
+    if (isControlled) setInternalIndex(activeIndex!);
+  }, [isControlled, activeIndex]);
+
+  const setIndex = (next: number) => {
+    // wrap around
+    if (!certificates.length) return;
+    const max = certificates.length - 1;
+    const normalized = next < 0 ? max : next > max ? 0 : next;
+
+    if (isControlled) {
+      onIndexChange?.(normalized);
+    } else {
+      setInternalIndex(normalized);
+      onIndexChange?.(normalized);
+    }
+  };
+
+  const nextSlide = () => setIndex(currentIndex + 1);
+  const prevSlide = () => setIndex(currentIndex - 1);
+  const goToSlide = (idx: number) => setIndex(idx);
+
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState<string>("");
+  const [previewName, setPreviewName] = useState<string>("certificate");
+  const tmpObjectUrlRef = useRef<string | null>(null); // for cleanup
+
+  const openPreview = (src: string, name?: string) => {
+    setPreviewSrc(src);
+    setPreviewName(
+      name || `certificate-${getCertId(current) || currentIndex + 1}`
+    );
+    setIsPopupOpen(true);
+  };
+
+  const closePopup = () => {
+    setIsPopupOpen(false);
+    if (tmpObjectUrlRef.current) {
+      URL.revokeObjectURL(tmpObjectUrlRef.current);
+      tmpObjectUrlRef.current = null;
+    }
+  };
+
+  // Close on ESC
+  useEffect(() => {
+    if (!isPopupOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closePopup();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isPopupOpen]);
+
+  // put this ref near your other refs
+  const isDownloadingRef = useRef(false);
+
+  // Download with filename; single click trigger; guarded against re-entry
+  const handleDownload = async () => {
+    if (isDownloadingRef.current) return;
+    isDownloadingRef.current = true;
+
+    const finish = () => {
+      isDownloadingRef.current = false;
+    };
+
+    const fallbackDirectDownload = () => {
+      const a = document.createElement("a");
+      a.href = previewSrc;
+      const extFromUrl =
+        (previewSrc.split(".").pop() || "").split("?")[0] || "file";
+      a.download = previewName.endsWith(extFromUrl)
+        ? previewName
+        : `${previewName}.${extFromUrl}`;
+      document.body.appendChild(a);
+      a.click(); // <-- only one click path
+      a.remove();
+      finish();
+    };
+
+    try {
+      const resp = await fetch(previewSrc, {
+        mode: "cors" as RequestMode,
+        cache: "no-cache",
+        credentials: "omit", // set to 'include' if your URLs need cookies
+      });
+      if (!resp.ok) throw new Error("Fetch failed");
+      const blob = await resp.blob();
+
+      const typeExt = blob.type?.split("/")[1];
+      const url = URL.createObjectURL(blob);
+      tmpObjectUrlRef.current = url;
+
+      const a = document.createElement("a");
+      a.href = url;
+
+      const urlExt = (previewSrc.split(".").pop() || "").split("?")[0];
+      const ext = typeExt || urlExt || "file";
+      a.download = previewName.endsWith(ext)
+        ? previewName
+        : `${previewName}.${ext}`;
+
+      document.body.appendChild(a);
+      a.click(); // ✅ single trigger
+      a.remove();
+
+      // free the blob url shortly after the click
+      setTimeout(() => {
+        if (tmpObjectUrlRef.current) {
+          URL.revokeObjectURL(tmpObjectUrlRef.current);
+          tmpObjectUrlRef.current = null;
+        }
+        finish();
+      }, 800);
+    } catch (e) {
+      fallbackDirectDownload();
+    }
+  };
+
+  // Helper: create a hidden iframe and print its contents, then cleanup
+  function printInHiddenIframe(
+    src: string,
+    isPdf: boolean,
+    name: string,
+    onDone?: () => void
+  ) {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+
+    const cleanup = () => {
+      try {
+        document.body.removeChild(iframe);
+      } catch {}
+      onDone?.();
+    };
+
+    // For PDFs we can just set the iframe src to the blob URL and print on load
+    if (isPdf) {
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          // give the browser a moment to spawn the dialog before cleanup
+          setTimeout(cleanup, 1500);
+        }
+      };
+      iframe.src = src;
+      return;
+    }
+
+    // For images: write a tiny HTML that fits the image and auto-prints
+    iframe.onload = () => {
+      const doc = iframe.contentDocument!;
+      doc.open();
+      doc.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>${name}</title>
+          <style>
+            html,body{margin:0;padding:0;height:100%}
+            .wrap{display:flex;align-items:center;justify-content:center;height:100%}
+            img{max-width:100%;max-height:100vh;object-fit:contain}
+          </style>
+        </head>
+        <body>
+          <div class="wrap"><img id="pimg" src="${src}" alt="${name}"/></div>
+          <script>
+            const img = document.getElementById('pimg');
+            (img.decode ? img.decode() : Promise.resolve()).then(() => {
+              setTimeout(() => { window.focus(); window.print(); }, 10);
+            }).catch(() => {
+              setTimeout(() => { window.focus(); window.print(); }, 10);
+            });
+          </script>
+        </body>
+      </html>
+    `);
+      doc.close();
+    };
+    // kick off about:blank load so onload fires
+    iframe.src = "about:blank";
+  }
+
+  // ✅ New: print using hidden iframe, keeping user gesture alive
+  const handlePrint = async () => {
+    const isPdf =
+      /\.pdf($|\?)/i.test(previewSrc) ||
+      previewSrc.toLowerCase().includes("application/pdf");
+
+    try {
+      // Fetch to make a same-origin blob URL (works for CORS-enabled or same-origin)
+      const resp = await fetch(previewSrc, {
+        mode: "cors" as RequestMode,
+        cache: "no-cache",
+        credentials: "omit", // set to "include" if your cert URLs need cookies
+      });
+      if (!resp.ok) throw new Error("Fetch failed");
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      printInHiddenIframe(blobUrl, isPdf, previewName, () => {
+        URL.revokeObjectURL(blobUrl);
+      });
+    } catch (err) {
+      // If CORS blocks blob creation, we can't force-print.
+      // Best fallback: try printing via a direct hidden iframe src (may work for PDFs).
+      if (isPdf) {
+        printInHiddenIframe(previewSrc, true, previewName);
+      } else {
+        // As a last resort, open in a new tab (user can press Ctrl/Cmd+P)
+        window.open(previewSrc, "_blank", "noopener,noreferrer");
+      }
+    }
+  };
+
+  if (!certificates || certificates.length === 0) {
+    return (
+      <div className="mt-4 relative w-[508px] h-[230px] bg-[#262626] rounded-md flex items-center justify-center">
+        <div className="text-white text-center">
+          <p className="mb-4">No certificates available</p>
+          <Button
+            type="button"
+            onClick={onUpdateFile}
+            className="bg-[#262626] text-white px-4 py-2 rounded-md shadow hover:bg-gray-700 focus:outline-none"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Certificate
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const current = certificates[currentIndex];
+  const url = getCertUrl(current);
+  const id = getCertId(current);
+
+  return (
+    <div className="mt-4 relative w-[508px] h-[230px] bg-[#262626] rounded-md overflow-hidden">
+      {/* Main slider container */}
+      <div className="relative w-full h-full">
+        {/* Certificate display */}
+        <div className="w-full h-full flex items-center justify-center p-4">
+          <div className="bg-neutral-800 p-3 rounded-md w-full max-w-[400px]">
+            {url ? (
+              <img
+                src={url}
+                alt={`Certificate ${currentIndex + 1}`}
+                className="w-full h-40 object-cover rounded mb-2 cursor-zoom-in"
+                onClick={() =>
+                  openPreview(url, `certificate-${id || currentIndex + 1}`)
+                }
+                onError={(e) => {
+                  // Prevent onError recursion
+                  const img = e.target as HTMLImageElement;
+                  img.onerror = null;
+                  // If remote URL fails, use inline safe placeholder (no network request)
+                  img.src = SAFE_PLACEHOLDER_SVG;
+                }}
+              />
+            ) : (
+              // No remote URL at all — render a static placeholder to avoid any fetch
+              <div className="w-full h-40 rounded mb-2 flex items-center justify-center bg-[#202020] text-gray-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="120"
+                  height="48"
+                  viewBox="0 0 120 48"
+                  className="opacity-80"
+                >
+                  <rect width="120" height="48" rx="6" fill="#262626" />
+                  <text
+                    x="50%"
+                    y="50%"
+                    fill="#9CA3AF"
+                    fontSize="12"
+                    fontFamily="Arial"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                  >
+                    upload image
+                  </text>
+                </svg>
+              </div>
+            )}
+
+            <p className="text-white text-sm truncate">ID: {id}</p>
+          </div>
+        </div>
+
+        {/* Navigation arrows */}
+        {certificates.length > 1 && (
+          <>
+            <button
+              onClick={prevSlide}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+              aria-label="Previous certificate"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={nextSlide}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+              aria-label="Next certificate"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        )}
+
+        {/* Slide indicators */}
+        {certificates.length > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+            {certificates.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentIndex ? "bg-white" : "bg-white/50"
+                }`}
+                aria-label={`Go to certificate ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Certificate counter */}
+        {certificates.length > 1 && (
+          <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+            {currentIndex + 1} / {certificates.length}
+          </div>
+        )}
+      </div>
+
+      {/* Update File Button */}
+      <button
+        type="button"
+        onClick={onUpdateFile}
+        className="absolute bottom-2 right-2 bg-[#262626] text-white px-3 py-2 rounded-md shadow hover:bg-gray-700 focus:outline-none flex items-center gap-2 text-sm"
+      >
+        <Upload className="w-4 h-4" />
+        Update File
+      </button>
+      {/* Full-Screen Preview */}
+      {isPopupOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-[1px] flex items-center justify-center z-[1000]"
+          onClick={closePopup}
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Top-left: Back + name */}
+          <div className="absolute top-4 left-4 flex items-center gap-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                closePopup();
+              }}
+              className="text-white p-2 rounded hover:bg-white/10"
+              aria-label="Close preview"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <span className="text-white/90 text-sm md:text-base font-medium">
+              {previewName}
+            </span>
+          </div>
+
+          {/* Top-right: Print + Download */}
+          <div className="absolute top-4 right-4 flex gap-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrint();
+              }}
+              className="text-white p-2 rounded hover:bg-white/10"
+              aria-label="Print certificate"
+            >
+              <Printer className="w-6 h-6" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownload();
+              }}
+              className="text-white p-2 rounded hover:bg-white/10"
+              aria-label="Download certificate"
+            >
+              <Download className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Centered preview */}
+          {/* PDFs will just open in print flow; for images we preview here */}
+          <img
+            src={previewSrc}
+            alt="Certificate preview"
+            className="max-w-[92vw] max-h-[82vh] w-auto h-auto rounded-md shadow"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Customization
+
+- **Styling**: Adjust container size and colors externally.
+- **Navigation**: Control slide index via parent state.
+- **File Management**: Integrate upload logic via `onUpdateFile`.
+
+---
+
+## Modification Guidelines
+
+- Do not remove URL normalization logic.
+- Preserve controlled/uncontrolled index handling.
+- Avoid triggering multiple downloads per click.
+- Keep print logic inside iframe-based flow.
+- Maintain safe placeholders for missing images.
+
+---
+
+This component provides a robust, user-friendly way to manage
+certificate previews and actions in admin workflows.

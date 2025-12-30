@@ -108,6 +108,16 @@ You can override automatic module detection using the `module` prop.
 Actions such as **Edit**, **Delete**, **Create Copy**, and **Save Draft** are shown
 only if the user has the required permissions.
 
+#### Render States
+
+The component renders differently based on access state:
+
+1. **Loading**: Displays a loading message while permissions are fetched.
+2. **Access Denied**: Displays a 403-style message and shows a toast once.
+3. **Authorized**: Renders the full form layout.
+
+Do not merge or simplify these states, as they serve different UX purposes.
+
 #### Edit & Save Lifecycle
 
 The component follows a strict edit workflow:
@@ -119,6 +129,15 @@ The component follows a strict edit workflow:
 - `saveArgs` (if provided) are forwarded to `onSaveChanges`.
 
 This ensures safe synchronization between UI state and backend updates.
+
+#### Internal State Synchronization
+
+Although `isEditable` is the single source of truth, the component also maintains
+an internal `isEditing` state for UI-specific behavior (such as dropdown actions).
+
+- `isEditing` is always synchronized from `isEditable`
+- Do not remove or decouple this internal state
+- Dropdown edit actions rely on `isEditing` for correct behavior
 
 #### Anatomy
 
@@ -144,6 +163,16 @@ This ensures safe synchronization between UI state and backend updates.
    - Displays Edit / Save button when enabled.
    - Button visibility respects edit permissions.
 
+#### Dropdown Menu Behavior
+
+- Dropdown visibility is managed internally.
+- Clicking outside the dropdown automatically closes it.
+- Dropdown items are filtered based on permissions.
+- Edit, Save, and Cancel actions are mutually exclusive.
+
+When modifying dropdown behavior, preserve click-outside handling
+and permission checks.
+
 #### Behavioral Notes
 
 - Dropdown actions are shown only if the user has permission.
@@ -151,6 +180,16 @@ This ensures safe synchronization between UI state and backend updates.
 - The form does not render while access data is loading.
 - Header and footer edit buttons stay synchronized.
 - The component safely supports async save handlers.
+
+#### Header Action Button Behavior
+
+The header action button behaves differently based on props:
+
+- If `onActionButtonClick` is provided, the button delegates control to the parent.
+- If not provided, the button toggles edit mode internally.
+- In both cases, `isEditable` remains the source of truth.
+
+This allows the component to support both controlled and semi-controlled usage.
 
 #### Component Code
 
