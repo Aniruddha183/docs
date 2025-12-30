@@ -16,14 +16,15 @@ The `Dynamic Form` component is a flexible and interactive form layout designed 
 #### Features
 
 - **Breadcrumb Navigation**: Displays navigation steps with optional links and icons.
-- **Editable States**: Allows toggling between view and edit modes.
+- **Editable States**: Supports view, edit, save, and cancel workflows.
 - **Status Bar**: Displays session progress with customizable colors.
-- **Action Buttons**: Supports primary action, delete, and copy functionalities.
-- **Dropdown Menu**: Additional options for editing, copying, and deleting the session.
-- **Back Navigation**: Optional back arrow support for easy navigation.
-- **Header Button Toggle**: Control visibility of the header action button.
-- **Separate Edit and Save Buttons**: Allows toggling between edit mode and save mode distinctly.
-- **Additional Action Button**: Supports an extra action button with customizable functionality.
+- **Permission-Aware UI**: Automatically hides or disables actions based on user access.
+- **Header & Footer Actions**: Supports edit/save actions in both header and footer.
+- **Dropdown Action Menu**: Conditionally shows Edit, Create Copy, and Delete actions.
+- **Access Enforcement**: Prevents unauthorized users from viewing the page.
+- **Back Navigation**: Optional back arrow support for navigation.
+- **Additional Action Buttons**: Supports secondary and analytics actions.
+- **Route-Aware Module Detection**: Automatically derives module name from URL.
 
 #### Usage
 
@@ -58,30 +59,66 @@ const ExampleComponent = () => {
 
 #### Props
 
-| Prop                      | Type                                            | Default     | Description                                      |
-| ------------------------- | ----------------------------------------------- | ----------- | ------------------------------------------------ |
-| `breadcrumb`              | `string[]`                                      | `[]`        | Array of breadcrumb labels.                      |
-| `breadcrumbLinks`         | `string[]`                                      | `undefined` | Optional links for breadcrumb navigation.        |
-| `breadcrumbIcons`         | `React.ReactNode[]`                             | `[]`        | Icons corresponding to breadcrumb items.         |
-| `statusBarSteps`          | `React.ReactNode[]`                             | `undefined` | Steps for the session progress status bar.       |
-| `statusBarColorOverride`  | `{ [index: number]: string }`                   | `undefined` | Custom colors for status bar steps.              |
-| `children`                | `ReactNode`                                     | `undefined` | Content to be displayed inside the form.         |
-| `isEditable`              | `boolean`                                       | `false`     | Determines whether the form is in edit mode.     |
-| `setIsEditable`           | `React.Dispatch<React.SetStateAction<boolean>>` | `undefined` | Function to toggle edit mode.                    |
-| `actionButtonLabel`       | `string`                                        | `"Edit"`    | Label for the primary action button.             |
-| `actionButtonIcon`        | `React.ReactNode`                               | `undefined` | Optional icon for the action button.             |
-| `onActionButtonClick`     | `() => void`                                    | `undefined` | Callback for the primary action button.          |
-| `onDeleteClick`           | `() => void`                                    | `undefined` | Callback for the delete action.                  |
-| `onCopyClick`             | `() => void`                                    | `undefined` | Callback for the copy action.                    |
-| `onSaveChanges`           | `() => void`                                    | `undefined` | Callback for saving changes.                     |
-| `showButton`              | `boolean`                                       | `false`     | Determines if the edit/save button is shown.     |
-| `showHeaderButton`        | `boolean`                                       | `true`      | Determines if the header action button is shown. |
-| `headerTitle`             | `string`                                        | `undefined` | Title displayed in the form header.              |
-| `showDropdown`            | `boolean`                                       | `true`      | Determines if the dropdown menu is displayed.    |
-| `showBackArrow`           | `boolean`                                       | `false`     | Shows a back arrow for navigation.               |
-| `onAdditionalButtonClick` | `() => void`                                    | `undefined` | Callback for the additional action button.       |
-| `additionalButtonLabel`   | `string`                                        | `undefined` | Label for the additional action button.          |
-| `additionalButtonIcon`    | `React.ReactNode`                               | `undefined` | Icon to display on the additional action button. |
+| Prop                      | Type                                            | Default     | Description                                           |
+| ------------------------- | ----------------------------------------------- | ----------- | ----------------------------------------------------- |
+| `breadcrumb`              | `string[]`                                      | `[]`        | Array of breadcrumb labels.                           |
+| `breadcrumbLinks`         | `string[]`                                      | `undefined` | Optional links for breadcrumb navigation.             |
+| `breadcrumbIcons`         | `React.ReactNode[]`                             | `[]`        | Icons corresponding to breadcrumb items.              |
+| `statusBarSteps`          | `React.ReactNode[]`                             | `undefined` | Steps for the session progress status bar.            |
+| `statusBarColorOverride`  | `{ [index: number]: string }`                   | `undefined` | Custom colors for status bar steps.                   |
+| `children`                | `ReactNode`                                     | `undefined` | Content to be displayed inside the form.              |
+| `isEditable`              | `boolean`                                       | `false`     | Determines whether the form is in edit mode.          |
+| `setIsEditable`           | `React.Dispatch<React.SetStateAction<boolean>>` | `undefined` | Function to toggle edit mode.                         |
+| `actionButtonLabel`       | `string`                                        | `"Edit"`    | Label for the primary action button.                  |
+| `actionButtonIcon`        | `React.ReactNode`                               | `undefined` | Optional icon for the action button.                  |
+| `onActionButtonClick`     | `() => void`                                    | `undefined` | Callback for the primary action button.               |
+| `onDeleteClick`           | `() => void`                                    | `undefined` | Callback for the delete action.                       |
+| `onCopyClick`             | `() => void`                                    | `undefined` | Callback for the copy action.                         |
+| `onSaveChanges`           | `() => void`                                    | `undefined` | Callback for saving changes.                          |
+| `showButton`              | `boolean`                                       | `false`     | Determines if the edit/save button is shown.          |
+| `showHeaderButton`        | `boolean`                                       | `true`      | Determines if the header action button is shown.      |
+| `headerTitle`             | `string`                                        | `undefined` | Title displayed in the form header.                   |
+| `showDropdown`            | `boolean`                                       | `true`      | Determines if the dropdown menu is displayed.         |
+| `showBackArrow`           | `boolean`                                       | `false`     | Shows a back arrow for navigation.                    |
+| `onAdditionalButtonClick` | `() => void`                                    | `undefined` | Callback for the additional action button.            |
+| `additionalButtonLabel`   | `string`                                        | `undefined` | Label for the additional action button.               |
+| `additionalButtonIcon`    | `React.ReactNode`                               | `undefined` | Icon to display on the additional action button.      |
+| `onCancel`                | `() => void`                                    | `undefined` | Called when the user cancels edit mode.               |
+| `saveArgs`                | `any[]`                                         | `[]`        | Optional arguments passed to `onSaveChanges`.         |
+| `enforceAccess`           | `boolean`                                       | `true`      | Enables permission-based access control.              |
+| `module`                  | `string`                                        | `undefined` | Overrides auto-derived module name for access checks. |
+| `analyticsButtonLabel`    | `string`                                        | `undefined` | Label for analytics button in header.                 |
+| `analyticsButtonIcon`     | `ReactNode`                                     | `undefined` | Icon for analytics button.                            |
+| `onAnalyticsButtonClick`  | `() => void`                                    | `undefined` | Callback for analytics button.                        |
+| `secondaryButtonLabel`    | `string`                                        | `undefined` | Label for secondary header button.                    |
+| `secondaryButtonIcon`     | `ReactNode`                                     | `undefined` | Icon for secondary header button.                     |
+| `onSecondaryButtonClick`  | `() => void`                                    | `undefined` | Callback for secondary button.                        |
+
+#### Access Control & Permissions
+
+When `enforceAccess` is enabled (default):
+
+- The component fetches user permissions automatically.
+- The module name is derived from the current route.
+- Unauthorized users see an **Access Denied** message.
+- A toast notification is shown once if access is denied.
+
+You can override automatic module detection using the `module` prop.
+
+Actions such as **Edit**, **Delete**, **Create Copy**, and **Save Draft** are shown
+only if the user has the required permissions.
+
+#### Edit & Save Lifecycle
+
+The component follows a strict edit workflow:
+
+- `isEditable` is the single source of truth.
+- Clicking **Edit** enables edit mode.
+- Clicking **Save Changes** triggers `onSaveChanges`.
+- Clicking **Cancel** triggers `onCancel` and exits edit mode.
+- `saveArgs` (if provided) are forwarded to `onSaveChanges`.
+
+This ensures safe synchronization between UI state and backend updates.
 
 #### Anatomy
 
@@ -91,7 +128,9 @@ const ExampleComponent = () => {
 
 2. **Header**:
 
-   - Displays title, action button, additional button, and optional dropdown menu.
+   - Displays title and optional back arrow.
+   - Contains permission-gated action buttons.
+   - Includes optional dropdown menu for advanced actions.
 
 3. **Status Bar**:
 
@@ -102,7 +141,16 @@ const ExampleComponent = () => {
    - Contains session details or form fields.
 
 5. **Footer**:
-   - Includes edit/save button and optional actions.
+   - Displays Edit / Save button when enabled.
+   - Button visibility respects edit permissions.
+
+#### Behavioral Notes
+
+- Dropdown actions are shown only if the user has permission.
+- Access checks occur before rendering the form.
+- The form does not render while access data is loading.
+- Header and footer edit buttons stay synchronized.
+- The component safely supports async save handlers.
 
 #### Component Code
 
@@ -111,10 +159,22 @@ const ExampleComponent = () => {
 ```tsx
 "use client";
 
-import React, { useReducer, ReactNode, useEffect, useRef } from "react";
+import React, {
+  useReducer,
+  ReactNode,
+  useEffect,
+  useRef,
+  useMemo,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
+import { usePathname } from "next/navigation";
+import { useToast } from "@/components/ui/toast/toast-context";
+
+const apiendpoint2 = process.env.NEXT_PUBLIC_API_ADMIN;
 
 interface LiveSessionFormProps {
   breadcrumb: string[];
@@ -127,9 +187,12 @@ interface LiveSessionFormProps {
   setIsEditable: React.Dispatch<React.SetStateAction<boolean>>;
   actionButtonLabel?: string;
   actionButtonIcon?: React.ReactNode;
+  onActionButtonClick?: () => void; // ✅ Add this
   onDeleteClick?: () => void; // New optional prop for Delete
   onCopyClick?: () => void; // New optional prop for Create a Copy
-  onSaveChanges?: () => void;
+  onSaveChanges?: (...args: any[]) => void | Promise<void>; // stays compatible
+  onCancel?: (...args: any[]) => void;
+  saveArgs?: any[]; // NEW, optional
   showButton?: boolean;
   showHeaderButton?: boolean;
   headerTitle?: string;
@@ -138,7 +201,58 @@ interface LiveSessionFormProps {
   additionalButtonLabel?: string;
   additionalButtonIcon?: React.ReactNode;
   onAdditionalButtonClick?: () => void;
+  analyticsButtonLabel?: string;
+  analyticsButtonIcon?: React.ReactNode;
+  enforceAccess?: boolean; // default true
+  module?: string;
+  onAnalyticsButtonClick?: () => void;
+  secondaryButtonLabel?: string;
+  secondaryButtonIcon?: React.ReactNode;
+  onSecondaryButtonClick?: () => void;
 }
+
+type Perms = Record<
+  | "View"
+  | "Edit"
+  | "Delete"
+  | "Review"
+  | "Create"
+  | "Approve"
+  | "Respond"
+  | "AddUserPermission"
+  | "AddGroupPermission"
+  | "AddRolePermission"
+  | "AddUser"
+  | "AddRole"
+  | "AddGroup"
+  | "DeleteUserPermission"
+  | "DeleteGroupPermission"
+  | "DeleteRolePermission"
+  | "DeleteGroup"
+  | "DeleteUser"
+  | "DeleteRole"
+  | "BulkUpload"
+  | "DELETEUSER"
+  | "Report"
+  | "AssignApprover"
+  | "AssignReviewer"
+  | "ADD_REVIEWER_COMMENT"
+  | "ADD_APPROVER_COMMENT"
+  | "CREATE_VERSION"
+  | "RETIRE"
+  | "SAVE_AS_DRAFT"
+  | "SEND_FOR_REVIEW",
+  boolean
+>;
+
+type AccessResponse = {
+  success: boolean;
+  pagesAccessible: string[];
+  moduleAccess: {
+    superAdmin: boolean;
+    modules: Record<string, Perms>;
+  };
+};
 
 type ToggleAction = { type: "TOGGLE" } | { type: "SET"; payload: boolean };
 
@@ -152,6 +266,123 @@ const toggleReducer = (state: boolean, action: ToggleAction): boolean => {
       return state;
   }
 };
+// --- utils: normalization
+const normalizeKey = (s: string) =>
+  (s || "").toLowerCase().replace(/[^\w]/g, "");
+
+// --- static base map (kept for compatibility)
+const MODULE_NAME_MAP: Record<string, string> = {
+  workoutmanagement: "Workout Management",
+  mediamanagement: "Media Management",
+  usermanagement: "User Management",
+  categorymanagement: "Category Management",
+  livesessionmanagement: "Live Session Management",
+  // ✅ NEW: anything under /gymManagement/* is Studio Management
+  gymmanagement: "Studio Management",
+};
+
+// --- segment/phrase aliases (auto-mapping by any segment or combo)
+const ALIAS_SEGMENT_MAP: Record<string, string> = {
+  // single-segment aliases
+  ...MODULE_NAME_MAP, // keep existing
+  studio: "Studio Management",
+  studiomangement: "Studio Management", // typo safety
+  // combined keys (joined segments) if you need special cases
+  gymmanagementlivesessionmanagement: "Studio Management",
+};
+
+// --- static manual regex overrides (catch-all for families of routes)
+const MANUAL_OVERRIDES: Array<{ test: RegExp; module: string }> = [
+  // ✅ Entire /gymManagement tree → Studio Management
+  {
+    test: /^\/(?:[a-z]{2}\/)?gymmanagement(?:\/.*)?$/i,
+    module: "Studio Management",
+  },
+];
+
+// --- localStorage-backed manual overrides you can add at runtime (no redeploy)
+const OVERRIDES_STORAGE_KEY = "ACCESS_MODULE_OVERRIDES";
+type OverrideItem = { pattern: string; module: string };
+
+function loadOverrides(): OverrideItem[] {
+  try {
+    return JSON.parse(localStorage.getItem(OVERRIDES_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+function saveOverrides(items: OverrideItem[]) {
+  try {
+    localStorage.setItem(OVERRIDES_STORAGE_KEY, JSON.stringify(items));
+  } catch {}
+}
+
+/** Call this anywhere (e.g., a small admin “Access Tools” panel) to add a manual override. */
+export function addModuleOverride(pattern: string, module: string) {
+  const items = loadOverrides().filter((it) => it.pattern !== pattern);
+  items.push({ pattern, module });
+  saveOverrides(items);
+}
+
+/** Central resolver with precedence: prop > runtime overrides > static overrides > segment aliases > base map */
+function deriveModuleNameFromPath(
+  path: string,
+  explicitFromProp?: string
+): { name: string; source: string } {
+  if (explicitFromProp && explicitFromProp.trim()) {
+    return { name: explicitFromProp.trim(), source: "prop" };
+  }
+
+  // 1) runtime overrides from localStorage
+  for (const { pattern, module } of loadOverrides()) {
+    try {
+      const re = new RegExp(pattern, "i");
+      if (re.test(path)) return { name: module, source: `runtime:${pattern}` };
+    } catch {
+      // bad pattern → ignore
+    }
+  }
+
+  // 2) static manual overrides
+  for (const { test, module } of MANUAL_OVERRIDES) {
+    if (test.test(path)) return { name: module, source: `manual:${test}` };
+  }
+
+  // 3) aliases by combo of segments
+  const segments = (path || "").toLowerCase().split("/").filter(Boolean);
+  const comboKey = normalizeKey(segments.join("")); // e.g., "gymmanagementlivesessionmanagement"
+  if (ALIAS_SEGMENT_MAP[comboKey]) {
+    return {
+      name: ALIAS_SEGMENT_MAP[comboKey],
+      source: `alias:combo:${comboKey}`,
+    };
+  }
+
+  // 4) aliases by individual segments
+  for (const seg of segments) {
+    const k = normalizeKey(seg);
+    if (ALIAS_SEGMENT_MAP[k]) {
+      return { name: ALIAS_SEGMENT_MAP[k], source: `alias:seg:${k}` };
+    }
+  }
+
+  // 5) fallback to first-segment base map
+  const firstKey = normalizeKey(segments[0] || "");
+  if (MODULE_NAME_MAP[firstKey]) {
+    return {
+      name: MODULE_NAME_MAP[firstKey],
+      source: "fallback:first-segment",
+    };
+  }
+
+  return { name: "", source: "unknown" };
+}
+
+// A tiny helper to hide chunks
+const Secure: React.FC<{ when: boolean; children: React.ReactNode }> = ({
+  when,
+  children,
+}) => (when ? <>{children}</> : null);
 
 const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
   breadcrumb,
@@ -162,12 +393,15 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
   children,
   isEditable,
   setIsEditable,
-  actionButtonLabel = "Edit",
+  actionButtonLabel,
   actionButtonIcon,
+  onActionButtonClick,
   onAdditionalButtonClick,
   onDeleteClick, // New prop
   onCopyClick, // New prop
+  onCancel,
   onSaveChanges,
+  saveArgs = [], // New optional prop
   showButton = false,
   headerTitle,
   showHeaderButton = true,
@@ -175,25 +409,200 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
   showBackArrow = false,
   additionalButtonLabel,
   additionalButtonIcon,
+  analyticsButtonLabel,
+  analyticsButtonIcon,
+  onAnalyticsButtonClick,
+  secondaryButtonLabel,
+  secondaryButtonIcon,
+  onSecondaryButtonClick,
+  module: moduleOverride,
+  enforceAccess = true,
 }) => {
+  const pathname = usePathname();
   const router = useRouter();
+  const { showToast } = useToast();
   const [isEditing, setIsEditing] = useReducer(toggleReducer, false);
+
+  // sync internal editing with parent prop isEditable (single source of truth)
+  useEffect(() => {
+    setIsEditing({ type: "SET", payload: Boolean(isEditable) });
+  }, [isEditable]);
   const [dropdownOpen, setDropdownOpen] = useReducer(toggleReducer, false);
+  const [access, setAccess] = useState<AccessResponse | null>(null);
+  const [accessLoading, setAccessLoading] = useState<boolean>(!!enforceAccess);
+  const moduleDerive = useMemo(
+    () =>
+      enforceAccess
+        ? deriveModuleNameFromPath(pathname || "", moduleOverride || undefined)
+        : { name: "", source: "skip" },
+    [pathname, enforceAccess, moduleOverride]
+  );
+
+  // If you want to allow the caller to force a module, pass your prop here:
+  // ? deriveModuleNameFromPath(pathname || "", module)
+
+  const moduleName = moduleDerive.name;
+
+  // useEffect(() => {
+  //   console.log("[Access] module derive:", moduleDerive);
+  // }, [moduleDerive]);
+
+  // fetch ACL only if enforcing
+  useEffect(() => {
+    if (!enforceAccess) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const adminId = Cookies.get("admin_id") || "";
+        const idToken = Cookies.get("id_token") || "";
+        const genToken = Cookies.get("genToken") || "";
+
+        const res = await fetch(
+          `${apiendpoint2}/access/users/accessible-pages/${adminId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              genToken,
+              "x-refresh-token": Cookies.get("refresh_token") || "",
+              "x-username": Cookies.get("username") || "",
+            },
+            signal: ctrl.signal,
+          }
+        );
+        const json: AccessResponse = await res.json();
+        setAccess(json ?? null);
+      } catch (e) {
+        if (!(e instanceof DOMException && e.name === "AbortError")) {
+          setAccess(null);
+        }
+      } finally {
+        setAccessLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [enforceAccess, apiendpoint2]);
+  // ---- permissions (ONLY superAdmin or View) ----
+  const superAdmin = !!access?.moduleAccess?.superAdmin;
+  const perms: Partial<Perms> =
+    (moduleName && access?.moduleAccess?.modules?.[moduleName]) || {};
+
+  // 🔑 this is the final gate you asked for
+  const canView = !enforceAccess || superAdmin || !!perms.View;
+
+  // 🔔 show Access Denied toast ONCE, AFTER ACL resolves
+  const deniedToastShown = useRef(false);
+  useEffect(() => {
+    if (!enforceAccess) return;
+    if (accessLoading) return; // wait until ACL loaded
+    if (canView) return; // only when actually denied
+    if (deniedToastShown.current) return;
+    deniedToastShown.current = true;
+    showToast({
+      type: "error",
+      title: "Access denied",
+      description: "You don’t have permission to view this page.",
+      actionText: "OK",
+    });
+  }, [enforceAccess, accessLoading, canView, showToast]);
+
+  const pages = Array.isArray(access?.pagesAccessible)
+    ? access!.pagesAccessible
+    : [];
+
+  // ✅ Debug log for permissions
+  // console.log("[Access Debug]", {
+  //   enforceAccess,
+  //   accessLoading,
+  //   access,
+  //   canView,
+  //   pages,
+  // });
+
+  const normalize = (s: string) => s?.trim().toLowerCase();
+
+  const viewAllowedByPages =
+    !!moduleName && pages.some((p) => normalize(p) === normalize(moduleName));
+
+  const can = (k: keyof Perms) => {
+    const result =
+      !enforceAccess ||
+      superAdmin ||
+      (k === "View" && viewAllowedByPages) ||
+      !!perms[k];
+
+    // console.log(`[can] ${k} =>`, result, {
+    //   superAdmin,
+    //   perms,
+    //   viewAllowedByPages,
+    //   moduleName,
+    // });
+    return result;
+  };
+
+  const canAny = (keys: (keyof Perms)[]) => {
+    const result = !enforceAccess || superAdmin || keys.some((k) => perms[k]);
+    // console.log(`[canAny] ${keys.join(",")} =>`, result);
+    return result;
+  };
+
+  // EXAMPLE MAPPING used inside JSX below:
+  const canEdit = can("Edit");
+  const canDelete = can("Delete");
+  const canAssignReviewer = can("AssignReviewer");
+  const canAssignApprover = can("AssignApprover");
+  const canSaveDraft = can("SAVE_AS_DRAFT");
+  const canSendForReview = can("SEND_FOR_REVIEW");
+  const showActionsMenu = canAny(["Edit", "Delete", "CREATE_VERSION"]);
+  // Which header "Edit" button to show
+  const showHeaderEditBtn = showHeaderButton && !!actionButtonLabel && canEdit;
+
+  // Which dropdown items are allowed
+  const allowDropdownEdit = canEdit; // "Edit" / "Save Changes"
+  const allowDropdownCopy = !!onCopyClick && can("CREATE_VERSION");
+  const allowDropdownDelete = !!onDeleteClick && canDelete;
+
+  // Only show the 3-dot dropdown if at least one item is allowed
+  const allowDropdown =
+    showDropdown &&
+    (allowDropdownEdit || allowDropdownCopy || allowDropdownDelete);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleEditClick = () => {
-    console.log("handleEditClick called, isEditable:", isEditable);
-
-    // Toggle between edit and non-edit mode without triggering save
-    setIsEditable((prev) => !prev);
+  const callOnSaveChanges = async () => {
+    if (!onSaveChanges) return;
+    if (Array.isArray(saveArgs) && saveArgs.length > 0) {
+      await onSaveChanges(...saveArgs); // passes args when provided
+    } else {
+      await onSaveChanges(); // old behavior
+    }
   };
 
-  const handleSaveClick = () => {
+  const handleEditClick = () => {
+    // Toggle the parent-provided isEditable
+    setIsEditable((prev) => {
+      const next = !prev;
+      // if we're leaving edit mode (prev === true), that means Save action
+      if (prev && onSaveChanges) {
+        void callOnSaveChanges();
+      }
+      return next;
+    });
+    // internal sync will be handled by the useEffect above
+  };
+
+  const handleSaveClick = async () => {
     if (onSaveChanges) {
-      console.log("Saving changes...");
-      onSaveChanges(); // Calls the API when saving
+      await callOnSaveChanges();
     }
+    // After save, ensure parent edit mode is turned off
+    setIsEditable(false);
+  };
+
+  const handleCancelClick = () => {
+    // Let the parent revert any temporary changes using onCancel
+    if (onCancel) onCancel();
+    // ensure edit mode is turned off in parent
+    setIsEditable(false);
   };
 
   const handleClickOutside = (event: MouseEvent) => {
@@ -207,11 +616,10 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
 
   const handleActionButtonClick = () => {
     if (isEditable) {
-      console.log("Saving content...");
-      if (onSaveChanges) onSaveChanges(); // ✅ Call API when saving
+      if (onSaveChanges) void callOnSaveChanges();
+      setIsEditable(false);
     } else {
-      console.log("Enabling edit mode...");
-      setIsEditable(true); // ✅ Toggle edit mode
+      setIsEditable(true);
     }
   };
 
@@ -226,178 +634,304 @@ const LiveSessionForm: React.FC<LiveSessionFormProps> = ({
     };
   }, [dropdownOpen]);
 
+  // While loading access, you can either render skeleton or pessimistic hide
+  // ⛔ don’t render the form at all while ACL is loading
+  if (enforceAccess && accessLoading) {
+    return <div className="p-6 text-neutral-300">Loading...</div>;
+  }
+
+  // After accessLoading guard, before return’s main body:
+  // console.log("[Access] About to compute canView", {
+  //   enforceAccess,
+  //   accessLoading,
+  //   moduleName,
+  //   modules: access?.moduleAccess?.modules
+  //     ? Object.keys(access.moduleAccess.modules)
+  //     : null,
+  //   pagesAccessible: access?.pagesAccessible,
+  //   rawAccess: access,
+  // });
+
   return (
-    <div className="container mx-auto py-10 pt-24 pr-5 pl-[280px]">
-      {/* Breadcrumb */}
-      <div className="mb-4 text-sm text-gray-500 flex items-center space-x-2">
-        {breadcrumb.map((item, index) => (
-          <React.Fragment key={index}>
-            {/* Divider for breadcrumbs */}
-            {index > 0 && <span className="text-lg text-white">›</span>}
-
-            {/* Breadcrumb with or without an icon */}
-            <div className="flex items-center space-x-2">
-              {breadcrumbIcons[index] && (
-                <span className="text-lg">{breadcrumbIcons[index]}</span>
-              )}
-              {breadcrumbLinks && breadcrumbLinks[index] ? (
-                <button
-                  className="text-lg text-white hover:underline focus:outline-none"
-                  onClick={() => router.push(breadcrumbLinks[index])}
-                >
-                  {item}
-                </button>
-              ) : (
-                <span className="text-lg text-white">{item}</span>
-              )}
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Main Component */}
-      <div className="border border-[#525252] rounded-lg">
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-[#525252]">
-          <div className="flex items-center space-x-2">
-            {showBackArrow && (
-              <ChevronLeft
-                className="h-6 w-6 text-white cursor-pointer"
-                onClick={() => router.back()}
-              />
-            )}
-            <h1 className="text-xl font-bold text-white">
-              {headerTitle || "Live Session Details"}
-            </h1>
+    <>
+      {enforceAccess && !canView ? (
+        // 403 banner (or return null if you want it fully invisible)
+        <div className="container mx-auto py-10 pt-24 pr-5 pl-[295px]">
+          <div className="rounded-lg border border-neutral-700 bg-neutral-800 text-white p-6">
+            <h2 className="text-lg font-semibold mb-2">Access Denied</h2>
+            <p className="text-neutral-300">
+              You don’t have permission to view this page. Please contact an
+              administrator if you believe this is a mistake.
+            </p>
           </div>
-          <div className="flex items-center space-x-4 relative">
-            {showHeaderButton && actionButtonLabel && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
-                onClick={handleActionButtonClick}
-              >
-                {actionButtonIcon && (
-                  <span className="flex items-center">{actionButtonIcon}</span>
-                )}
-                <span className="text-white">{actionButtonLabel}</span>
-              </Button>
-            )}
+        </div>
+      ) : (
+        // wrapper with sidebar + main frame
+        <div className="flex">
+          {/* Sidebar (example, adjust to your sidebar code) */}
+          <aside
+            id="sidebar"
+            className="fixed top-0 left-0 h-full w-[260px] bg-neutral-900"
+          >
+            {/* sidebar content */}
+          </aside>
 
-            {/* ✅ New Additional Button */}
-            {additionalButtonLabel && onAdditionalButtonClick && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
-                onClick={onAdditionalButtonClick}
-              >
-                {additionalButtonIcon && (
-                  <span className="flex items-center">
-                    {additionalButtonIcon}
-                  </span>
-                )}
-                <span className="text-white">{additionalButtonLabel}</span>
-              </Button>
-            )}
+          {/* Main Frame */}
+          <main className="flex-1 ml-[280px] px-5 pt-24">
+            {/* Breadcrumb */}
+            <div
+              className={`fixed top-16 left-[280px] right-0 
+        flex items-center px-4 py-3 z-10 
+        border-b-2 border-neutral-700 
+        bg-gradient-to-br from-[rgba(41,41,41,0.04)] 
+        to-[rgba(99,98,98,0.04)] backdrop-blur-[5px] text-white`}
+            >
+              {breadcrumb.map((item, index) => (
+                <React.Fragment key={index}>
+                  {/* Divider for breadcrumbs */}
+                  {index > 0 && (
+                    <span className="">
+                      <ChevronRight />
+                    </span>
+                  )}
 
-            {/* Conditional Dropdown */}
-            {showDropdown && (
-              <>
-                <Button
-                  aria-expanded={dropdownOpen}
-                  variant="ghost"
-                  size="icon"
-                  className="hover:bg-neutral-700 bg-neutral-800"
-                  onClick={() => setDropdownOpen({ type: "TOGGLE" })}
-                >
-                  <MoreHorizontal className="h-6 w-6 text-white" />
-                </Button>
-                {dropdownOpen && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute right-0 mt-2 w-40 bg-[#262626] border border-gray-600 rounded-md shadow-lg text-white z-50"
-                    style={{
-                      top: "100%",
-                      marginTop: "0.5rem",
-                    }}
-                  >
-                    <button
-                      className="w-full px-4 py-2 text-left hover:bg-gray-700"
-                      onClick={handleEditClick}
-                      style={{
-                        borderBottom: "1px solid var(--Neutral-600, #525252)",
-                      }}
-                    >
-                      {isEditing ? "Save Changes" : "Edit"}
-                    </button>
-                    {onCopyClick && (
-                      <button
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700"
-                        onClick={onCopyClick}
-                        style={{
-                          borderBottom: "1px solid var(--Neutral-600, #525252)",
-                        }}
-                      >
-                        Create a Copy
-                      </button>
+                  {/* Breadcrumb with or without an icon */}
+                  <div className="flex items-center space-x-2">
+                    {breadcrumbIcons[index] && (
+                      <span className="text-lg">{breadcrumbIcons[index]}</span>
                     )}
-                    {onDeleteClick && (
+                    {breadcrumbLinks && breadcrumbLinks[index] ? (
                       <button
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700"
-                        onClick={onDeleteClick}
+                        className="text-lg text-white hover:underline focus:outline-none"
+                        onClick={() => router.push(breadcrumbLinks[index])}
                       >
-                        Delete
+                        {item}
                       </button>
+                    ) : (
+                      <span className="text-lg text-white">{item}</span>
                     )}
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+                </React.Fragment>
+              ))}
+            </div>
 
-        {/* Status Bar */}
-        <div className="relative flex items-center px-6 py-4">
-          {(statusBarSteps ?? []).map((step, index) => (
-            <React.Fragment key={index}>
-              {index > 0 && (
-                <div
-                  className="flex-grow h-px mx-4"
-                  style={{
-                    backgroundColor:
-                      statusBarColorOverride?.[index] || "#525252",
-                  }}
-                ></div>
-              )}
-              <div
-                className={`flex items-center space-x-2 text-sm ${
-                  index === 0 ? "text-[#0E9F6E]" : "text-gray-400"
-                }`}
-              >
-                {step}
+            {/* Main Component */}
+            <div className="border border-[#525252] rounded-lg mt-10">
+              {/* Header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-[#525252]">
+                <div className="flex items-center space-x-2">
+                  {showBackArrow && (
+                    <ChevronLeft
+                      className="h-6 w-6 text-white cursor-pointer"
+                      onClick={() => router.back()}
+                    />
+                  )}
+                  <h1 className="text-xl font-bold text-white">
+                    {headerTitle || "Live Session Details"}
+                  </h1>
+                </div>
+                <div className="flex items-center space-x-4 relative">
+                  {/* Header Edit button (if you use it separately from dropdown) */}
+                  <Secure when={showHeaderEditBtn}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
+                      onClick={onActionButtonClick ?? handleActionButtonClick}
+                    >
+                      {actionButtonIcon && (
+                        <span className="flex items-center">
+                          {actionButtonIcon}
+                        </span>
+                      )}
+                      <span className="text-white">{actionButtonLabel}</span>
+                    </Button>
+                  </Secure>
+
+                  {/* Additional button (leave ungated unless you want a specific perm) */}
+                  {additionalButtonLabel && onAdditionalButtonClick && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
+                      onClick={onAdditionalButtonClick}
+                    >
+                      {additionalButtonIcon && (
+                        <span className="flex items-center">
+                          {additionalButtonIcon}
+                        </span>
+                      )}
+                      <span className="text-white">
+                        {additionalButtonLabel}
+                      </span>
+                    </Button>
+                  )}
+
+                  {/* Secondary button */}
+                  {secondaryButtonLabel && onSecondaryButtonClick && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
+                      onClick={onSecondaryButtonClick}
+                    >
+                      {secondaryButtonIcon && (
+                        <span className="flex items-center">
+                          {secondaryButtonIcon}
+                        </span>
+                      )}
+                      <span className="text-white">{secondaryButtonLabel}</span>
+                    </Button>
+                  )}
+
+                  {/* Analytics (you said leave it alone for now) */}
+                  {analyticsButtonLabel && onAnalyticsButtonClick && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-neutral-700 bg-neutral-800 flex items-center w-auto px-4 py-2 rounded-lg"
+                      onClick={onAnalyticsButtonClick}
+                    >
+                      {analyticsButtonIcon && (
+                        <span className="flex items-center">
+                          {analyticsButtonIcon}
+                        </span>
+                      )}
+                      <span className="text-white">{analyticsButtonLabel}</span>
+                    </Button>
+                  )}
+
+                  {/* 3-dot dropdown gated by allowed items */}
+                  <Secure when={allowDropdown}>
+                    <>
+                      <Button
+                        aria-expanded={dropdownOpen}
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-neutral-700 bg-neutral-800"
+                        onClick={() => setDropdownOpen({ type: "TOGGLE" })}
+                      >
+                        <MoreHorizontal className="h-6 w-6 text-white" />
+                      </Button>
+
+                      {dropdownOpen && (
+                        <div
+                          ref={dropdownRef}
+                          className="absolute right-0 mt-2 w-40 bg-[#262626] border border-gray-600 rounded-md shadow-lg text-white z-50"
+                          style={{ top: "100%", marginTop: "0.5rem" }}
+                        >
+                          {/* Edit / Save Changes / Cancel */}
+                          <Secure when={allowDropdownEdit}>
+                            {isEditing ? (
+                              <>
+                                <button
+                                  className="w-full px-4 py-2 text-left hover:bg-neutral-700"
+                                  onClick={handleSaveClick}
+                                  style={{
+                                    borderBottom:
+                                      "1px solid var(--Neutral-600, #525252)",
+                                  }}
+                                >
+                                  Save Changes
+                                </button>
+                                <button
+                                  className="w-full px-4 py-2 text-left hover:bg-neutral-700"
+                                  onClick={handleCancelClick}
+                                  style={{
+                                    borderBottom:
+                                      "1px solid var(--Neutral-600, #525252)",
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className="w-full px-4 py-2 text-left hover:bg-neutral-700"
+                                onClick={handleEditClick}
+                                style={{
+                                  borderBottom:
+                                    "1px solid var(--Neutral-600, #525252)",
+                                }}
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </Secure>
+
+                          {/* Create a Copy */}
+                          {allowDropdownCopy && (
+                            <button
+                              className="w-full px-4 py-2 text-left hover:bg-neutral-700"
+                              onClick={onCopyClick}
+                              style={{
+                                borderBottom:
+                                  "1px solid var(--Neutral-600, #525252)",
+                              }}
+                            >
+                              Create a Copy
+                            </button>
+                          )}
+
+                          {/* Delete */}
+                          {allowDropdownDelete && (
+                            <button
+                              className="w-full px-4 py-2 text-left hover:bg-neutral-700"
+                              onClick={onDeleteClick}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  </Secure>
+                </div>
               </div>
-            </React.Fragment>
-          ))}
-        </div>
 
-        {/* Form Fields */}
-        <div className="px-6 py-4">{children}</div>
+              {/* Status Bar */}
+              <div className="relative flex items-center px-6 py-4">
+                {(statusBarSteps ?? []).map((step, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && (
+                      <div
+                        className="flex-grow h-px mx-4"
+                        style={{
+                          backgroundColor:
+                            statusBarColorOverride?.[index] || "#525252",
+                        }}
+                      ></div>
+                    )}
+                    <div
+                      className={`flex items-center space-x-2 text-sm ${
+                        index === 0 ? "text-[#0E9F6E]" : "text-gray-400"
+                      }`}
+                    >
+                      {step}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
 
-        {/* Footer */}
-        <div className="flex justify-end px-6 py-4">
-          {showButton && (
-            <Button
-              onClick={handleEditClick}
-              className="bg-[#A3A3A3] px-4 py-2"
-            >
-              {isEditable ? "Save Changes" : "Edit"}
-            </Button>
-          )}
+              {/* Form Fields */}
+              <div className="px-6 py-">{children}</div>
+
+              {/* Footer */}
+              <div className="flex justify-end px-6 py-4">
+                <Secure when={showButton && canEdit}>
+                  <Button
+                    onClick={handleEditClick}
+                    className="bg-[#A3A3A3] px-4 py-2"
+                  >
+                    {isEditable ? "Save Changes" : "Edit"}
+                  </Button>
+                </Secure>
+              </div>
+            </div>
+          </main>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
@@ -412,5 +946,29 @@ export default LiveSessionForm;
 - **Status Bar**: Define steps and colors to match the workflow.
 - **Header Button Visibility**: Show or hide the main header action button.
 - **Additional Action Button**: Add an extra button for custom functionality.
+
+#### Modification Guidelines
+
+When updating this component, follow these boundaries:
+
+- **Access logic**:  
+  Do not modify permission checks (`can`, `canAny`, `enforceAccess`) unless access rules are changing globally.
+
+- **Edit state**:  
+  `isEditable` must remain the single source of truth.  
+  Avoid introducing additional local edit states.
+
+- **Save behavior**:  
+  Always trigger saves via `onSaveChanges`.  
+  If arguments are needed, use `saveArgs` instead of changing the handler signature.
+
+- **Dropdown actions**:  
+  Add new dropdown items only if they are permission-gated.
+
+- **Header vs Footer buttons**:  
+  Keep both synchronized. Do not add independent edit toggles.
+
+- **Routing-based access**:  
+  Avoid hardcoding module names. Use `module` prop only when auto-detection fails.
 
 This component provides a structured yet customizable form experience for every form layout.
