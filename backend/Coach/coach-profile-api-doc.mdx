@@ -1,0 +1,441 @@
+---
+
+title: "Coach Profile API Documentation"
+description: "REST API reference for the Coach Profile module — profile creation, updates, image uploads, KYC handling, review workflow, and coach dashboard data."
+---
+
+# Coach Profile Module
+
+This document describes all **coach-facing APIs** related to managing a coach profile. It covers profile creation and updates, image uploads (direct and presigned), KYC assets, bio updates, review submission flow, profile retrieval, and dashboard/progress metrics.
+
+Only APIs that are **actually wired in `profileRouter.ts`** are documented here. Extra helper/controller functions present in `profileController.ts` but **not exposed via routes** are intentionally excluded.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/coach
+```
+
+Profile-related routes are mounted under:
+
+```
+/profile/*
+```
+
+Image-related routes are mounted under:
+
+```
+/image/*
+```
+
+So a full endpoint looks like:
+
+```
+/api/fitnearn/web/coach/profile/...
+```
+
+---
+
+## Middleware & Utilities
+
+These utilities are used internally by the profile routes:
+
+* `authenticateCoachToken` (applied at router/app level)
+* `upload.single('image')` — multipart image uploads
+* `getPresignedUploadUrl` — S3 presigned upload generation
+* `UploadContext.COACH`
+* `generateUniqueSequence('COH')`
+* Models:
+
+  * `ProfileModel`
+  * `CoachImageProfileModel`
+  * `CoachKycModel`
+  * `ProfileUpdateModel`
+
+---
+
+## Core Models (Key Fields)
+
+### ProfileModel
+
+* `coach_id`
+* `name`, `email`, `mobileNumber`, `countryCode`
+* `profileImage`, `coverImage`
+* `age`, `gender`
+* `category`, `categoryLevel`
+* `experience`, `peopleCoached`
+* `bio`
+* `stage` (DRAFT | UNDER_REVIEW | APPROVED)
+* `onBoardingComplete`
+* `kycStatus`
+* `createdAt`, `updatedAt`
+
+### CoachImageProfileModel
+
+* `coachId`
+* `tag` (PROFILE | COVER | KYC)
+* `key`, `url`
+* `uploadedAt`
+
+### ProfileUpdateModel
+
+* `updateId`
+* `coachId`
+* `fields`
+* `status` (PENDING | APPROVED | REJECTED)
+* `createdAt`
+
+---
+
+## Endpoints
+
+> Each endpoint includes: method, exact path (where available), controller name, request shape (body/params/queries/headers), a short functioning description (what it does and how), example success response, and common errors.
+
+### 1. Create / Save Coach Profile
+
+**Method:** `POST`
+**URL:** `/api/fitnearn/web/coach/profile/create`
+**Controller:** `createProfile`
+
+**Request Body (JSON)**
+
+```json
+{
+  "coachId": "COA0001",
+  "name": "Jane Doe",
+  "email": "jane@fitnearn.com",
+  "mobileNumber": "9999999999",
+  "age": 30,
+  "gender": "female",
+  "category": "yoga",
+  "categoryLevel": "beginner",
+  "experience": "5 years",
+  "peopleCoached": 200,
+  "bio": "Certified yoga instructor",
+  "profileImage": "https://cdn/profile.jpg",
+  "coverImage": "https://cdn/cover.jpg"
+}
+```
+
+**Functioning**
+
+* Validates coach existence and required identifiers.
+* Builds an `updateFields` object from provided body fields (only present fields are applied).
+* Performs an upsert on `ProfileModel` (`findOneAndUpdate` with `upsert: true`) to create or update the profile.
+* Returns the created/updated profile document.
+
+**Success**
+
+```json
+{ "success": true, "data": { /* ProfileModel object */ } }
+```
+
+**Common errors**
+
+* `400 Bad Request` — missing/invalid `coachId` or required fields.
+* `404 Not Found` — coach account not registered (if applicable).
+* `500 Internal Server Error` — DB or unexpected error.
+
+---
+
+### 2. Upload Coach Image (Direct Upload)
+
+**Method:** `POST`
+**URL:** `/api/fitnearn/web/coach/image/upload`
+**Middleware:** `upload.single('image')`
+**Controller:** `uploadFile`
+
+**Headers**
+
+* `Authorization`: `Bearer <token>` (required if route protected)
+
+**Form Data**
+
+* `coachId` (string) — required
+* `tag` (string) — one of `PROFILE` | `COVER` | `KYC` (required)
+* `image` — multipart file field (required)
+
+**Functioning**
+
+* Accepts the uploaded file in `req.file` (multer memory storage).
+* Calls image utilities (`uploadImage` / `imageHandler`) to upload to S3 and returns `key`/`url` metadata.
+* Persists or updates `CoachImageProfileModel` with `coachId`, `tag`, `key`, and `url`.
+* If `tag === 'KYC'`, creates/updates `CoachKycModel` and sets `ProfileModel.kycStatus = 'In-Process'`.
+
+**Success**
+
+```json
+{
+  "success": true,
+  "message": "File uploaded",
+  "data": { "url": "https://cdn/image.jpg", "key": "coach/COA0001/profile/..", "tag": "PROFILE" }
+}
+```
+
+**Common errors**
+
+* `400` missing `coachId` or file
+* `401/403` unauthorized (if auth enforced)
+* `500` S3/upload or DB failure
+
+**Notes**
+
+* Prefer presigned upload for large files to avoid backend bandwidth usage (see endpoint #3).
+
+---
+
+### 3. Generate Presigned Upload URL (Recommended)
+
+**Method:** `POST`
+**URL:** `/api/fitnearn/web/coach/image/presigned-url`
+**Controller:** `getCoachPresignedUploadUrl`
+
+**Request Body (JSON)**
+
+```json
+{ "coachId": "COA0001", "tag": "PROFILE", "mimeType": "image/jpeg" }
+```
+
+**Functioning**
+
+* Calls `getPresignedUploadUrl(mimeType, coachId, UploadContext.COACH, folderTag, tag)`, which returns:
+
+  * `uploadUrl` (PUT) — presigned S3 URL the client can upload directly to
+  * `publicUrl` — accessible URL to use in the app
+  * `key` — object key to persist
+* Persists a placeholder `CoachImageProfileModel` entry (or updates it) with the `key`/`publicUrl` metadata so the server can reconcile once the client uploads.
+* If `tag === 'KYC'`, create/update `CoachKycModel` and set `kycStatus`.
+
+**Security/Usage**
+
+* The client should upload directly to the returned `uploadUrl` with the correct headers and content-type.
+* After upload, the client may call a confirm endpoint (if implemented) or the server will reconcile based on the persisted `key`.
+
+**Success**
+
+```json
+{ "success": true, "data": { "uploadUrl": "https://s3-presigned-url", "publicUrl": "https://cdn/image.jpg", "key": "coach/COA0001/profile/..." } }
+```
+
+**Common errors**
+
+* `400` missing parameters
+* `500` failed to generate presigned URL
+
+---
+
+### 4. Save / Update Bio (Quick Field Update)
+
+**Method:** `POST`
+**URL:** `/api/fitnearn/web/coach/profile/save-bio`
+**Controller:** `saveBio`
+
+**Request Body**
+
+```json
+{ "coachId": "COA0001", "bio": "Updated professional bio" }
+```
+
+**Functioning**
+
+* Validates presence of `coachId` and `bio`.
+* Updates `ProfileModel` with the new `bio`.
+
+**Success**
+
+```json
+{ "success": true, "message": "profile updated" }
+```
+
+**Common errors**
+
+* `406` no bio provided
+* `404` coach not found
+* `500` DB error
+
+---
+
+### 5. Send Profile for Review (Onboarding / Review Flow)
+
+**Method:** `PATCH`
+**URL:** `/api/fitnearn/web/coach/profile/send-for-review/:coachId`
+**Controller:** `sendProfileForReview`
+
+**Path Params**
+
+* `coachId` (string)
+
+**Functioning**
+
+* Loads the profile by `coach_id`.
+* Updates lifecycle fields: `stage: 'UNDER_REVIEW'` and `onBoardingComplete: true`.
+* Triggers side-effects such as sending notification/email to the reviewer or the coach (via `shootMail` / `sendNotification`).
+
+**Success**
+
+```json
+{ "success": true, "message": "profile sent for review" }
+```
+
+**Common errors**
+
+* `404` profile not found
+* `500` notification or DB error
+
+---
+
+### 6. Get Coach Profile
+
+**Method:** `GET`
+**URL:** `/api/fitnearn/web/coach/profile/:coachId`
+**Controller:** `getProfile`
+
+**Path Params**
+
+* `coachId` (string)
+
+**Functioning**
+
+* Fetches the profile document from `ProfileModel` (excludes heavy fields like `updateHistory` unless needed).
+* Returns profile data used by client apps for display/edit.
+
+**Success**
+
+```json
+{ "success": true, "data": { /* profile */ } }
+```
+
+**Common errors**
+
+* `404` not found
+* `500` internal error
+
+---
+
+### 7. Coach Dashboard / Progress Board
+
+**Method:** `GET`
+**URL:** `/api/fitnearn/web/coach/profile/details/:coachId`
+**Controller:** `homePageProgressBoard`
+
+**Path Params**
+
+* `coachId` (string)
+
+**Functioning**
+
+* Aggregates counts and metrics for the coach:
+
+  * Sessions (completed / upcoming)
+  * Total posts, blogs, videos
+  * Revenue/earnings summary (if applicable)
+* Queries `PublicSession`, `PostModel`, `Blog`, and `WorkoutVideoModel` and composes a summary object.
+
+**Success**
+
+```json
+{ "success": true, "data": { "totalSessions": 40, "completedSessions": 30, "upcomingSessions": 3, "totalBlogs": 4, "totalPosts": 10 } }
+```
+
+**Common errors**
+
+* `404` coach not found
+* `500` aggregation error
+
+---
+
+### 8. Request Profile Update (Create Update Request)
+
+**Method:** `PATCH`
+**URL:** `/api/fitnearn/web/coach/profile/update`
+**Controller:** `updateProfile`
+
+**Request Body**
+
+```json
+{
+  "coachId": "COA0001",
+  "experience": "6 years",
+  "peopleCoached": 250,
+  "profileImage": "https://cdn/new-profile.jpg"
+}
+```
+
+**Functioning**
+
+* Prevents concurrent update requests by checking `ProfileUpdateModel` for open requests.
+* Generates a unique update sequence id using `generateUniqueSequence('UPDATE')` (e.g., `UPDATE00012`).
+* Persists a `ProfileUpdateModel` document containing requested fields and `updateId`.
+* Returns the created update request so admins can review/approve.
+
+**Success**
+
+```json
+{ "success": true, "message": "update request created", "data": { "updateId": "UPDATE00012" } }
+```
+
+**Common errors**
+
+* `400` existing update in progress
+* `400` invalid payload
+* `500` DB / sequence generation error
+
+---
+
+### 9. Delete Coach Profile
+
+**Method:** `DELETE`
+**URL:** `/api/fitnearn/web/coach/profile/delete/:coachId`
+**Controller:** `deleteCoachProfile`
+
+**Path Params**
+
+* `coachId` (string)
+
+**Functioning**
+
+* Soft-deletes or hard-deletes the `ProfileModel` record depending on business rules.
+* Cleans up related `CoachImageProfileModel` entries and KYC records as per policy.
+* Records audit logs for deletion.
+
+**Success**
+
+```json
+{ "success": true, "message": "Coach profile deleted" }
+```
+
+**Common errors**
+
+* `404` coach not found
+* `500` DB or cleanup failure
+
+---
+
+## Notes & Implementation Considerations
+
+* **Prefer presigned uploads** for client-side image uploads to keep server bandwidth low.
+* **KYC flow:** uploads with `tag === 'KYC'` should create/update `CoachKycModel` and set `ProfileModel.kycStatus` to `In-Process`.
+* **Update requests:** use `ProfileUpdateModel` for staged changes; avoid directly mutating approved profiles without an update request.
+* **Auth & headers:** many controller flows expect an `Authorization` bearer token and sometimes `x-refresh-token` / `x-username` headers — ensure the client includes them if your router enforces auth.
+* **Notifications:** `sendProfileForReview` triggers side-effects (emails/notifications). Expect these when integrating the endpoint.
+* **Validation:** router-level validators may exist in `profileRouter.ts` — use them to enforce stricter payload checks.
+
+---
+
+## Summary Table
+
+| Method | Endpoint                                                   | Description                                    |
+| ------ | ---------------------------------------------------------- | ---------------------------------------------- |
+| POST   | `/api/fitnearn/web/coach/profile/create`                   | Create or upsert coach profile                 |
+| POST   | `/api/fitnearn/web/coach/image/upload`                     | Upload profile / cover / KYC image (multipart) |
+| POST   | `/api/fitnearn/web/coach/image/presigned-url`              | Generate S3 presigned upload URL               |
+| POST   | `/api/fitnearn/web/coach/profile/save-bio`                 | Update coach bio                               |
+| PATCH  | `/api/fitnearn/web/coach/profile/send-for-review/:coachId` | Submit profile for admin review                |
+| GET    | `/api/fitnearn/web/coach/profile/:coachId`                 | Get coach profile                              |
+| GET    | `/api/fitnearn/web/coach/profile/details/:coachId`         | Coach dashboard / progress metrics             |
+| PATCH  | `/api/fitnearn/web/coach/profile/update`                   | Create profile update request                  |
+| DELETE | `/api/fitnearn/web/coach/profile/delete/:coachId`          | Delete coach profile                           |
+
+---

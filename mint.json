@@ -409,7 +409,9 @@
               "pages": [
                 "backend/Coach/api-doc-coach-auth-routes",
                 "backend/Coach/coach-live-session-api-doc",
-                "backend/Coach/coach-blog-api-routes"
+                "backend/Coach/coach-blog-api-routes",
+                "backend/Coach/coach-profile-api-doc",
+                "backend/Coach/coach-kyc-api-doc"
               ]
             },
             {
