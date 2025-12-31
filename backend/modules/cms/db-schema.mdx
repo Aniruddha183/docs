@@ -1,0 +1,177 @@
+---
+title: "CMS Database Schema"
+description: "Database schema definition for the CMS module."
+---
+
+# CMS Database Schema
+
+## Purpose
+
+This document defines **how CMS data is stored**.  
+It describes the **structure, constraints, and mutability** of persisted data without explaining how the data is used or exposed.
+
+This is the **structural source of truth** for CMS persistence.
+
+---
+
+## Collection: Content
+
+The CMS uses a single collection to store all content entries, supporting multiple content types.
+
+---
+
+### Primary Identifier
+
+| Field     | Type   | Constraints                 |
+| --------- | ------ | --------------------------- |
+| contentId | String | Required, Unique, Immutable |
+
+- `contentId` is generated at creation time
+- It must never be modified after creation
+
+---
+
+### Core Fields
+
+| Field           | Type   | Required | Mutable |
+| --------------- | ------ | -------- | ------- |
+| title           | String | Yes      | Yes     |
+| type            | Enum   | Yes      | Yes     |
+| applicationType | Enum   | Yes      | Yes     |
+| createdAt       | Date   | Yes      | No      |
+| updatedAt       | Date   | Yes      | Yes     |
+
+---
+
+### Enums
+
+#### Content Type
+
+```text
+ContactFooter
+GeneralContent
+```
+
+#### Application Type
+
+```text
+FitnEarn Website
+FitnEarn Pal
+FitCart
+FitnEarn Studio
+```
+
+---
+
+## Type-Specific Fields
+
+### ContactFooter Content
+
+The following fields are applicable when `type = ContactFooter`:
+
+#### fitnearnFooter
+
+| Field       | Type   | Required | Mutable |
+| ----------- | ------ | -------- | ------- |
+| description | String | No       | Yes     |
+
+#### contactDetails
+
+| Field       | Type   | Required | Mutable |
+| ----------- | ------ | -------- | ------- |
+| address     | String | No       | Yes     |
+| email       | String | No       | Yes     |
+| helpline    | String | No       | Yes     |
+| officeHours | String | No       | Yes     |
+
+#### faqs
+
+FAQs are embedded documents within Content.
+
+| Field    | Type   | Required | Mutable |
+| -------- | ------ | -------- | ------- |
+| faqId    | String | Yes      | Yes     |
+| question | String | Yes      | Yes     |
+| answer   | String | Yes      | Yes     |
+
+- FAQs do not exist independently
+- Their lifecycle is fully tied to the parent Content document
+
+---
+
+### GeneralContent Content
+
+The following field is applicable when `type = GeneralContent`:
+
+| Field       | Type   | Required | Mutable |
+| ----------- | ------ | -------- | ------- |
+| description | String | No       | Yes     |
+
+- Typically stores rich or structured text
+- Stored as a string representation
+
+---
+
+## Indexes
+
+| Field     | Type         |
+| --------- | ------------ |
+| contentId | Unique index |
+
+---
+
+## Timestamps
+
+The schema automatically maintains:
+
+| Field     | Description                                |
+| --------- | ------------------------------------------ |
+| createdAt | Timestamp when the content is created      |
+| updatedAt | Timestamp when the content is last updated |
+
+---
+
+## Mutability Summary
+
+### Immutable Fields
+
+- `contentId`
+- `createdAt`
+
+### Mutable Fields
+
+- `title`
+- `type`
+- `applicationType`
+- `fitnearnFooter`
+- `contactDetails`
+- `faqs`
+- `description`
+
+---
+
+## Structural Constraints
+
+- Content fields are **type-dependent**, but not enforced by separate collections
+- All content types share the same persistence structure
+- No internal state or lifecycle field is stored
+
+---
+
+## Non-Goals
+
+This document does **not** define:
+
+- Business rules or validation logic
+- API behavior or permissions
+- Content visibility or access rules
+- Frontend rendering behavior
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Architecture Guide
+- Platform-specific Business Logic
+- API Documentation

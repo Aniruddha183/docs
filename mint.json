@@ -310,6 +310,41 @@
             }
           ]
         },
+        {
+          "group": "CMS Module",
+          "pages": [
+            "backend/modules/cms/overview",
+            "backend/modules/cms/architecture",
+            "backend/modules/cms/db-schema",
+            "backend/modules/cms/layers-breakdown",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                {
+                  "group": "Content Management",
+                  "pages": [
+                    "backend/modules/cms/admin-panel/api-documentation",
+                    "backend/modules/cms/admin-panel/business-logic"
+                  ]
+                }
+              ]
+            },
+
+            {
+              "group": "Website",
+              "pages": [
+                {
+                  "group": "Content Consumption",
+                  "pages": [
+                    "backend/modules/cms/website/api-documentation",
+                    "backend/modules/cms/website/business-logic"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
 
         {
           "group": "Studio Module",
