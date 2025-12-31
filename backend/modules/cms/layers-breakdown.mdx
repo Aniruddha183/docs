@@ -1,182 +1,224 @@
 ---
-title: "CMS Backend Layers Breakdown"
-description: "Internal layering and responsibility breakdown of the CMS backend (Lambda)."
+title: "CMS Lambda Layers Breakdown"
+description: "Categorization of CMS Lambda functions based on infrastructure, domain ownership, cross-domain capabilities, and isolation rules."
 ---
 
-# CMS Backend Layers Breakdown
+# CMS Lambda Layers Breakdown
 
 ## Purpose
 
-This document describes the **internal structure of the CMS backend**, focusing on **how responsibilities are separated across layers** within the Lambda/service implementation.
+This document defines **how Lambda functions and utilities used by the CMS module are categorized** based on:
 
-It explains **where logic lives**, **how requests flow internally**, and **how admin and public routes diverge**, without documenting API contracts or business rules.
+- Business meaning
+- Domain ownership
+- Sharing rules
+- Isolation boundaries
+
+It exists to ensure that:
+
+- CMS domain logic does not leak into shared layers
+- Infrastructure utilities remain business-agnostic
+- Cross-domain capabilities are not incorrectly shared as helpers
+- Future changes to CMS do not unintentionally impact other modules
+
+This document answers:
+
+> **“Where does a CMS-related function belong, and should it be shared?”**
 
 ---
 
-## High-Level Layering
+## Layer A — Platform / Infra Layer (GLOBAL)
 
-The CMS backend follows a **layered architecture** to ensure separation of concerns:
+### Definition
 
-1. Routing Layer
-2. Controller Layer
-3. Middleware Layer
-4. Service Layer
-5. Model / Persistence Layer
+Functions that provide **pure technical or infrastructure capabilities** and have **no knowledge of CMS concepts**, such as content, application type, permissions, or workflows.
 
-Each layer has a **single, well-defined responsibility**.
+These utilities do not know:
+
+- What entity they operate on
+- Why the operation exists
+- Who is consuming the result
 
 ---
 
-## 1️⃣ Routing Layer
+### Identification Rules
 
-### Responsibility
+A function belongs to **Layer A** only if:
 
-- Defines HTTP routes
-- Maps routes to controllers
-- Applies middleware chains
+- It does not reference CMS entities (Content, FAQ, ApplicationType, etc.)
+- It does not enforce CMS rules or validations
+- It does not trigger business side effects
+- It can be reused by **any module** without modification
 
-### Characteristics
+---
 
-- Separate routing for:
+### CMS Examples
+
+- `logger`
+- `responseHandler`
+- `uploadImage` (raw upload only)
+- `deleteImageFromS3`
+- `uploadEncryptedDataToS3`
+- `generatePresignedUrl`
+- `decryptDataKeyWithKMS`
+
+---
+
+### Implementation Rules
+
+- Implemented as **shared Lambda Layers**
+- Versioned and reused across all backend modules
+- Must remain backward compatible
+
+---
+
+## Layer B — CMS Domain Layer Utilities (DOMAIN-SPECIFIC)
+
+### Definition
+
+Functions that **encode CMS-specific knowledge**, rules, or behavior.
+
+These utilities are meaningful **only inside the CMS domain**.
+
+---
+
+### Identification Rules
+
+A function belongs to **Layer B** if it:
+
+- Knows CMS entities (Content, FAQ, ContentType, ApplicationType)
+- Applies CMS validations or constraints
+- Shapes or transforms CMS data
+- Enforces permission-dependent behavior
+- Is used only by CMS APIs
+
+---
+
+### Key Rule
+
+✅ **Duplication across domains is allowed**  
+❌ **Sharing CMS domain utilities outside CMS is forbidden**
+
+---
+
+### CMS Examples
+
+- `validateContentTypePayload`
+- `validateApplicationType`
+- `sanitizeContentPayload`
+- `mapContentResponse`
+- `filterContentByApplicationType`
+- `prepareContentForPublicView`
+- `mergeFaqUpdates`
+- `extractCmsAdminFromRequest`
+
+These functions are tightly coupled to CMS semantics and must remain isolated.
+
+---
+
+### Implementation Rules
+
+- Lives inside the CMS module
+- Not exported to shared Lambda layers
+- Can evolve freely with CMS requirements
+
+---
+
+## Layer C — Cross-Domain Capability Layer (SEPARATE STACK)
+
+### Definition
+
+Logic that represents a **business capability** used by multiple domains, where CMS is **only a consumer**, not the owner.
+
+These are **services**, not utilities.
+
+---
+
+### Identification Rules
+
+A function belongs to **Layer C** if:
+
+- CMS and other domains depend on it
+- It performs a meaningful business action
+- It causes external side effects
+- It must scale or fail independently
+
+---
+
+### CMS-Relevant Examples
+
+- Notification services (email, push, in-app)
+- OTP generation and delivery
+- Media processing pipelines
+- Search / indexing services
+
+CMS may **call** these services, but must never embed their logic.
+
+---
+
+### Implementation Rules
+
+- Deployed as a **separate stack**
+- Accessed via API or events
+- Owned by a shared-services or platform team
+
+---
+
+## Layer D — Isolation Layer (CONCEPTUAL, NOT CODE)
+
+### Definition
+
+An **intentional duplication strategy** where similar logic is written separately for CMS to avoid tight coupling with other domains or platforms.
+
+This is not a folder or Lambda layer.
+
+---
+
+### CMS Examples
+
+- Content filtering logic implemented differently for:
   - Admin APIs
   - Public APIs
-- No business logic
-- No database access
-
-### Notes
-
-- Admin routes attach authentication and authorization middleware
-- Public routes expose read-only endpoints without auth
+- Slightly different validation or transformation rules per consumer
+- CMS-specific formatting that looks generic but is not reusable
 
 ---
 
-## 2️⃣ Controller Layer
+### Identification Rules
 
-### Responsibility
+Logic belongs conceptually to **Layer D** if:
 
-- Acts as the **entry point for request handling**
-- Extracts request data (params, body, query)
-- Delegates processing to services
-- Formats API responses
-
-### Characteristics
-
-- One controller method per API action
-- No direct database access
-- No permission logic beyond invoking middleware
-
-### What controllers should NOT do
-
-- Implement business rules
-- Validate permissions
-- Perform complex data transformations
+- It looks reusable
+- But behaves differently depending on CMS context
+- Or would introduce coupling if shared
 
 ---
 
-## 3️⃣ Middleware Layer
+### Key Rule
 
-### Responsibility
-
-- Cross-cutting concerns applied before controller execution
-
-### Common Middleware Responsibilities
-
-- Authentication (admin routes)
-- Authorization (permission checks)
-- ID generation (for content creation)
-- Request validation (basic structural checks)
-
-### Notes
-
-- Middleware blocks execution early on failure
-- Business behavior is not implemented here
+✅ Duplication is intentional  
+❌ Abstraction is harmful here
 
 ---
 
-## 4️⃣ Service Layer
+## CMS Enforcement Rules (MANDATORY)
 
-### Responsibility
+Before adding or sharing any CMS function, answer:
 
-- Implements **core operational logic**
-- Coordinates data creation, updates, and retrieval
-- Applies type-driven behavior
+1. Does this function know CMS entities or rules?
+2. Does it shape or validate CMS data?
+3. Does it cause business side effects?
+4. Would another domain realistically reuse it without modification?
 
-### Characteristics
-
-- Receives validated input from controllers
-- Interacts with models
-- Returns normalized results to controllers
-
-### Service Layer Boundaries
-
-- No HTTP concerns
-- No direct response formatting
-- No authentication logic
+If the answer to **any** is “yes” → it does **not** belong in Layer A.
 
 ---
 
-## 5️⃣ Model / Persistence Layer
+## Summary Table
 
-### Responsibility
-
-- Defines database schema
-- Handles persistence and retrieval of CMS content
-
-### Characteristics
-
-- Uses schema-defined constraints
-- No awareness of API consumers (admin or public)
-- No business decision-making
-
----
-
-## Admin vs Public Flow (Internal)
-
-### Admin Flow
-
-- Route → Auth Middleware → Permission Middleware → Controller → Service → Model
-
-### Public Flow
-
-- Route → Controller → Service → Model
-
-The **same service and model layers** are reused for both flows.
-
----
-
-## Error Handling Flow
-
-- Validation and permission errors are handled at middleware level
-- Operational errors are propagated from service layer
-- Controllers format errors into API responses
-- Database errors do not leak raw details to consumers
-
----
-
-## Design Constraints
-
-- No layer should bypass another layer
-- Controllers must not access models directly
-- Services must not depend on request/response objects
-- Models must not contain business logic
-
----
-
-## Non-Goals
-
-This document does **not** describe:
-
-- API endpoint definitions
-- Business rules or content behavior
-- Frontend or platform-specific logic
-- Infrastructure or deployment configuration
-
----
-
-## Related Documentation
-
-- CMS Overview
-- Architecture Guide
-- Database Schema
-- Admin API Documentation
-- Public API Documentation
+| Layer   | Scope                | Sharing Allowed  | CMS Role |
+| ------- | -------------------- | ---------------- | -------- |
+| Layer A | Infra / Technical    | Yes (Global)     | Consumer |
+| Layer B | CMS Domain           | No               | Owner    |
+| Layer C | Business Capability  | Yes (as Service) | Consumer |
+| Layer D | Conceptual Isolation | No               | Owner    |
