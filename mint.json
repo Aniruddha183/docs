@@ -178,101 +178,134 @@
           ]
         },
         {
-          "group": "Coach Module",
+          "group": "Authentication Module",
           "pages": [
             "backend/modules/coach/overview",
             "backend/modules/coach/db-schema",
 
             {
+              "group": "Website",
+              "pages": [
+                "backend/Coach/user-auth-routes(Not Prepared)"                        
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/api-doc-coach-auth-routes",
+                "backend/Coach/coach-profile-api-doc",
+                "backend/Coach/coach-kyc-api-doc"
+
+              ]
+            },
+            {
               "group": "Admin Panel",
               "pages": [
-                "backend/modules/coach/admin-panel/layers-breakdown",
-                {
-                  "group": "Blog",
-                  "pages": [
-                    "backend/modules/coach/admin-panel/blog/architecture",
-                    "backend/modules/coach/admin-panel/blog/api-documentation",
-                    "backend/modules/coach/admin-panel/blog/business-logic"
-                  ]
-                },
-                {
-                  "group": "Booking",
-                  "pages": [
-                    "backend/modules/coach/admin-panel/booking/architecture",
-                    "backend/modules/coach/admin-panel/booking/api-documentation",
-                    "backend/modules/coach/admin-panel/booking/business-logic"
-                  ]
-                },
-                {
-                  "group": "Live Session",
-                  "pages": [
-                    "backend/modules/coach/admin-panel/live-session/architecture",
-                    "backend/modules/coach/admin-panel/live-session/api-documentation",
-                    "backend/modules/coach/admin-panel/live-session/business-logic"
-                  ]
-                }
+                "backend/Coach/admin-auth-routes(Not Prepared)"
               ]
-            },
-
-            {
-              "group": "Mobile App",
-              "pages": [
-                "backend/modules/coach/mobile-app/layers-breakdown",
-                {
-                  "group": "Blog",
-                  "pages": [
-                    "backend/modules/coach/mobile-app/blog/architecture",
-                    "backend/modules/coach/mobile-app/blog/api-documentation",
-                    "backend/modules/coach/mobile-app/blog/business-logic"
-                  ]
-                },
-                {
-                  "group": "Booking",
-                  "pages": [
-                    "backend/modules/coach/mobile-app/booking/architecture",
-                    "backend/modules/coach/mobile-app/booking/api-documentation",
-                    "backend/modules/coach/mobile-app/booking/business-logic"
-                  ]
-                },
-                {
-                  "group": "Live Session",
-                  "pages": [
-                    "backend/modules/coach/mobile-app/live-session/architecture",
-                    "backend/modules/coach/mobile-app/live-session/api-documentation",
-                    "backend/modules/coach/mobile-app/live-session/business-logic"
-                  ]
-                }
-              ]
-            },
+            }
+          ]
+        },
+        {
+          "group": "Live Session Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/liveSession-db-schema",
 
             {
               "group": "Website",
               "pages": [
-                "backend/modules/coach/website/layers-breakdown",
-                {
-                  "group": "Blog",
-                  "pages": [
-                    "backend/modules/coach/website/blog/architecture",
-                    "backend/modules/coach/website/blog/api-documentation",
-                    "backend/modules/coach/website/blog/business-logic"
-                  ]
-                },
-                {
-                  "group": "Booking",
-                  "pages": [
-                    "backend/modules/coach/website/booking/architecture",
-                    "backend/modules/coach/website/booking/api-documentation",
-                    "backend/modules/coach/website/booking/business-logic"
-                  ]
-                },
-                {
-                  "group": "Live Session",
-                  "pages": [
-                    "backend/modules/coach/website/live-session/architecture",
-                    "backend/modules/coach/website/live-session/api-documentation",
-                    "backend/modules/coach/website/live-session/business-logic"
-                  ]
-                }
+                "backend/User/user-live-session-api-doc"        
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/coach-live-session-api-doc"        
+              ]
+            },
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-live-session-management"        
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Coach Booking Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/coachBooking-db-schema",
+
+            {
+              "group": "Website",
+              "pages": [
+                "backend/User/user-coach-booking-api-doc"        
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/coach-live-session-api-doc"        
+              ]
+            },
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-coach-booking-management"        
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Blog Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/blog-db-schema",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-blog-management"        
+              ]
+            },
+            {
+              "group": "Website",
+              "pages": [
+                "backend/User/user-blog-api-doc"        
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/coach-blog-api-routes"        
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Workout Plan Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/workoutPlan-db-schema",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-workoutPlan-management"
+              ]
+            },
+            {
+              "group": "Website",
+              "pages": [
+                "backend/User/user-workout-plan-api-doc(Not Prepared)1"        
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/coach-workoutPlan-api-doc"        
               ]
             }
           ]
@@ -376,6 +409,7 @@
                 "backend/Coach/coach-live-session-api-doc",
                 "backend/Coach/coach-blog-api-routes",
                 "backend/Coach/coach-profile-api-doc",
+                "backend/Coach/coach-workoutPlan-api-doc",
                 "backend/Coach/coach-kyc-api-doc"
               ]
             },

@@ -1,0 +1,425 @@
+---
+
+title: "Coach Workout Plan API Documentation"
+description: "REST API reference for Coach Workout Plan module (create/copy/version/week/day/upload-thumbnail/update/fetch)."
+---
+
+# Coach Workout Plan
+
+This document describes the REST APIs that coaches use to manage structured workout plans: create plans, create weeks and days, copy existing weeks/days, upload thumbnails, create rest days, version plans, update pricing/details, and fetch plans and their details.
+
+---
+
+## Base URL
+
+All routes below are prefixed by the exact paths as defined in the router. There is no single base prefix beyond what each route contains.
+
+```
+/api/fitnearn/web/coach/
+```
+
+---
+
+## Shared middleware & utilities (used by these routes)
+
+* `idGenerationMiddleware('<PREFIX>')` — used to generate unique IDs (e.g. `WORKOUT_PLAN`, `WEEK`, `DAY`). When present on a route, the controller expects `req.generatedId` to be available.
+* `upload.single('thumbnail')` — multer memory upload used on the thumbnail upload endpoint; controller expects `req.file` with `buffer` and `mimetype`.
+* `uploadImage` (imageHandler) — helper used by the controller to push images to S3 and return `{ location, key }`.
+* Models referenced: `WorkoutPlanModel`, `WeekPlan`, `DayPlan` (selected from `index.d.ts` in your project).
+
+---
+
+## Notes about request shapes
+
+Where a controller reads `req.body`, `req.params`, `req.headers`, or `req.file`, I list them explicitly per endpoint below. If an `idGenerationMiddleware` is applied to the route, the controller commonly uses `req.generatedId` to create new resource IDs.
+
+---
+
+## Endpoints
+
+Each endpoint lists: Method, Path, Middleware (as present in router), Controller, Request params (params/body/query/headers/files), Short functioning description, Example success response shape, and common error cases.
+
+### 1. Create Workout Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/workout-plan/create`
+* **Middleware:** `idGenerationMiddleware('WORKOUT_PLAN')`
+* **Controller:** `createWorkoutPlan`
+* **Request Body (JSON):**
+
+  * `creatorId` (string) — coach id who owns the plan
+  * `planName` (string)
+  * `description` (string)
+  * `category` (string)
+  * `numberOfWeeks` (number)
+  * `level` (string)
+  * `dailyStepsGoal` (number)
+  * `dailyExerciseGoal` (number)
+
+**Functioning**
+
+* Generates a new `planId` from `req.generatedId` (middleware).
+* Builds and saves a `WorkoutPlan` document (basic metadata and empty `weeklyPlans` initially).
+* Returns the newly created workout plan object.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Workout plan created successfully", "data": { /* WorkoutPlan object */ } }
+```
+
+**Errors**: `400` missing fields, `500` DB failure.
+
+---
+
+### 2. Create Week Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/week-plan/create`
+* **Middleware:** `idGenerationMiddleware('WEEK')`
+* **Controller:** `createWeekPlan`
+* **Request Body (JSON):**
+
+  * `weekNumber` (number) — ordinal week index within the workout plan
+  * `dayIds` (string[]) — list of `dayId` entries (may be empty during creation)
+  * `workoutPlanId` (string) — parent `planId`
+
+**Functioning**
+
+* Uses `req.generatedId` as the `weekId` and persists a `WeekPlan` document with `weekNumber`, `dailyPlans` (from `dayIds`) and `status: 'draft'`.
+* Updates the parent `WorkoutPlan` to include this `weekId` in its `weeklyPlans` array.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Week plan created", "data": { /* WeekPlan object */ } }
+```
+
+**Errors**: `404` if `workoutPlanId` not found, `500` DB error.
+
+---
+
+### 3. Upload Thumbnail Image for Workout Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/workout-plan/upload-image`
+* **Middleware:** `upload.single('thumbnail')` (multer)
+* **Controller:** `uploadThumbnailImage`
+* **Request**:
+
+  * **Headers:**
+
+    * `Authorization: Bearer <idToken>` — controller extracts identity token and will return `401` if missing.
+    * `x-refresh-token` (optional)
+    * `x-username` (optional)
+  * **Body (form fields):**
+
+    * `workoutPlanId` (string) — plan to attach thumbnail to
+    * `coachId` (string) — used as S3 prefix
+  * **Files (multipart):**
+
+    * `thumbnail` — file field (controller expects `req.file.buffer` & `req.file.mimetype`)
+
+**Functioning**
+
+* Validates presence of an identity token in `Authorization` header.
+* Verifies the `workoutPlanId` exists.
+* Uploads the received file buffer to S3 using `uploadImage`, stores returned `location`/`key` in the `WorkoutPlan` thumbnail fields and persists changes.
+
+**Success (200/201)**
+
+```json
+{ "success": true, "message": "Thumbnail uploaded", "data": { "thumbnailUrl": "https://...", "thumbnailKey": "..." } }
+```
+
+**Errors**: `401` missing token, `404` plan not found, `500` S3/DB failure.
+
+---
+
+### 4. Create or Edit Day Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/day-plan/create`
+* **Middleware:** (none on router)
+* **Controller:** `createOrEditDayPlan`
+* **Request Body (JSON):**
+
+  * `exercises` (array) — array of exercise objects for the day
+  * `dayId?` (string) — if provided, controller updates the existing day plan
+  * `dayNumber` (number)
+  * `status` (string) — e.g. `'save' | 'submit' | 'draft'` — controller maps `'save'` to `'draft'`, `'submit'` to `'filled'`
+  * `weekId` (string) — parent week id to attach the day to (when creating)
+
+**Functioning**
+
+* If `dayId` is present: updates the existing `DayPlan` with new `exercises` and `status`.
+* If `dayId` is not present: creates a new `DayPlan`, generates a `dayId` via `generateUniqueSequence('DAY')`, saves it and pushes the new `dayId` into the specified `WeekPlan.dailyPlans`.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Day plan created successfully", "data": { /* DayPlan */ } }
+```
+
+**Errors**: `404` if referenced `dayId`/`weekId` not found when updating/attaching; `500` DB error.
+
+---
+
+### 5. Copy Day Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/day-plan/copy`
+* **Middleware:** (none on router)
+* **Controller:** `copyDayPlan`
+* **Request Body (JSON):**
+
+  * `dayId` (string) — id of the existing day to copy
+  * `dayNumber` (number) — new day number to assign
+  * `weekId` (string) — parent week to attach the copied day
+
+**Functioning**
+
+* Finds the existing `DayPlan` by `dayId`.
+* Generates a new `dayId` (`generateUniqueSequence('DAY')`), duplicates the `exercises` and related counts into a new `DayPlan` document with status `'draft'`, saves it, and appends its `dayId` to the specified `WeekPlan.dailyPlans`.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Day plan copied successfully", "data": { /* new DayPlan */ } }
+```
+
+**Errors**: `404` original day not found; `500` DB error.
+
+---
+
+### 6. Copy Week Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/week-plan/copy`
+* **Middleware:** (none on router)
+* **Controller:** `copyWeekPlan`
+* **Request Body (JSON):**
+
+  * `weekId` (string) — id of the existing week to copy
+  * `weekNumber` (number) — new week number
+  * `workoutPlanId` (string) — parent plan to attach the copied week
+
+**Functioning**
+
+* Looks up the existing `WeekPlan` by `weekId`.
+* Creates a new `weekId` (`generateUniqueSequence('WEEK')`), duplicates `dailyPlans` array and saves a new `WeekPlan` with status `'draft'`.
+* Updates `WorkoutPlanModel` to include the newly created `weekId` into `weeklyPlans`.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Week plan copied successfully", "data": { /* new WeekPlan */ } }
+```
+
+**Errors**: `404` original week not found; `500` DB error.
+
+---
+
+### 7. Create a Version of a Workout Plan
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/workout-plan-version/:planId`
+* **Middleware:** (none on router)
+* **Controller:** `versionWorkoutPlan`
+* **URL Params:**
+
+  * `planId` (string) — id of the base workout plan to version (may include version suffixes in stored data)
+
+**Functioning**
+
+* Retrieves the specified `planId`.
+* Finds if another version is already in `Draft` / `Under Review` / `Pending Approval` — if so, returns an error telling the user to resolve existing versions first.
+* Otherwise it clones the plan into a new versioned `planId` (controller uses basePlanId and appends `:V{n}`) and persist the new `WorkoutPlan` document.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Version created", "data": { /* versioned WorkoutPlan */ } }
+```
+
+**Errors**: `404` plan not found; `409` version already exists/in-review; `500` DB error.
+
+---
+
+### 8. Create Rest Day (Day status update)
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/web/coach/day-plan/status-update`
+* **Middleware:** `idGenerationMiddleware('DAY')`
+* **Controller:** `setAsRestDay`
+* **Request Body (JSON):**
+
+  * `dayNumber` (number)
+  * `weekId` (string)
+  * (generated) `dayId` is provided by `req.generatedId`
+
+**Functioning**
+
+* Validates the `weekId` exists.
+* Creates a new `DayPlan` with `status: 'rest-day'` and no exercises.
+* Pushes the new dayId into the `WeekPlan.dailyPlans` array.
+
+**Success (201)**
+
+```json
+{ "success": true, "message": "Rest day created successfully", "data": { /* DayPlan */ } }
+```
+
+**Errors**: `404` week not found; `500` DB error.
+
+---
+
+### 9. Update Workout Details (pricing / coupon etc.)
+
+* **Method:** `PATCH`
+* **URL:** `/api/fitnearn/web/coach/workout-plan/update`
+* **Middleware:** (none on router)
+* **Controller:** `updateWorkoutDetails`
+* **Request Body (JSON):**
+
+  * `workoutPlanId` (string) — target planId
+  * `originalPrice` (number)
+  * `discountPercentage` (number)
+  * `discountedPrice` (number)
+  * `couponCode` (string)
+
+**Functioning**
+
+* Finds the `WorkoutPlan` by `planId` and updates provided pricing/discount fields.
+* Controller contains logic to compute `discountedPrice` when a discountPercentage is supplied.
+
+**Success (200)**
+
+```json
+{ "success": true, "message": "Workout updated", "data": { /* updated WorkoutPlan */ } }
+```
+
+**Errors**: `404` plan not found; `400` invalid payload; `500` DB error.
+
+---
+
+### 10. Get Workout Plans by Creator
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/web/coach/workout-plan/get-by-creator/:creatorId`
+* **Controller:** `getWorkoutPlan`
+* **URL Params:**
+
+  * `creatorId` (string)
+
+**Functioning**
+
+* Returns all `WorkoutPlan` documents matching `creatorId`.
+
+**Success (200)**
+
+```json
+{ "success": true, "message": "Workout plan fetched successfully", "data": [ /* plans */ ] }
+```
+
+**Errors**: `404` none found; `500` DB error.
+
+---
+
+### 11. Get Workout Plan Details (full)
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/web/coach/workout-plan/get-details/:planId`
+* **Controller:** `getWorkoutPlanDetails`
+* **URL Params:**
+
+  * `planId` (string)
+
+**Functioning**
+
+* Fetches the `WorkoutPlan` by `planId`, finds related `WeekPlan` documents via `weeklyPlans`, then populates each `WeekPlan` with its `DayPlan` documents so the response contains a full structure of weeks -> days -> exercises.
+
+**Success (200)**
+
+```json
+{ "success": true, "data": { /* plan with weeks and days */ } }
+```
+
+**Errors**: `404` plan not found; `500` DB error.
+
+---
+
+### 12. Get Week Plan Details
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/web/coach/week-plan/get/:weekId`
+* **Controller:** `getWeekPlanDetails`
+* **URL Params:**
+
+  * `weekId` (string)
+
+**Functioning**
+
+* Loads the `WeekPlan` by `weekId`, fetches all referenced `DayPlan` documents and replaces `dailyPlans` ids with full day objects in the returned payload.
+
+**Success (200)**
+
+```json
+{ "success": true, "message": "Week plan fetched successfully", "data": { /* week with day objects */ } }
+```
+
+**Errors**: `404` week not found; `500` DB error.
+
+---
+
+### 13. Get Day Plan Details
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/web/coach/day-plan/get/:dayId`
+* **Controller:** `getDayPlanDetails`
+* **URL Params:**
+
+  * `dayId` (string)
+
+**Functioning**
+
+* Returns the `DayPlan` document for `dayId` (exercises array, status, counts).
+
+**Success (200)**
+
+```json
+{ "success": true, "message": "Day plan fetched successfully", "data": { /* DayPlan */ } }
+```
+
+**Errors**: `404` day not found; `500` DB error.
+
+---
+
+## Summary table
+
+| Method | Endpoint                                  | Description                                            |
+| ------ | ----------------------------------------- | ------------------------------------------------------ |
+| POST   | `/workout-plan/create`                    | Create workout plan                                    |
+| POST   | `/week-plan/create`                       | Create week in a plan                                  |
+| POST   | `/workout-plan/upload-image`              | Upload thumbnail image (multipart)                     |
+| POST   | `/day-plan/create`                        | Create or edit a day plan                              |
+| POST   | `/day-plan/copy`                          | Copy day plan                                          |
+| POST   | `/week-plan/copy`                         | Copy week plan                                         |
+| POST   | `/workout-plan-version/:planId`           | Create a version of a workout plan                     |
+| POST   | `/day-plan/status-update`                 | Create a rest day (uses idGenerationMiddleware('DAY')) |
+| PATCH  | `/workout-plan/update`                    | Update plan pricing/details                            |
+| GET    | `/workout-plan/get-by-creator/:creatorId` | Get all plans for a coach                              |
+| GET    | `/workout-plan/get-details/:planId`       | Get full plan details (weeks + days)                   |
+| GET    | `/week-plan/get/:weekId`                  | Get week with days                                     |
+| GET    | `/day-plan/get/:dayId`                    | Get day plan                                           |
+
+---
+
+## Implementation notes & considerations
+
+* **ID generation:** Routes that use `idGenerationMiddleware` rely on `req.generatedId`. Keep this middleware in place when creating new resources.
+* **Thumbnail upload:** The upload route uses multer's memory storage — controllers expect a `Buffer` and immediately stream/upload to S3; avoid large files or change to multipart streaming if needed.
+* **Atomic updates:** When creating/copying weeks and days the controllers push references into parent documents (`WorkoutPlan.weeklyPlans`, `WeekPlan.dailyPlans`) — consider transactions if you require multi-document atomicity.
+* **Validation:** Input validation (required fields, types) should be enforced at the route or controller level — controllers currently return `400`/`404`/`500` as appropriate.
+
+---

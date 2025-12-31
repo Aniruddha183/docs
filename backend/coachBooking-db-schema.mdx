@@ -1,0 +1,235 @@
+---
+
+title: "DB Schema"
+description: "Complete schema reference for Coach Booking module (full fields list, indexes, and TypeScript interfaces)."
+---
+
+# Coach Booking — DB Schema
+
+Full model field lists for the Coach Booking module. These match the fields used by bookingManagementController and related controllers.
+
+---
+
+## Models
+
+### `IPrivateSession` (Private booking between a user and a coach)
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `sessionId`: `string` — unique id (e.g., `PRV0001`)
+* `coachId`: `string`
+* `userId`: `string` — the user who created/booked the private session (could be same as invited user)
+* `title`: `string`
+* `description`: `string`
+* `date`: `string | Date`
+* `startTime`: `string`
+* `endTime`: `string`
+* `duration`: `number`
+* `timeZone`: `string`
+* `seats`: `number` — total seats (usually 1 for private, but may be >1)
+* `price`: `number`
+* `currency`: `string`
+* `status`: `string` — `scheduled` | `cancelled` | `completed` | `pending`
+* `invitedEmails`: `string[]` — list of invited user emails
+* `invitedUsers`: `Array<{ userId: string; email?: string; status: 'invited' | 'accepted' | 'declined' }>`
+* `createdBy`: `{ userId?: string; coachId?: string }`
+* `createdAt`: `Date`
+* `updatedAt`: `Date`
+* `meetingLink`: `string` — optional
+* `meta`: `Record<string, any>`
+
+**Indexes**
+
+* `sessionId` unique
+* `coachId` for lookups
+* `{ coachId, date, startTime }` for conflict checks
+
+---
+
+### `IBooking` / `IPayment`
+
+Represents payments/bookings for private sessions and may be shared with other booking flows.
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `bookingId`: `string`
+* `sessionId`: `string`
+* `userId`: `string`
+* `orderId`: `string`
+* `paymentId`: `string`
+* `status`: `string` — `success` | `failed` | `pending` | `refunded`
+* `amount`: `number`
+* `currency`: `string`
+* `transactionId`: `string`
+* `gateway`: `string` — `razorpay`, `stripe`, etc.
+* `createdAt`, `updatedAt`
+
+---
+
+### `ISlot` / `ISessionSlot`
+
+Used to describe a coach's available time-slot metadata.
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `slotId`: `string`
+* `coachId`: `string`
+* `date`: `string | Date`
+* `startTime`: `string`
+* `endTime`: `string`
+* `capacity`: `number`
+* `booked`: `number`
+* `status`: `string` — `available` | `booked` | `blocked`
+* `createdAt`, `updatedAt`
+
+---
+
+### `IInvitation`
+
+Invitation records for sessions (used by inviteUser endpoint).
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `inviteId`: `string`
+* `sessionId`: `string`
+* `fromUserId`: `string` (sender)
+* `toEmail`: `string`
+* `toUserId`?: `string`
+* `message`?: `string`
+* `status`: `string` — `sent` | `accepted` | `declined` | `expired`
+* `sentAt`: `Date`
+* `respondedAt`?: `Date`
+
+---
+
+### `UserInviteToken`
+
+Small token record used for one-click invite accept flows (added per your request).
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `token`: `string` — randomized token
+* `sessionId`: `string`
+* `inviteeEmail`: `string`
+* `expiresAt`: `Date`
+* `usedAt`?: `Date`
+* `createdAt`: `Date`
+
+---
+
+### `IProfileModel` (referenced in booking flows)
+
+Only key fields used in booking flows (denormalized snapshots).
+
+* `coach_id`: `string`
+* `name`: `string`
+* `email`: `string`
+* `mobileNumber`: `string`
+* `profileImage`?: `string`
+
+---
+
+## TypeScript interfaces (inferred)
+
+```ts
+export interface IPrivateSession {
+  _id?: string;
+  sessionId: string;
+  coachId: string;
+  userId: string;
+  title?: string;
+  description?: string;
+  date: string | Date;
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  timeZone?: string;
+  seats?: number;
+  price?: number;
+  currency?: string;
+  status?: 'scheduled' | 'cancelled' | 'completed' | 'pending';
+  invitedEmails?: string[];
+  invitedUsers?: Array<{ userId: string; email?: string; status: 'invited' | 'accepted' | 'declined' }>;
+  createdBy?: { userId?: string; coachId?: string };
+  createdAt?: Date;
+  updatedAt?: Date;
+  meetingLink?: string;
+  meta?: Record<string, any>;
+}
+
+export interface IBooking {
+  _id?: string;
+  bookingId: string;
+  sessionId: string;
+  userId: string;
+  orderId?: string;
+  paymentId?: string;
+  status?: 'success' | 'failed' | 'pending' | 'refunded';
+  amount?: number;
+  currency?: string;
+  transactionId?: string;
+  gateway?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface ISlot {
+  _id?: string;
+  slotId: string;
+  coachId: string;
+  date: string | Date;
+  startTime: string;
+  endTime?: string;
+  capacity?: number;
+  booked?: number;
+  status?: 'available' | 'booked' | 'blocked';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IInvitation {
+  _id?: string;
+  inviteId: string;
+  sessionId: string;
+  fromUserId: string;
+  toEmail: string;
+  toUserId?: string;
+  message?: string;
+  status?: 'sent' | 'accepted' | 'declined' | 'expired';
+  sentAt?: Date;
+  respondedAt?: Date;
+}
+
+export interface IUserInviteToken {
+  _id?: string;
+  token: string;
+  sessionId: string;
+  inviteeEmail: string;
+  expiresAt: Date;
+  usedAt?: Date;
+  createdAt?: Date;
+}
+
+export interface IProfileModelSnapshot {
+  coach_id?: string;
+  name?: string;
+  email?: string;
+  mobileNumber?: string;
+  profileImage?: string;
+}
+```
+
+---
+
+## Implementation notes
+
+* Conflict checking endpoints should compare `{ coachId, date, startTime, duration }` to detect overlaps. Use queries that convert times to a canonical timezone when comparing.
+* `UserInviteToken` must be indexed on `token` with TTL (`expiresAt`) for auto-expiry.
+* Keep sensitive payment fields encrypted at rest (if storing any gateway response payloads).
+
+---

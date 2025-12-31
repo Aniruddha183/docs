@@ -1,0 +1,113 @@
+---
+
+title: "Workout Plan DB Schema"
+description: "Database schema reference for models used in Workout Plan Management module."
+---
+
+# DB Schema : Admin Workout Plan Management
+
+This document lists the key schemas and important fields used by the Admin Workout Plan Management module. These are inferred from controller usage and should be confirmed against the canonical schema definitions in `index.d.ts` or the shared-models package.
+
+---
+
+## WorkoutPlanModel
+
+Represents a workout plan created by an admin/coach.
+
+**Important fields**
+
+* `planId` — string, unique plan identifier (e.g. `WP:0001`)
+* `creatorId` — string, user/coach/admin who created the plan
+* `planName` — string
+* `description` — string
+* `category` — string
+* `level` — string
+* `numberOfWeeks` — number
+* `weeklyPlans` — `string[]` (array of `weekId` references)
+* `thumbnailUrl` — string
+* `thumbnailKey` — string (S3 key)
+* `dailyStepsGoal` — number
+* `dailyExerciseGoal` — number
+* `price`, `originalPrice`, `discountedPrice` — number (pricing metadata)
+* `couponCode` — string
+* `reviewerAdmin` — string (admin id assigned as reviewer)
+* `approverAdmin` — string (admin id assigned as approver)
+* `stage` — string (workflow stage: `draft` , `under_review` , `approved` , `published`)
+* `state`, `status` — strings for lifecycle management
+* `history` — array of objects with properties: `at` (Date), `by` (string), `action` (string), `meta` (object)
+* `createdAt`, `updatedAt`
+
+**Indexes & usage notes**
+
+* Index on `planId`, `creatorId`, `stage`, `status` for fast filtering.
+
+---
+
+## WeekPlan
+
+Represents a single week inside a workout plan.
+
+**Important fields**
+
+* `weekId` — string
+* `planId` — parent `planId` reference
+* `weekNumber` — number
+* `dailyPlans` — `string[]` (array of `dayId` references)
+* `notes` — string (optional)
+* `createdAt`, `updatedAt`
+
+---
+
+## DayPlan
+
+Represents a day's plan (list of exercises, metadata).
+
+**Important fields**
+
+* `dayId` — string
+* `weekId` — parent `weekId`
+* `dayNumber` — number
+* `exercises` — array/object describing exercises: each exercise may include `{ exerciseId, name, sets, reps, duration, restSeconds, notes }`
+* `status` — string (`draft` , `filled` , `rest`)
+* `createdAt`, `updatedAt`
+
+---
+
+## AdminReviewWorkoutPlan
+
+Stores reviewer/approver audit comments and decisions for a plan.
+
+**Important fields**
+
+* `_id` — string
+* `planId` — string (refers to the base plan id)
+* `reviewer` — object containing:
+
+  * `adminId` — string
+  * `comments` — array of `{ commentId, comment, createdAt, updatedAt, lock: boolean }`
+* `approver` — object containing similar fields for approver
+* `stage` — string
+* `lock` — boolean (indicates if the review/approval is finalized)
+* `createdAt`, `updatedAt`
+
+**Behavior**
+
+* Deleting or editing review comments is subject to `lock` semantics — edits allowed while `lock === false`.
+
+---
+
+## WeekTaskDetails
+
+Auxiliary model used to track tasks related to week creation/assignment.
+
+**Important fields**
+
+* `taskId` — string
+* `type` — string (e.g. `WEEK_PLAN`)
+* `referenceId` — string (e.g. `weekId`)
+* `title`, `description` — strings
+* `status` — string (`pending` , `in_progress` , `completed`)
+* `assignedTo` — string (admin id)
+* `createdAt`, `updatedAt`
+
+---
