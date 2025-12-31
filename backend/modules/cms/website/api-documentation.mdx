@@ -1,0 +1,129 @@
+---
+title: "CMS Public API Documentation"
+description: "Public read-only APIs for consuming CMS content."
+---
+
+# CMS Public API Documentation
+
+## Purpose
+
+This document defines the **public APIs** used by frontend platforms (such as Website or Mobile) to **read and display CMS content**.
+
+These APIs are **read-only**, **unauthenticated**, and do not allow any modification of content.
+
+---
+
+## Base URL
+
+```
+
+/api/fitnearn/web/admin/contentPublic
+
+```
+
+---
+
+## Authentication
+
+- No authentication required
+- APIs are publicly accessible
+- No permissions are evaluated at runtime
+
+---
+
+## Endpoints
+
+### 1. Get Content By ID
+
+Retrieves a single CMS content entry using `contentId`.
+
+- **Method**: `GET`
+- **Endpoint**: `/get/:id`
+
+#### Example Request
+
+```
+
+GET /contentPublic/get/CNT00001
+
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website",
+    "fitnearnFooter": {},
+    "contactDetails": {},
+    "faqs": []
+  }
+}
+```
+
+#### Error Responses
+
+- `404 Not Found` – Content does not exist
+- `500 Internal Server Error`
+
+---
+
+### 2. Get All Contents
+
+Retrieves all CMS content entries available for public consumption.
+
+- **Method**: `GET`
+- **Endpoint**: `/get`
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "contentId": "CNT00001",
+      "title": "Contact Us",
+      "type": "ContactFooter",
+      "applicationType": "FitnEarn Website"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+- `500 Internal Server Error`
+
+---
+
+## Behavior Notes
+
+- Public APIs do not modify content
+- Content visibility is controlled by API exposure, not content state
+- All returned content is assumed to be safe for public rendering
+- Public APIs do not perform permission or role checks
+
+---
+
+## Non-Goals
+
+This document does **not** describe:
+
+- Content creation or updates
+- Admin-only APIs
+- Business rules or internal behavior
+- Database structure
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Architecture Guide
+- Database Schema
+- Website Business Logic

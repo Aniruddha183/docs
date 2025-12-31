@@ -1,0 +1,231 @@
+---
+title: "CMS Admin API Documentation"
+description: "API reference for admin users to manage CMS content."
+---
+
+# CMS Admin API Documentation
+
+## Purpose
+
+This document defines the **API contract** for admin users interacting with the CMS module.  
+It specifies **available endpoints, request/response formats, permissions, and error conditions**.
+
+This document does **not** describe business rules, internal behavior, or database structure.
+
+---
+
+## Base URL
+
+```
+
+/api/fitnearn/web/admin/content
+
+```
+
+---
+
+## Authentication & Authorization
+
+All admin APIs require:
+
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: Permission-based access control
+
+Permissions determine which operations an admin can perform.
+
+---
+
+## Endpoints
+
+### 1. Create Content
+
+Creates a new CMS content entry.
+
+- **Method**: `POST`
+- **Endpoint**: `/create`
+- **Required Permission**: `CREATE_CONTENT`
+- **Middleware**:
+  - `authenticateAdminToken`
+  - `authorize(CREATE_CONTENT)`
+  - `idGenerationMiddleware('CNT')`
+
+#### Request Body
+
+```json
+{
+  "title": "Contact Us",
+  "type": "ContactFooter",
+  "applicationType": "FitnEarn Website",
+  "fitnearnFooter": { "description": "Footer description" },
+  "contactDetails": {
+    "address": "Address",
+    "email": "support@fitnearn.com",
+    "helpline": "1234567890",
+    "officeHours": "9 AM - 6 PM"
+  },
+  "faqs": [{ "question": "Question?", "answer": "Answer." }]
+}
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website"
+  }
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request` – Invalid or missing request data
+- `500 Internal Server Error`
+
+---
+
+### 2. Get All Contents
+
+Fetches all CMS content entries.
+
+- **Method**: `GET`
+- **Endpoint**: `/get`
+- **Required Permission**: `GET_CONTENT`
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "contentId": "CNT00001",
+      "title": "Contact Us",
+      "type": "ContactFooter",
+      "applicationType": "FitnEarn Website"
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+- `500 Internal Server Error`
+
+---
+
+### 3. Get Content By ID
+
+Retrieves a single content entry by `contentId`.
+
+- **Method**: `GET`
+- **Endpoint**: `/get/:id`
+- **Required Permission**: `READ_CONTENT`
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Contact Us",
+    "type": "ContactFooter",
+    "applicationType": "FitnEarn Website",
+    "fitnearnFooter": {},
+    "contactDetails": {},
+    "faqs": []
+  }
+}
+```
+
+#### Error Responses
+
+- `404 Not Found` – Content does not exist
+- `500 Internal Server Error`
+
+---
+
+### 4. Update Content By ID
+
+Updates an existing CMS content entry.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/update/:id`
+- **Required Permission**: `UPDATE_CONTENT`
+
+#### Request Body
+
+```json
+{
+  "title": "Updated Title",
+  "type": "GeneralContent",
+  "applicationType": "FitnEarn Studio",
+  "description": "Updated content description"
+}
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "contentId": "CNT00001",
+    "title": "Updated Title",
+    "type": "GeneralContent",
+    "applicationType": "FitnEarn Studio"
+  }
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request` – Invalid request data
+- `404 Not Found` – Content does not exist
+- `500 Internal Server Error`
+
+---
+
+### 5. Delete Content By ID
+
+Deletes a CMS content entry.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/delete/:id`
+- **Required Permission**: `DELETE_CONTENT`
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Content deleted successfully"
+}
+```
+
+#### Error Responses
+
+- `404 Not Found` – Content does not exist
+- `500 Internal Server Error`
+
+---
+
+## Notes
+
+- Permissions determine which admin actions are allowed
+- Admin APIs may create, update, or delete content
+- No content lifecycle state is managed by the CMS
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Architecture Guide
+- Database Schema
+- Admin Business Logic

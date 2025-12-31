@@ -1,0 +1,182 @@
+---
+title: "CMS Backend Layers Breakdown"
+description: "Internal layering and responsibility breakdown of the CMS backend (Lambda)."
+---
+
+# CMS Backend Layers Breakdown
+
+## Purpose
+
+This document describes the **internal structure of the CMS backend**, focusing on **how responsibilities are separated across layers** within the Lambda/service implementation.
+
+It explains **where logic lives**, **how requests flow internally**, and **how admin and public routes diverge**, without documenting API contracts or business rules.
+
+---
+
+## High-Level Layering
+
+The CMS backend follows a **layered architecture** to ensure separation of concerns:
+
+1. Routing Layer
+2. Controller Layer
+3. Middleware Layer
+4. Service Layer
+5. Model / Persistence Layer
+
+Each layer has a **single, well-defined responsibility**.
+
+---
+
+## 1️⃣ Routing Layer
+
+### Responsibility
+
+- Defines HTTP routes
+- Maps routes to controllers
+- Applies middleware chains
+
+### Characteristics
+
+- Separate routing for:
+  - Admin APIs
+  - Public APIs
+- No business logic
+- No database access
+
+### Notes
+
+- Admin routes attach authentication and authorization middleware
+- Public routes expose read-only endpoints without auth
+
+---
+
+## 2️⃣ Controller Layer
+
+### Responsibility
+
+- Acts as the **entry point for request handling**
+- Extracts request data (params, body, query)
+- Delegates processing to services
+- Formats API responses
+
+### Characteristics
+
+- One controller method per API action
+- No direct database access
+- No permission logic beyond invoking middleware
+
+### What controllers should NOT do
+
+- Implement business rules
+- Validate permissions
+- Perform complex data transformations
+
+---
+
+## 3️⃣ Middleware Layer
+
+### Responsibility
+
+- Cross-cutting concerns applied before controller execution
+
+### Common Middleware Responsibilities
+
+- Authentication (admin routes)
+- Authorization (permission checks)
+- ID generation (for content creation)
+- Request validation (basic structural checks)
+
+### Notes
+
+- Middleware blocks execution early on failure
+- Business behavior is not implemented here
+
+---
+
+## 4️⃣ Service Layer
+
+### Responsibility
+
+- Implements **core operational logic**
+- Coordinates data creation, updates, and retrieval
+- Applies type-driven behavior
+
+### Characteristics
+
+- Receives validated input from controllers
+- Interacts with models
+- Returns normalized results to controllers
+
+### Service Layer Boundaries
+
+- No HTTP concerns
+- No direct response formatting
+- No authentication logic
+
+---
+
+## 5️⃣ Model / Persistence Layer
+
+### Responsibility
+
+- Defines database schema
+- Handles persistence and retrieval of CMS content
+
+### Characteristics
+
+- Uses schema-defined constraints
+- No awareness of API consumers (admin or public)
+- No business decision-making
+
+---
+
+## Admin vs Public Flow (Internal)
+
+### Admin Flow
+
+- Route → Auth Middleware → Permission Middleware → Controller → Service → Model
+
+### Public Flow
+
+- Route → Controller → Service → Model
+
+The **same service and model layers** are reused for both flows.
+
+---
+
+## Error Handling Flow
+
+- Validation and permission errors are handled at middleware level
+- Operational errors are propagated from service layer
+- Controllers format errors into API responses
+- Database errors do not leak raw details to consumers
+
+---
+
+## Design Constraints
+
+- No layer should bypass another layer
+- Controllers must not access models directly
+- Services must not depend on request/response objects
+- Models must not contain business logic
+
+---
+
+## Non-Goals
+
+This document does **not** describe:
+
+- API endpoint definitions
+- Business rules or content behavior
+- Frontend or platform-specific logic
+- Infrastructure or deployment configuration
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Architecture Guide
+- Database Schema
+- Admin API Documentation
+- Public API Documentation

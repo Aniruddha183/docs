@@ -1,0 +1,158 @@
+---
+title: "CMS Admin Business Logic"
+description: "Behavioral rules and effects of admin interactions with CMS content."
+---
+
+# CMS Admin Business Logic
+
+## Purpose
+
+This document defines **how CMS content behaves when accessed or modified by admin users**.  
+It explains **type-driven behavior**, **side effects of admin actions**, and **how permissions influence outcomes**.
+
+This document focuses on **behavior**, not API contracts or database structure.
+
+---
+
+## Admin Capabilities Overview
+
+Admin behavior is governed by **permissions**, not roles.
+
+Depending on assigned permissions, an admin may:
+
+- Create content
+- Read content
+- Update content
+- Delete content
+
+There is no separate lifecycle state for content (e.g., Draft or Published).
+
+---
+
+## Content Type–Driven Behavior
+
+CMS supports multiple content types.  
+The behavior of admin actions depends on the selected **content type**.
+
+---
+
+### ContactFooter Content
+
+ContactFooter content represents **structured informational data**.
+
+When managing ContactFooter content:
+
+- Admins may update:
+  - Footer description
+  - Contact details
+  - FAQs
+- FAQs are managed **as part of the content**, not independently
+- Adding, editing, or removing FAQs updates the entire content entry
+
+There is no restriction on modifying ContactFooter content after creation.
+
+---
+
+### GeneralContent Content
+
+GeneralContent represents **free-form informational content**.
+
+When managing GeneralContent:
+
+- Admins may update the content description at any time
+- The description may represent structured or rich text
+- The CMS does not interpret or validate content structure beyond basic storage
+
+---
+
+## Update Behavior and Side Effects
+
+### Updating Content
+
+When an admin updates content:
+
+- Only fields provided in the request are modified
+- Fields not included in the request remain unchanged
+- Updating content does **not** create a new version or copy
+
+The following fields are **fully mutable**:
+
+- `title`
+- `type`
+- `applicationType`
+- `fitnearnFooter`
+- `contactDetails`
+- `faqs`
+- `description`
+
+---
+
+### Changing Content Type
+
+Admins may change the content type after creation.
+
+Behavior when changing `type`:
+
+- Fields irrelevant to the new type may be ignored by consuming platforms
+- CMS does not automatically remove previously stored fields
+- Responsibility for rendering relevant fields lies with consuming platforms
+
+---
+
+### Changing Application Type
+
+Admins may update the `applicationType` of existing content.
+
+Behavior:
+
+- The content becomes associated with the new application scope
+- Visibility via public APIs is determined by application type
+- No historical linkage to previous application type is maintained
+
+---
+
+## Deletion Behavior
+
+When content is deleted:
+
+- The deletion is **permanent**
+- No soft-delete or recovery mechanism exists
+- All associated FAQs are deleted with the content
+
+---
+
+## Permission-Based Constraints
+
+- Admins without delete permission cannot remove content
+- Admins without update permission cannot modify content
+- Read-only admins may only view content
+
+CMS does not partially apply changes if permission checks fail.
+
+---
+
+## Error and Validation Behavior
+
+- Permission validation occurs **before** any content modification
+- Invalid input data results in request rejection
+- CMS does not perform cross-content validation (each content entry is independent)
+
+---
+
+## Non-Goals
+
+This document does **not** describe:
+
+- API endpoint details
+- Database schema
+- Public content consumption behavior
+- Frontend rendering logic
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Admin API Documentation
+- Database Schema
+- Architecture Guide
