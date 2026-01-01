@@ -1,0 +1,122 @@
+---
+title: "CMS Module Overview"
+description: "High-level overview of the Content Management System (CMS) used across FitnEarn platforms."
+---
+
+# CMS Module Overview
+
+## Purpose
+
+The Content Management System (CMS) is responsible for managing and serving **static and semi-static content** across FitnEarn platforms.  
+It enables admins to create, update, and manage content, while allowing public platforms to consume and display that content without modification.
+
+The CMS acts as a **central source of truth for content**, independent of frontend presentation or platform-specific UI behavior.
+
+---
+
+## Types of Content
+
+The CMS currently supports the following content types:
+
+### 1. ContactFooter
+
+Structured content used for:
+
+- Website footer information
+- Contact details
+- FAQs
+- Legal or support-related static information
+
+This content type follows a **fixed structure** and is rendered differently by consuming platforms based on their UI requirements.
+
+---
+
+### 2. GeneralContent
+
+Flexible, free-form content used for:
+
+- About Us pages
+- Informational or marketing pages
+- CMS-driven static sections
+
+This content type allows rich text and dynamic layouts and is stored in a generic format to support multiple renderers.
+
+---
+
+## Content Scope
+
+Each content entry is scoped by:
+
+- **Content Type** (ContactFooter or GeneralContent)
+- **Application Type** (e.g., FitnEarn Website, FitnEarn Pal, FitCart, FitnEarn Studio)
+
+This allows the same CMS to serve different platforms while keeping content logically separated.
+
+---
+
+## Consumers of CMS
+
+### Admin Panel
+
+- Admin users manage content through protected APIs
+- Access is controlled via **permission-based authorization**
+- Depending on assigned permissions, an admin may:
+  - Create content
+  - Read content
+  - Update content
+  - Delete content
+
+There is no separate admin role hierarchy; permissions define capabilities.
+
+---
+
+### Public Platforms (Website, Mobile, etc.)
+
+- Public platforms consume content through **read-only public APIs**
+- No authentication is required for public access
+- Public platforms cannot modify content
+- Content visibility is determined by:
+  - The API being accessed
+  - The application type of the content
+
+There is **no internal publish/unpublish state** for content.
+
+---
+
+## Key Characteristics
+
+- CMS content does **not** have lifecycle states such as Draft, Published, or Rejected
+- Visibility is controlled entirely through **API boundaries and permissions**
+- All content fields are **mutable** via update APIs
+- Content behavior is **type-driven**, not state-driven
+
+---
+
+## Non-Goals
+
+The CMS module does **not**:
+
+- Control frontend layouts or styling
+- Manage publishing workflows or approval states
+- Handle user-generated content
+- Enforce content versioning
+
+---
+
+## Future Considerations (High-Level)
+
+- Additional content types may be introduced
+- New application types may be added
+- Public consumption rules may evolve, but without introducing content states
+- CMS behavior should remain independent of frontend rendering logic
+
+Detailed evolution rules are documented in **Future Considerations**.
+
+---
+
+## Related Documentation
+
+- Architecture Guide
+- Database Schema
+- Platform-specific API Documentation
+- Platform-specific Business Logic

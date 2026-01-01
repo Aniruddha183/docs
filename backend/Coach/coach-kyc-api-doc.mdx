@@ -1,0 +1,241 @@
+---
+
+title: "Coach KYC API Documentation"
+description: "REST reference for the Coach KYC endpoints (image-upload, presigned image upload, and KYC details update)."
+---
+
+# Coach KYC
+
+This file documents only the three KYC-related endpoints you specified. Each entry shows the exact route, middleware used, request shape, short explanation of how the endpoint works, example success response, and common errors.
+
+> Base URL (service root):
+
+```
+/api/fitnearn/
+```
+
+> Note: two routes live under `/api/fitnearn/coach/*` and one under `/api/fitnearn/web/coach/*`. Use the exact paths below when calling the APIs.
+
+---
+
+## Shared utilities mentioned
+
+* `upload.fields([...])` — multer middleware accepting multiple named file fields (used for `frontImage` and `backImage`).
+* `encryptCoachImageData` — controller that encrypts image data and uploads it to the encrypted S3 bucket (server-side encryption + multipart upload). Internally it uses `uploadEncryptedDataToS3(...)` or similar helper.
+* `getCoachPresignedUploadUrl` — controller that returns a presigned PUT URL and a public object key/url so the client can upload profile/cover images directly to S3.
+* `addCoachKYCDetails` — controller that saves KYC metadata (s3 keys/urls, doc types, timestamps) into the DB and updates coach `kycStatus`.
+
+---
+
+## Models used (key fields referenced in responses)
+
+### `ICoachKyc` (KYC document record) — minimal fields
+
+* `kycId` (string)
+* `coachId` (string)
+* `type` (string) — e.g. `PAN`, `AADHAAR`, `ID_PROOF`
+* `frontImage` / `backImage` — objects with `{ s3Key, s3Url, encryptionMetadata? }`
+* `status` — `uploaded` | `submitted` | `in_review` | `verified` | `rejected`
+* `uploadedAt`, `submittedAt`
+
+---
+
+## Endpoints
+
+### 1) Coach KYC — Encrypted Image Upload (server-side multipart + encryption)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/coach/kyc/image-upload`
+* **Middleware**:
+
+  * `upload.fields([{ name: 'frontImage', maxCount: 1 }, { name: 'backImage', maxCount: 1 }])` — mandatory `multipart/form-data` file fields
+* **Controller**: `encryptCoachImageData`
+
+**Purpose / Short functioning description**
+
+This endpoint accepts the coach's KYC images as a multipart form, encrypts the files on the server using a KMS-derived data key, and uploads them to the encrypted S3 bucket using multipart upload. The controller:
+
+1. Validates `coachId` and request ownership (if auth applied).
+2. Reads `req.files.frontImage[0]` and `req.files.backImage[0]` (if present).
+3. Calls the server-side encryption+upload helper (e.g. `uploadEncryptedDataToS3`) for each file. That helper:
+
+   * derives a one-time data key from KMS,
+   * encrypts the file bytes (AES-GCM),
+   * uploads encrypted bytes via multipart upload using presigned part URLs,
+   * returns `{ s3Key, s3Url, encryptionMetadata }` where `encryptionMetadata` contains base64 `encryptedKey`, `iv`, and `authTag`.
+4. Persists a `CoachKyc` record with front/back image metadata and `status: 'uploaded'` and `uploadedAt` timestamps.
+5. Returns the created KYC record (or partial metadata) to the client.
+
+**Request (multipart/form-data)**
+
+* Fields (form-data):
+
+  * `coachId` (string) — required (as form field)
+  * `type` (string) — e.g. `PAN` / `AADHAAR` (optional but recommended)
+  * `frontImage` (file) — required for most ID types
+  * `backImage` (file) — optional (some IDs need both sides)
+
+**Example success response**
+
+```json
+{
+  "success": true,
+  "message": "KYC images uploaded and encrypted",
+  "data": {
+    "kycId": "KYC000123",
+    "coachId": "COA0001",
+    "type": "PAN",
+    "frontImage": {
+      "s3Key": "encrypted/COA0001/kyc/1600000000000_front",
+      "s3Url": "https://encrypted-bucket.s3.region.amazonaws.com/encrypted/COA0001/kyc/1600000000000_front",
+      "encryptionMetadata": { "encryptedKey": "..", "iv": "..", "authTag": ".." }
+    },
+    "backImage": null,
+    "status": "uploaded",
+    "uploadedAt": "2025-12-30T12:34:56.000Z"
+  }
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — missing `coachId` or required file fields.
+* `413 Payload Too Large` — file exceeds configured upload limits.
+* `500 Internal Server Error` — KMS failure, multipart upload failure, or abort failure.
+
+**Security notes**
+
+* The encrypted bucket must be isolated with strict IAM.
+* Keep `encryptionMetadata` protected; never expose raw plaintext keys.
+* Audit and log admin accesses to decrypted data.
+
+---
+
+### 2) Get Presigned Upload URL — Profile / Cover Image (client-side direct upload)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/image/upload`
+* **Controller**: `getCoachPresignedUploadUrl`
+
+**Purpose / Short functioning description**
+
+Generates a short-lived presigned PUT URL and returns a public object key/URL for uploading non-sensitive images (profile or cover). The client uploads the file directly to S3 (using the returned `uploadUrl`) and then stores the returned `publicUrl` in the appropriate DB record via another API call.
+
+**Request (JSON)**
+
+```json
+{
+  "coachId": "COA0001",
+  "tag": "PROFILE",        // or "COVER"
+  "mimeType": "image/jpeg",
+  "expiresInSec": 300       // optional; default server value if omitted
+}
+```
+
+**Functioning**
+
+1. Validates `coachId` and `mimeType`.
+2. Calls `getPresignedUploadUrl(mimeType, coachId, UploadContext.COACH, folderName)` which returns `{ uploadUrl, key, publicUrl }`.
+3. Optionally creates/updates a `CoachImageProfileModel` placeholder entry with the `key`/`publicUrl`.
+4. Returns the presigned `uploadUrl` and `publicUrl` to the client.
+
+**Response (success)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "uploadUrl": "https://s3-presigned-url",
+    "key": "coach/PROFILE/COA0001/uuid",
+    "publicUrl": "https://bucket.s3.region.amazonaws.com/coach/PROFILE/COA0001/uuid",
+    "expiresIn": 300
+  }
+}
+```
+
+**Usage note**
+
+* Client must `PUT` the file to `uploadUrl` with correct `Content-Type` header.
+* After successful upload, the `publicUrl` can be used in other API calls (e.g., `addCoachKYCDetails` or profile update endpoints) to store image URLs in DB.
+
+**Common errors**
+
+* `400` missing parameters
+* `500` failed to generate presigned URL
+
+---
+
+### 3) Add / Update Coach KYC Details (save metadata pointing to uploaded images)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/coach/kyc/update-details`
+* **Controller**: `addCoachKYCDetails`
+
+**Purpose / Short functioning description**
+
+This endpoint persists KYC metadata after the image(s) are uploaded (either via encrypted server upload or presigned direct upload). It links s3 keys/urls to a `CoachKyc` record and updates the coach's `kycStatus`.
+
+**Request Body (JSON)**
+
+```json
+{
+  "coachId": "COA0001",
+  "type": "PAN",
+  "frontImage": {
+    "s3Key": "encrypted/COA0001/kyc/1600000000000_front",
+    "s3Url": "https://encrypted-bucket.s3.region.amazonaws.com/encrypted/COA0001/kyc/1600000000000_front"
+  },
+  "backImage": {
+    "s3Key": "encrypted/COA0001/kyc/1600000000000_back",
+    "s3Url": "https://encrypted-bucket.s3.region.amazonaws.com/encrypted/COA0001/kyc/1600000000000_back"
+  }
+}
+```
+
+**Functioning**
+
+1. Validates that `coachId` exists and that provided `s3Key`/`s3Url` belong to allowed buckets/prefixes.
+2. Creates or updates a `CoachKycModel` record with provided metadata and sets `status: 'uploaded'` and `uploadedAt`.
+3. Optionally triggers a KYC submission workflow or returns the created record for the client to call a separate submit endpoint.
+4. Updates `ProfileModel.kycStatus` (e.g. `uploaded` / `pending`) where applicable.
+
+**Success**
+
+```json
+{
+  "success": true,
+  "message": "KYC details saved",
+  "data": {
+    "kycId": "KYC000123",
+    "coachId": "COA0001",
+    "status": "uploaded"
+  }
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — invalid s3 key/url format or missing coachId
+* `403 Forbidden` — if s3Key belongs to a different user or bucket
+* `500` DB failure or validation error
+
+---
+
+## Security & Operational notes
+
+* Encrypted images should be stored in a dedicated encrypted bucket. Keep encryption metadata (`encryptedKey`, `iv`, `authTag`) in the DB and restrict access.
+* Presigned URLs are for non-sensitive assets (profile/cover). For sensitive KYC scans, prefer server-side encrypted uploads (route #1) or client-side encryption.
+* Enforce size and type checks (e.g. only PNG/JPEG; limit file size) in middleware to avoid processing waste and to protect the KMS/S3 payload handling.
+* Implement audit logging for KYC uploads, metadata changes, and any admin retrieval/decryption actions.
+
+---
+
+## Quick summary table
+
+| Method | Endpoint                                 | Purpose                                                    |
+| ------ | ---------------------------------------- | ---------------------------------------------------------- |
+| POST   | `/api/fitnearn/coach/kyc/image-upload`   | Upload + server-side encrypt front/back images (multipart) |
+| POST   | `/api/fitnearn/web/coach/image/upload`   | Get presigned PUT URL + publicUrl for profile/cover images |
+| PATCH  | `/api/fitnearn/coach/kyc/update-details` | Save KYC metadata (s3 keys/urls) and update `kycStatus`    |
+
+---

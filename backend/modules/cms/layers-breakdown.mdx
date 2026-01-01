@@ -1,0 +1,178 @@
+---
+title: "CMS Lambda Layers Breakdown"
+description: "Layer-wise classification of middleware and functions used in the CMS module."
+---
+
+# CMS Lambda Layers Breakdown
+
+## Purpose
+
+This document explains **how the CMS module uses shared Lambda layers**, and **why each function belongs to a specific layer**.
+
+The goal is to make it clear:
+
+- What is global infrastructure
+- What is access-control capability
+- What is CMS-specific
+- What does NOT exist for CMS
+
+This prevents incorrect sharing or refactoring in the future.
+
+---
+
+## Layer A — Platform / Infra Layer (GLOBAL)
+
+### Definition
+
+Pure technical utilities that are:
+
+- Domain-agnostic
+- Permission-agnostic
+- Reusable across all backend modules
+
+These utilities **do not know who is calling them or why**.
+
+---
+
+### CMS Usage
+
+#### `idGenerationMiddleware`
+
+**Why it belongs here**
+
+- Generates unique IDs
+- Does not know about CMS, Admin, Content, or permissions
+- Used across multiple backend modules
+- No business rules or side effects
+
+**Conclusion**
+✔ Correctly classified as **Layer A (Global Infra)**
+
+---
+
+## Layer B — Domain Layer Utilities (CMS Domain)
+
+### Definition
+
+Functions that encode **CMS-specific business rules or workflows**.
+
+---
+
+### CMS Usage
+
+❌ **None**
+
+**Why**
+
+- CMS does not have domain-level utilities in middleware form
+- CMS business logic lives in controllers/services, not shared helpers
+- No reusable CMS-only utilities extracted at this layer
+
+**Conclusion**
+✔ Layer B exists conceptually  
+✔ Currently **empty for CMS**
+
+---
+
+## Layer C — Cross-Domain Capability Layer (SEPARATE STACK)
+
+### Definition
+
+Logic that represents a **business capability**, not a utility.
+These functions:
+
+- Are meaningful in business terms
+- Apply permissions or identity
+- Can be reused by multiple admin-facing modules
+- Cause security or access side effects
+
+---
+
+### CMS Usage
+
+#### `authenticateAdminToken`
+
+**Why it belongs here**
+
+- Enforces admin authentication
+- Knows about admin identity
+- Used across **admin modules**, not just CMS
+- Has security and business impact
+
+---
+
+#### `authorize`
+
+**Why it belongs here**
+
+- Enforces permission-based access
+- Understands business permissions (`CREATE_CONTENT`, `READ_CONTENT`, etc.)
+- Used only for admin-facing routes
+- Affects system behavior, not just request formatting
+
+**Important Clarification**
+
+- Although used only in admin APIs, this is still a **capability**, not CMS logic
+- CMS is a **consumer**, not the owner
+
+**Conclusion**
+✔ Both correctly belong to **Layer C**
+
+---
+
+## Layer D — Isolation Layer (CONCEPTUAL)
+
+### Definition
+
+Intentional duplication to avoid coupling.
+
+---
+
+### CMS Usage
+
+❌ **None**
+
+**Why**
+
+- CMS does not duplicate access logic
+- CMS relies on shared admin capabilities instead
+- No CMS-specific reimplementation of auth or permissions
+
+---
+
+## Route Flow Mapping (For Clarity)
+
+### Admin Routes
+
+```
+
+authenticateAdminToken  →  authorize  →  idGenerationMiddleware  →  CMS Controller
+
+```
+
+- Layer C → Layer C → Layer A → CMS logic
+
+---
+
+### Public Routes
+
+```
+
+CMS Controller
+
+```
+
+- No authentication
+- No permissions
+- No shared layers involved
+
+---
+
+## Summary Table
+
+| Layer   | Purpose             | CMS Functions                         |
+| ------- | ------------------- | ------------------------------------- |
+| Layer A | Global Infra        | `idGenerationMiddleware`              |
+| Layer B | CMS Domain          | None                                  |
+| Layer C | Access / Capability | `authenticateAdminToken`, `authorize` |
+| Layer D | Isolation           | None                                  |

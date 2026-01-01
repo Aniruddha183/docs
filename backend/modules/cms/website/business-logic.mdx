@@ -1,0 +1,127 @@
+---
+title: "CMS Public Platform Business Logic"
+description: "Behavioral rules for consuming and rendering CMS content on public platforms."
+---
+
+# CMS Public Platform Business Logic
+
+## Purpose
+
+This document defines **how public platforms (Website and similar consumers)** should interpret, handle, and render CMS content received from public APIs.
+
+It describes **expected behavior**, not API contracts or backend implementation.
+
+---
+
+## Public Consumption Model
+
+Public platforms:
+
+- Consume CMS content via **read-only public APIs**
+- Do not modify content
+- Do not manage content state or lifecycle
+- Render content based on **type** and **applicationType**
+
+There is no publishing workflow or visibility state managed by CMS.
+
+---
+
+## Content Interpretation Rules
+
+### Content Type Handling
+
+Public platforms must interpret content based on its `type`.
+
+---
+
+#### ContactFooter
+
+When content type is `ContactFooter`:
+
+- Content is treated as **structured data**
+- Typical usage includes:
+  - Footer text
+  - Contact information
+  - FAQs
+- Platforms should:
+  - Render only relevant fields
+  - Ignore missing or unused fields gracefully
+  - Avoid assuming the presence of all sub-fields
+
+---
+
+#### GeneralContent
+
+When content type is `GeneralContent`:
+
+- Content is treated as **free-form informational data**
+- The `description` field represents the primary content
+- Platforms are responsible for:
+  - Rendering the description appropriately
+  - Handling formatting or structured text if applicable
+
+CMS does not enforce or interpret the content format.
+
+---
+
+## Application Type Handling
+
+Each content entry is associated with an `applicationType`.
+
+Public platforms must:
+
+- Consume only content relevant to their application scope
+- Ignore content entries intended for other platforms
+- Avoid rendering content with mismatched application types
+
+Filtering may occur either:
+
+- At the API level
+- Or at the frontend level, depending on integration
+
+---
+
+## Update and Change Tolerance
+
+Public platforms must be tolerant to:
+
+- Changes in content structure
+- Optional fields being added or removed
+- Content type changes made by admins
+
+Platforms must **not assume**:
+
+- Stability of content shape beyond documented fields
+- That a content type will remain unchanged over time
+
+---
+
+## Error Handling Expectations
+
+Public platforms should:
+
+- Gracefully handle missing content
+- Handle empty responses without breaking UI
+- Treat `404` responses as valid “content not available” cases
+
+Public platforms must not attempt retries for logical errors.
+
+---
+
+## Non-Goals
+
+This document does **not** describe:
+
+- Admin workflows or permissions
+- API endpoint definitions
+- Database schema or persistence rules
+- Frontend design or styling decisions
+
+---
+
+## Related Documentation
+
+- CMS Overview
+- Architecture Guide
+- Public API Documentation
+- Database Schema

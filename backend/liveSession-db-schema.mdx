@@ -1,0 +1,227 @@
+---
+
+title: "DB Schema"
+description: "Complete schema reference for Live Session module (full fields list, indexes, constraints, and TypeScript interface)."
+---
+
+This document contains the **full field lists** and implementation notes for models used by the *Live Session* module. These are inferred from the controller logic and API documentation; please review against your canonical `index.d.ts` for final alignment.
+
+---
+
+## Models
+
+### `IPublicSession`
+
+Represents a public / live session record.
+
+**Full fields**
+
+* `_id`: `ObjectId` (MongoDB internal)
+* `sessionId`: `string` — unique business id (e.g., `LSX00001`)
+* `coachId`: `string` — reference to `IProfileModel.coach_id`
+* `title`: `string`
+* `description`: `string`
+* `slug`: `string` — optional URL slug
+* `category`: `string`
+* `level`: `string` (e.g., `beginner|intermediate|advanced`)
+* `focusArea`: `string[]`
+* `thumbnailURL`: `string`
+* `thumbnailKey`: `string` — S3 key for image
+* `thumbnailMediaId`: `string` — media id reference
+* `date`: `string` | `Date` — scheduled date (YYYY-MM-DD)
+* `startTime`: `string` — scheduled start time (HH:mm:ss or ISO time)
+* `endTime`: `string` — computed or stored end time
+* `duration`: `number` — minutes
+* `durationRange`: `{ min: number, max: number }` — optional
+* `timeZone`: `string` — IANA timezone like `Asia/Kolkata`
+* `seats`: `number` — total seats available
+* `availableSeats`: `number` — computed / updated
+* `price`: `number` — coach-facing price
+* `bookingPrice`: `number` — price user pays (incl fees)
+* `liveSessionPrice`: `number` — for live-only pricing
+* `currency`: `string` — e.g. `INR` / `USD`
+* `sessionType`: `string` — `public` | `recorded` | `hybrid`
+* `status`: `string` — `draft` | `published` | `cancelled` | `completed` | `archived`
+* `state`: `string` — higher-level lifecycle state (used by controllers)
+* `stage`: `string` — review stage (e.g., `reviewer_pending`, `approver_pending`)
+* `isRefunded`: `boolean`
+* `cancelReason`: `string` | null
+* `cancelledBy`: `{ adminId?: string, coachId?: string, userId?: string }` — who cancelled
+* `meetingLink`: `string` — URL for live meeting
+* `meetingProvider`: `string` — e.g., `Zoom`, `Jitsi`
+* `bookingId`: `string` — latest booking ref
+* `orderId`: `string` — payment order id
+* `paymentId`: `string` — payment gateway id
+* `bookings`: `number` — total bookings count
+* `attendees`: `Array<{ userId: string, bookingId: string, attended: boolean, attendedAt?: Date }>`
+* `likes`: `number`
+* `likedBy`: `string[]` — optional array of userIds (may be trimmed)
+* `shares`: `number`
+* `reports`: `number` — aggregated count
+* `reportsDetails`: `[{ reporterId: string, reason: string, createdAt: Date }]`
+* `createdBy`: `{ adminId?: string, coachId?: string }`
+* `createdAt`: `Date`
+* `updatedAt`: `Date`
+* `publishedAt`: `Date | null`
+* `cancellationRefundedAt`: `Date | null`
+* `metadata`: `Record<string, any>` — extensible object for tags
+
+**Indexes**
+
+* `sessionId` (unique)
+* Compound index on `{ coachId, date, startTime }` for conflict checks
+* Index on `status`, `stage`, and `date` for queries
+
+---
+
+### `IBookedSlot` / `IUserBookedSession`
+
+Represents a booking record for a user who booked a public session.
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `bookingId`: `string` — unique booking identifier
+* `sessionId`: `string` — reference to `IPublicSession.sessionId`
+* `userId`: `string`
+* `coachId`: `string`
+* `orderId`: `string` — payment order id
+* `paymentId`: `string` — payment gateway refund id
+* `status`: `string` — `success` | `failed` | `pending` | `refunded`
+* `transactionId`: `string`
+* `currency`: `string`
+* `grandTotal`: `number`
+* `gstAmount`: `number` — tax
+* `seatCount`: `number`
+* `createdAt`: `Date`
+* `updatedAt`: `Date`
+* `refund`: `{ refundedAt?: Date, refundAmount?: number, refundId?: string, refundStatus?: string }`
+* `userMeta`: `{ name?: string, email?: string, profileImage?: string }` — denormalized snapshot
+
+**Indexes**
+
+* `bookingId` (unique)
+* `sessionId` for lookups
+* `userId` for user booking queries
+
+---
+
+### `IAdminLiveSessionReview`
+
+Admin review / audit entries associated with a session.
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `sessionId`: `string`
+* `reviewer`: `{ adminId: string, comments: Array<{ commentId: string, comment: string, createdAt: Date, updatedAt?: Date, lock: boolean }> }`
+* `approver`: `{ adminId: string, comments: Array<{ commentId: string, comment: string, createdAt: Date, updatedAt?: Date, lock: boolean }> }`
+* `stage`: `string`
+* `lock`: `boolean` — indicates finalization of review workflow for this session
+* `history`: `Array<{ by: string, action: string, at: Date }>`
+* `createdAt`, `updatedAt`
+
+**Notes**
+
+* Review `lock` semantics: reviewer/approver can save draft comments while `lock === false`. Finalizing actions set `lock = true` and make comments immutable.
+
+---
+
+## TypeScript interfaces (inferred)
+
+```ts
+export interface IPublicSession {
+  _id?: string;
+  sessionId: string;
+  coachId: string;
+  title: string;
+  description?: string;
+  slug?: string;
+  category?: string;
+  level?: string;
+  focusArea?: string[];
+  thumbnailURL?: string;
+  thumbnailKey?: string;
+  thumbnailMediaId?: string;
+  date: string | Date;
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  durationRange?: { min: number; max: number };
+  timeZone?: string;
+  seats?: number;
+  availableSeats?: number;
+  price?: number;
+  bookingPrice?: number;
+  liveSessionPrice?: number;
+  currency?: string;
+  sessionType?: string;
+  status?: string;
+  state?: string;
+  stage?: string;
+  isRefunded?: boolean;
+  cancelReason?: string | null;
+  cancelledBy?: { adminId?: string; coachId?: string; userId?: string };
+  meetingLink?: string;
+  meetingProvider?: string;
+  bookingId?: string;
+  orderId?: string;
+  paymentId?: string;
+  bookings?: number;
+  attendees?: Array<{ userId: string; bookingId: string; attended: boolean; attendedAt?: Date }>;
+  likes?: number;
+  likedBy?: string[];
+  shares?: number;
+  reports?: number;
+  reportsDetails?: Array<{ reporterId: string; reason: string; createdAt: Date }>;
+  createdBy?: { adminId?: string; coachId?: string };
+  createdAt?: Date;
+  updatedAt?: Date;
+  publishedAt?: Date | null;
+  cancellationRefundedAt?: Date | null;
+  metadata?: Record<string, any>;
+}
+
+export interface IBookedSlot {
+  _id?: string;
+  bookingId: string;
+  sessionId: string;
+  userId: string;
+  coachId: string;
+  orderId?: string;
+  paymentId?: string;
+  status: 'success' | 'failed' | 'pending' | 'refunded';
+  transactionId?: string;
+  currency?: string;
+  grandTotal?: number;
+  gstAmount?: number;
+  seatCount?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+  refund?: { refundedAt?: Date; refundAmount?: number; refundId?: string; refundStatus?: string };
+  userMeta?: { name?: string; email?: string; profileImage?: string };
+}
+
+export interface IAdminLiveSessionReview {
+  _id?: string;
+  sessionId: string;
+  reviewer?: { adminId: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> };
+  approver?: { adminId: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> };
+  stage?: string;
+  lock?: boolean;
+  history?: Array<{ by: string; action: string; at: Date }>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+## Implementation notes
+
+* When enforcing uniqueness ensure `sessionId` is globally unique; maintain a central sequence generator for human-readable ids (e.g., `LSX0001`).
+* Conflict checks should use `{ coachId, date, startTime }` plus `duration`/`endTime` to detect overlapping sessions (see controllers using `parseDateTime` logic).
+* For analytics, keep `bookings`, `likes`, and `shares` as denormalized fields for quick reads; update them transactionally when booking operations succeed or fail.
+* Keep `thumbnailKey` to allow S3 cleanup when sessions are deleted.
+
+---

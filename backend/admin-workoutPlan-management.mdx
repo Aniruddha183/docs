@@ -1,0 +1,524 @@
+---
+
+title: "Admin Workout Plan Management API Documentation"
+description: "REST API reference for Admin Workout Plan Management (create/edit/review/week/day management, comments, assignments, analytics, and deletions)."
+---
+
+# Admin Workout Plan Management
+
+This document describes the admin-facing REST APIs for managing workout plans: creating plans, adding weeks/days, reviewer/approver flows, assigning admins, comments, edits, and deletions.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/workout-plan
+```
+
+---
+
+## Middleware & Utilities 
+
+* `authenticateAdminToken` — validates admin JWT and attaches admin context to `req`.
+* `authorize(permission | permissionArray)` / `authorizeMultiple(...)` — permission checks (e.g. `CREATE_WORKOUT_PLAN`, `REVIEW_WORKOUT_PLAN`, `GET_WORKOUT_PLAN_DETAILS`).
+* `upload.single('thumbnail')` (from `imageHandler`) — accepts thumbnail uploads and attaches `req.file`.
+* `idGenerationMiddleware('WORKOUT_PLAN')`, `idGenerationMiddleware('CMT')` — generate unique IDs for plans, weeks, days, and comments.
+* `generateUniqueSequence` — used to create task IDs and other sequences.
+
+---
+
+## Models used (selected from shared models)
+
+> These models are the ones the controller imports and uses. Only key fields required to understand payloads/responses are listed.
+
+### `WorkoutPlanModel` (workout plan)
+
+* `planId` — unique identifier (e.g. `WP00001`)
+* `creatorId` — admin/coach who created the plan
+* `planName`, `description`, `category`, `level`
+* `numberOfWeeks`, `weeklyPlans` (array of `weekId`)
+* `thumbnailUrl`, `thumbnailKey`
+* `dailyStepsGoal`, `dailyExerciseGoal`
+* `reviewerAdmin`, `approverAdmin`
+* `state`, `stage`, `status` (lifecycle fields)
+* `history` (array of change records)
+
+### `WeekPlan`
+
+* `weekId` — unique identifier
+* `weekNumber` — ordinal week number
+* `dailyPlans` — array of `dayId`
+
+### `DayPlan`
+
+* `dayId` — unique identifier
+* `dayNumber`, `exercises` (array/object describing exercises), `status` (`draft` | `filled` | `rest`)
+
+### `AdminReviewWorkoutPlan`
+
+* `planId` — associated plan
+* `reviewerComments`, `approverComments` — arrays of review entries
+* `lock` flags for reviewer/approver flows
+
+### `WeekTaskDetails`
+
+* `taskId`, `type` (`WEEK_PLAN`), `referenceId` (weekId), `status`
+
+---
+
+## Routes & Endpoints
+
+> Each endpoint below lists: method, path, middleware, controller, request parameters (params/body/query/headers/files where applicable), a short **Functioning** description (what it does and how), example success response shape, and common errors.
+
+### 1. Reviewer — Add Reviewer Comment / Stage (Review)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/review`
+* **Middleware**: `authenticateAdminToken`, `authorize('REVIEW_WORKOUT_PLAN')`, `idGenerationMiddleware('CMT')`
+* **Controller**: `reviewerAdminComment`
+
+**Request Body**
+
+* `adminId` (string) — reviewer admin id
+* `planId` (string) — plan id to review
+* `comment` (string) — review text
+* `visibility` (string) — visibility for comment (e.g. `private` | `public`)
+* `stage` (string) — reviewer stage identifier
+* `action` (string) — action taken (e.g. `save` | `submit`)
+
+**Functioning**
+
+* Validates reviewer identity and that the `planId` exists.
+* Creates or updates an `AdminReviewWorkoutPlan` entry using the generated comment id (from `idGenerationMiddleware`).
+* If action is `submit`, sets the plan `state` to `Pending Approval`; otherwise keeps it `Under Review` and allows further edits while the review `lock` is not set.
+* Pushes an entry to the plan's `history` for audit.
+
+**Success (example)**
+
+```json
+{ "success": true, "message": "Workout plan updated successfully", "data": { /* review object */ } }
+```
+
+**Common errors**: `401` not assigned reviewer, `404` plan or admin not found, `500` server error.
+
+---
+
+### 2. Create Workout Plan (admin)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/create`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`, `upload.single('thumbnail')`, `idGenerationMiddleware('WORKOUT_PLAN')`
+* **Controller**: `createWorkoutPlan`
+
+**Request**
+
+* **Headers**: `Authorization: Bearer <token>` (controller reads Authorization header to extract token)
+* **Body (JSON)**:
+
+  * `adminId` (string) — creator admin
+  * `planName` (string)
+  * `description` (string)
+  * `category` (string)
+  * `numberOfWeeks` (number)
+  * `level` (string)
+  * `dailyStepsGoal` (number)
+  * `dailyExerciseGoal` (number)
+  * `thumbnailURL` (string) — optional if `thumbnail` file provided
+* **File**: `thumbnail` (multipart file) — optional, accepted by `upload.single`
+
+**Functioning**
+
+* Generates `planId` via `idGenerationMiddleware` and optionally uploads the `thumbnail` to S3 (controller uses image upload helpers when `req.file` is present).
+* Creates a `WorkoutPlanModel` document with core fields and `userType: 'ADMIN'`, and persists it.
+* Returns the saved plan object.
+
+**Success (example)**
+
+```json
+{ "success": true, "message": "Workout plan created successfully", "data": { /* workout plan object */ } }
+```
+
+**Common errors**: `400` missing required fields; `500` DB/S3 errors.
+
+---
+
+### 3. Create Week (attach to a plan)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/create-week`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`, `idGenerationMiddleware('WEEK')` (middleware applied in router)
+* **Controller**: `createWeekPlan`
+
+**Request Body**
+
+* `adminId` (string)
+* `workoutPlanId` (string) — parent `planId`
+* `weekNumber` (number)
+* `dayIds` (string[]) — array of existing `dayId`s to attach (optional)
+
+**Functioning**
+
+* Generates new `weekId` and creates a `WeekPlan` document (`weekNumber`, `dailyPlans`).
+* Pushes the `weekId` into the `WorkoutPlanModel.weeklyPlans` array.
+* Also creates a `WeekTaskDetails` entry (taskId generated via `generateUniqueSequence`) to track the week-creation task.
+
+**Success**: returns `{ success: true, data: { savedWeekPlan, taskDetails } }`.
+
+**Errors**: `404` if `workoutPlanId` not found, `500` server error.
+
+---
+
+### 4. Create or Edit Day Plan
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/create-day`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`, `idGenerationMiddleware('DAY')`
+* **Controller**: `createOrEditDayPlan`
+
+**Request Body**
+
+* `dayId` (string, optional) — if provided, the day is updated; otherwise new day is created
+* `dayNumber` (number)
+* `weekId` (string) — parent week
+* `exercises` (array/object) — exercise list/details
+* `status` (string) — e.g. `save` (draft) | `submit` (filled)
+
+**Functioning**
+
+* If `dayId` is present, updates the existing `DayPlan` with `exercises` and computed `status` (maps `save` → `draft`, `submit` → `filled`).
+* If `dayId` absent, creates a new `DayPlan` document and returns it.
+
+**Success**: `{ success: true, data: { /* day plan */ } }`.
+
+**Errors**: `404` if referenced week not found, `500` server error.
+
+---
+
+### 5. Copy Week
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/copy-week`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`, `idGenerationMiddleware('WEEK')`
+* **Controller**: `copyWeekPlan`
+
+**Request Body**
+
+* `weekId` (string) — source week to copy
+* `adminId` (string)
+* `weekNumber` (number) — new week number
+
+**Functioning**
+
+* Reads the source `WeekPlan`, duplicates its `dailyPlans` (copies `DayPlan` documents to new `dayId`s), creates a new `WeekPlan` with new `weekId` and links it into the specified `WorkoutPlanModel` (if provided).
+
+**Success**: returns the newly created `WeekPlan` and copied day entries.
+
+**Errors**: `404` source week not found, `500` on DB errors.
+
+---
+
+### 6. Copy Day
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/copy-day`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`, `idGenerationMiddleware('DAY')`
+* **Controller**: `copyDayPlan`
+
+**Request Body**
+
+* `dayId` (string) — source day to copy
+* `weekId` (string) — target week
+* `dayNumber` (number)
+
+**Functioning**
+
+* Duplicates the source `DayPlan` into a new `DayPlan` with a new `dayId`, updates the target `WeekPlan.dailyPlans` to include the new `dayId`.
+
+**Success**: newly created day returned.
+
+---
+
+### 7. Set Day as Rest Day
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/rest-day`
+* **Middleware**: `authenticateAdminToken`, `authorize('CREATE_WORKOUT_PLAN')`
+* **Controller**: `setAsRestDay`
+
+**Request Body**
+
+* `weekId` (string)
+* `dayNumber` (number)
+
+**Functioning**
+
+* Finds the day in the specified week and sets its `status` to `rest`.
+
+**Success**: updated day plan returned.
+
+---
+
+### 8. Update Workout Plan Meta Details
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/update-meta-details`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_WORKOUT_PLAN')`
+* **Controller**: `editWorkoutPlanDetails`
+
+**Request Body**
+
+* `planId` (string)
+* Any combination of meta fields to update: `planName`, `description`, `category`, `numberOfWeeks`, `level`, `dailyStepsGoal`, `dailyExerciseGoal`, `thumbnailURL`
+
+**Functioning**
+
+* Validates `planId` and updates only the provided meta fields on the `WorkoutPlanModel` document.
+
+**Success**: returns the updated workout plan.
+
+---
+
+### 9. Update Workout Payment Details
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/update-payment`
+* **Middleware**: `authenticateAdminToken`, `authorize('UPDATE_WORKOUT_PLAN')`
+* **Controller**: `updateWorkoutPaymentDetails`
+
+**Request Body**
+
+* `workoutPlanId` (string)
+* `originalPrice` (number)
+* `discountedPrice` (number)
+* `discountPercentage` (number)
+* `couponCode` (string)
+
+**Functioning**
+
+* Updates pricing fields on the workout plan and stores coupon/discount metadata for sale flows.
+
+**Success**: updated workout plan data returned.
+
+---
+
+### 10. Approver — Approve / Deny / Save (Stage)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/approver-review`
+* **Middleware**: `authenticateAdminToken`, `authorize('REVIEW_WORKOUT_PLAN')`, `idGenerationMiddleware('CMT')`
+* **Controller**: `approverAdminReview`
+
+**Request Body**
+
+* `planId` (string)
+* `adminId` (string) — approver
+* `status` (string) — e.g. `Approved` | `Denied` | `InReview`
+* `visibility` (string)
+* `stage` (string)
+* `comment` (string)
+
+**Functioning**
+
+* Validates approver assignment and admin role, appends approver comment using generated comment id, updates `WorkoutPlanModel` stage/state.
+* On `Approved`, sets plan as approved and triggers notification to the coach (email via `shootMail`) and updates versioning if needed.
+* Sets review `lock` on final action so comments cannot be edited further.
+
+**Success**: updated plan and review objects returned.
+
+**Errors**: `401` not assigned approver, `404` plan/admin not found.
+
+---
+
+### 11. Edit Admin Review Comments (in `AdminReviewWorkoutPlan`)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/edit-comments`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_COMMENT')`
+* **Controller**: `editAdminComments`
+
+**Request Body**
+
+* `planId` (string)
+* `commentId` (string)
+* `commentType` (string) — e.g. `reviewer` | `approver`
+* `comment` (string) — new text
+
+**Functioning**
+
+* Finds and updates an admin review comment inside `AdminReviewWorkoutPlan` arrays. Edits only allowed while the comment's `lock` is `false`.
+
+---
+
+### 12. Add Week-level Comment
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/week-comment`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_WORKOUT_PLAN')`, `idGenerationMiddleware('CMT')`
+* **Controller**: `addWeekComment`
+
+**Request Body**
+
+* `weekId` (string)
+* `adminId` (string)
+* `comment` (string)
+* `visibility` (string)
+
+**Functioning**
+
+* Adds a comment to the specified week; generates `commentId` and persists it. Useful for week-level reviewer notes.
+
+---
+
+### 13. Assign Reviewer / Approver
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/assign-reviewer` and `/assign-approver`
+* **Middleware**: `authenticateAdminToken`, `authorize('ASSIGN_REVIEWER')`
+* **Controller**: `assignReviewer`, `assignApprover`
+
+**Request Body**
+
+* `planId` (string)
+* `adminId` (string)
+
+**Functioning**
+
+* Associates the reviewer/approver admin with the `WorkoutPlanModel` document (`reviewerAdmin` / `approverAdmin`) and persists.
+
+---
+
+### 14. Edit Week Task Details
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/workout-plan/edit-week-task`
+* **Middleware**: `authenticateAdminToken`, `authorize('EDIT_WORKOUT_PLAN')`
+* **Controller**: `editWeekTaskDetails`
+
+**Request Body**
+
+* `taskId` (string)
+* `adminId` (string)
+* `title?`, `description?`, `status?` (fields to update)
+
+**Functioning**
+
+* Updates `WeekTaskDetails` document fields such as status and notes.
+
+---
+
+### 15. Delete Plan / Week / Day
+
+* **Method**: `DELETE`
+* **URL**:
+
+  * `/api/fitnearn/web/admin/workout-plan/delete-plan/:planId` — delete plan
+  * `/api/fitnearn/web/admin/workout-plan/delete-week/:weekId` — delete week
+  * `/api/fitnearn/web/admin/workout-plan/delete-day/:dayId` — delete day
+* **Middleware**: `authenticateAdminToken`, `authorize('DELETE_WORKOUT_PLAN')`
+* **Controllers**: `deletePlan`, `deleteWeek`, `deleteDay`
+
+**Path Params**
+
+* `planId` | `weekId` | `dayId` — identifiers for the resource to delete
+
+**Functioning**
+
+* Performs a `findOneAndDelete` on the corresponding model and returns the deleted document. Controller may also perform related cleanup where relevant.
+
+**Success**: `200/201` with deleted object.
+
+**Errors**: `404` if resource not found, `500` on DB error.
+
+---
+
+### 16. Read / List Endpoints
+
+* **Get Versioned Plans (filters)**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get-version-plans`
+  * **Controller**: `getAllVersionedWorkoutPlansWithFilter`
+  * **Query Params (typical)**: `page`, `limit`, `search`, `status`, `creatorId`
+  * **Functioning**: Returns a paginated list of versioned plans matching provided filters.
+
+* **Get All Plans**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get`
+  * **Controller**: `getWorkoutPlans`
+  * **Query Params**: `page`, `limit`, `status`, `sort`, `category`
+  * **Functioning**: Returns paginated list with minimal plan metadata.
+
+* **Get Plan Details**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get-details/:planId`
+  * **Controller**: `getWorkoutPlanDetails`
+  * **Path Params**: `planId`
+  * **Functioning**: Populates `weeklyPlans` and each week's `dailyPlans` and merges admin-review data and reviewer/approver names into the response.
+
+* **Get Week Details**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get-week-details/:weekId`
+  * **Controller**: `getWeekPlanDetails`
+  * **Path Params**: `weekId`
+
+* **Get Weeks / Days (lists)**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get-weeks` and `/get-days`
+  * **Controller**: `getAllWeeks`, `getAllDays`
+  * **Query Params**: `planId`, `page`, `limit`
+
+* **Get Admin Comments for a Plan**
+
+  * **Method**: `GET`
+  * **URL**: `/api/fitnearn/web/admin/workout-plan/get-admin-comments/:planId`
+  * **Controller**: `getAdminComments`
+  * **Path Params**: `planId`
+  * **Functioning**: Returns admin-review comments (reviewer & approver) for audit.
+
+---
+
+## Notes & Implementation considerations
+
+* **Review locks & drafts:** Reviewer and approver flows use `lock` semantics — reviewers/approvers can save draft comments while `lock === false`. Finalizing actions (submit/approve/deny) set `lock = true` and prevent further edits.
+* **Week/Day linkage:** Plans link to weeks via `weeklyPlans` (array of `weekId`), and week documents link to days via `dailyPlans` (array of `dayId`). Deleting a parent resource should be coordinated to avoid orphaned records.
+* **Task tracking:** Week creation also creates a `WeekTaskDetails` task for audit/assignment—this is created via `generateUniqueSequence`.
+* **Permissions:** Ensure router-level `authorize(...)` permissions mirror the permission matrix used by the admin UI.
+
+---
+
+## Summary table
+
+| Method | Endpoint                      | Description                          |
+| ------ | ----------------------------- | ------------------------------------ |
+| POST   | `/review`                     | Reviewer adds comment / stage review |
+| POST   | `/create`                     | Create workout plan                  |
+| POST   | `/create-week`                | Create week for a plan               |
+| POST   | `/create-day`                 | Create or edit day plan              |
+| POST   | `/copy-week`                  | Duplicate a week                     |
+| POST   | `/copy-day`                   | Duplicate a day                      |
+| POST   | `/rest-day`                   | Mark an existing day as rest         |
+| PATCH  | `/update-meta-details`        | Update plan metadata                 |
+| PATCH  | `/update-payment`             | Update plan pricing & coupon info    |
+| PATCH  | `/approver-review`            | Approver stage: approve/deny/save    |
+| PATCH  | `/edit-comments`              | Edit admin review comment            |
+| PATCH  | `/week-comment`               | Add week-level comment               |
+| PATCH  | `/assign-reviewer`            | Assign reviewer admin                |
+| PATCH  | `/assign-approver`            | Assign approver admin                |
+| PATCH  | `/edit-week-task`             | Edit week task details               |
+| DELETE | `/delete-plan/:planId`        | Delete a workout plan                |
+| DELETE | `/delete-week/:weekId`        | Delete a week                        |
+| DELETE | `/delete-day/:dayId`          | Delete a day                         |
+| GET    | `/get-version-plans`          | Get versioned plans with filters     |
+| GET    | `/get`                        | List workout plans                   |
+| GET    | `/get-details/:planId`        | Get full plan details                |
+| GET    | `/get-week-details/:weekId`   | Get week details                     |
+| GET    | `/get-weeks`                  | List weeks                           |
+| GET    | `/get-days`                   | List days                            |
+| GET    | `/get-admin-comments/:planId` | Get admin review comments            |
+
+---

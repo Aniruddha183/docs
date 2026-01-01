@@ -1,0 +1,222 @@
+---
+
+title: "DB Schema"
+description: "Complete schema reference for Blog module (full fields list, indexes, and TypeScript interfaces)."
+---
+
+# Blog — DB Schema
+
+Full field lists for models used by the Blog module. These reflect the fields controllers read/write and are ready to be converted to TypeScript interfaces.
+
+---
+
+## Models
+
+### `IBlog` / `Blog`
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `blogId`: `string` — human-readable unique id (e.g., `BLOG0001`)
+* `authorId`: `string` — reference to `IProfileModel.coach_id` or user id
+* `authorName`: `string`
+* `title`: `string`
+* `slug`: `string`
+* `summary`: `string`
+* `content`: `any` — rich text blocks or HTML (controller expects serialized content)
+* `thumbnail`: `{ url: string, key?: string, mediaId?: string, altText?: string }`
+* `images`: `Array<{ imageId: string; url: string; key?: string; altText?: string; uploadedAt?: Date }>`
+* `tags`: `string[]`
+* `category`: `string`
+* `readingTime`: `number` — minutes estimate
+* `meta`: `{ description?: string; keywords?: string[] }`
+* `stage`: `string` — `draft` | `under_review` | `approved` | `published` | `rejected`
+* `status`: `string` — similar to stage, used for filtering
+* `isVersioned`: `boolean`
+* `version`: `number`
+* `previousVersionId`: `string | null`
+* `views`: `number`
+* `likes`: `number`
+* `shares`: `number`
+* `commentsCount`: `number`
+* `reportsCount`: `number`
+* `publishedAt`: `Date | null`
+* `createdAt`: `Date`
+* `updatedAt`: `Date`
+* `publishedBy`: `{ adminId?: string; coachId?: string }`
+* `history`: `Array<{ by: string; action: string; at: Date; meta?: any }>`
+
+**Indexes**
+
+* `blogId` (unique)
+* `authorId`
+* `stage`, `status`
+* `tags` (multikey)
+
+---
+
+### `IBlogImage`
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `imageId`: `string`
+* `blogId`: `string | null` — may be null for uploaded-but-unused images
+* `key`: `string` — s3 key
+* `url`: `string` — public url
+* `altText`: `string`
+* `uploadedBy`: `{ userId?: string; adminId?: string; coachId?: string }`
+* `uploadedAt`: `Date`
+* `usedInContent`: `boolean` — true when image is referenced in blog content
+
+---
+
+### `IBlogComment` / `BlogComment`
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `commentId`: `string` — human-friendly id (e.g., `CMT0001`)
+* `blogId`: `string`
+* `userId`: `string | null` — null for admin-created comments
+* `adminId`: `string | null` — if created by an admin
+* `comment`: `string`
+* `parentCommentId`: `string | null` — root or reply
+* `replyCount`: `number`
+* `likes`: `number`
+* `status`: `string` — `active` | `deleted` | `flagged`
+* `reports`: `number`
+* `createdAt`: `Date`
+* `updatedAt`: `Date`
+
+**Behavior**
+
+* Root comments are stored as separate documents; replies may be stored as nested arrays or separate docs depending on implementation. Controllers expect efficient retrieval of root + replies.
+
+---
+
+### `IAdminBlogReview`
+
+(Reviewer/approver audit trail used to track review decisions)
+
+**Full fields**
+
+* `_id`: `ObjectId`
+* `blogId`: `string`
+* `reviewer`: `{ adminId?: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> }`
+* `approver`: `{ adminId?: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> }`
+* `stage`: `string`
+* `lock`: `boolean`
+* `createdAt`, `updatedAt`
+
+---
+
+### `IReportModel`
+
+Used for reporting blogs or comments.
+
+* `_id` — ObjectId
+* `targetId` — string (blogId | commentId)
+* `targetType` — `blog` | `comment`
+* `reporterId` — string
+* `reason` — string
+* `status` — `open` | `resolved` | `ignored`
+* `createdAt`, `updatedAt`
+
+---
+
+## TypeScript interfaces (inferred)
+
+```ts
+export interface IBlog {
+  _id?: string;
+  blogId: string;
+  authorId: string;
+  authorName?: string;
+  title: string;
+  slug?: string;
+  summary?: string;
+  content?: any;
+  thumbnail?: { url: string; key?: string; mediaId?: string; altText?: string };
+  images?: Array<{ imageId: string; url: string; key?: string; altText?: string; uploadedAt?: Date }>;
+  tags?: string[];
+  category?: string;
+  readingTime?: number;
+  meta?: { description?: string; keywords?: string[] };
+  stage?: string;
+  status?: string;
+  isVersioned?: boolean;
+  version?: number;
+  previousVersionId?: string | null;
+  views?: number;
+  likes?: number;
+  shares?: number;
+  commentsCount?: number;
+  reportsCount?: number;
+  publishedAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  publishedBy?: { adminId?: string; coachId?: string };
+  history?: Array<{ by: string; action: string; at: Date; meta?: any }>;
+}
+
+export interface IBlogImage {
+  _id?: string;
+  imageId: string;
+  blogId?: string | null;
+  key: string;
+  url: string;
+  altText?: string;
+  uploadedBy?: { userId?: string; adminId?: string; coachId?: string };
+  uploadedAt?: Date;
+  usedInContent?: boolean;
+}
+
+export interface IBlogComment {
+  _id?: string;
+  commentId: string;
+  blogId: string;
+  userId?: string | null;
+  adminId?: string | null;
+  comment: string;
+  parentCommentId?: string | null;
+  replyCount?: number;
+  likes?: number;
+  status?: 'active' | 'deleted' | 'flagged';
+  reports?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IAdminBlogReview {
+  _id?: string;
+  blogId: string;
+  reviewer?: { adminId?: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> };
+  approver?: { adminId?: string; comments: Array<{ commentId: string; comment: string; createdAt: Date; updatedAt?: Date; lock?: boolean }> };
+  stage?: string;
+  lock?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IReportModel {
+  _id?: string;
+  targetId: string;
+  targetType: 'blog' | 'comment';
+  reporterId: string;
+  reason: string;
+  status?: 'open' | 'resolved' | 'ignored';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+## Implementation notes
+
+* `IBlogImage` entries should be cleaned up if `usedInContent` is false when a blog is finalized (the `saveBlogPost` flow already does this in controllers).
+* Keep `commentsCount` denormalized for fast listing.
+* Use a separate collection for `AdminBlogReview` to avoid bloating `IBlog` documents with audit history.
+
+---

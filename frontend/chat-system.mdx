@@ -1,0 +1,534 @@
+---
+title: "Chat System Component"
+description: "A flexible admin–user chat system with support for replies, edits, deletes, and optimistic UI updates."
+---
+
+### Chat System Component
+
+<Frame>
+  <img src="/images/chat-system.png" style={{ borderRadius: "0.5rem" }} />
+</Frame>
+
+---
+
+## Overview
+
+The `ChatSystem` component is a reusable chat and comment thread system designed
+for admin workflows such as **reviews**, **approvals**, **rejections**, and
+**internal discussions**.
+
+It supports:
+
+- Root messages and replies
+- Admin replies with profile context
+- Edit and delete actions
+- Optimistic UI updates with rollback on failure
+
+The component is API-agnostic and relies on callback props for backend
+integration.
+
+---
+
+## Core Concepts
+
+- **Messages**  
+  Each chat item is represented as a `Message` object with author, content,
+  timestamp, and identity metadata.
+
+- **Root Message**  
+  The first message in `initialMessages` is treated as the original/root comment.
+
+- **Replies**  
+  All subsequent messages are treated as replies to the root or selected parent.
+
+- **Optimistic Updates**  
+  UI updates immediately while API calls run in the background, with rollback
+  on failure.
+
+---
+
+## Features
+
+- **Threaded Conversation**
+  - Displays root message followed by replies.
+- **Reply, Edit, Delete Actions**
+  - Available via per-message dropdown.
+- **Optimistic UI Handling**
+  - Immediate UI feedback with safe rollback.
+- **Admin Identity Resolution**
+  - Uses cookie or provided profile for avatar and name.
+- **Keyboard Shortcuts**
+  - `Enter` or `Cmd/Ctrl + Enter` to send replies.
+- **Configurable Alignment**
+  - Replies can be forced to align right.
+- **Custom Send Button**
+  - Supports custom label and icon.
+
+---
+
+## Usage
+
+### Basic Usage
+
+```tsx
+<ChatSystem initialMessages={messages} />
+```
+
+---
+
+### With Backend Integration
+
+```tsx
+<ChatSystem
+  initialMessages={messages}
+  adminProfile={{ name: "Admin", profileImage: "/admin.png" }}
+  createReply={async ({ parent, text }) => {
+    return api.createReply(parent.id, text);
+  }}
+  editMessage={async ({ messageId, text }) => {
+    return api.editMessage(messageId, text);
+  }}
+  deleteMessage={async ({ messageId }) => {
+    return api.deleteMessage(messageId);
+  }}
+/>
+```
+
+---
+
+## Props
+
+| Prop                 | Type                                      | Default           | Description                                      |
+| -------------------- | ----------------------------------------- | ----------------- | ------------------------------------------------ |
+| `initialMessages`    | `Message[]`                               | `[]`              | Initial messages; first item is treated as root. |
+| `adminProfile`       | `{ name: string; profileImage?: string }` | Admin placeholder | Admin display identity.                          |
+| `createReply`        | `(args) => Promise<any>`                  | `undefined`       | Creates a reply via API.                         |
+| `editMessage`        | `(args) => Promise<void>`                 | `undefined`       | Edits an existing message.                       |
+| `deleteMessage`      | `(args) => Promise<void>`                 | `undefined`       | Deletes a message.                               |
+| `onReply`            | `(parent, reply) => Promise<void>`        | `undefined`       | Legacy reply handler (fallback).                 |
+| `onEdit`             | `(msg) => Promise<void>`                  | `undefined`       | Legacy edit handler (fallback).                  |
+| `onDelete`           | `(msg) => Promise<void>`                  | `undefined`       | Legacy delete handler (fallback).                |
+| `repliesAlwaysRight` | `boolean`                                 | `true`            | Forces replies to align right.                   |
+| `sendButtonLabel`    | `string \| null`                          | `null`            | Optional label for send button.                  |
+| `sendButtonIcon`     | `ReactNode`                               | `SendHorizontal`  | Custom icon for send button.                     |
+
+---
+
+## Message Lifecycle
+
+### Reply
+
+1. User clicks **Reply**
+2. Input is focused automatically
+3. Message is added optimistically
+4. API call is triggered
+5. Rollback occurs on failure
+
+### Edit
+
+1. Message enters edit mode
+2. Text is updated optimistically
+3. API call persists changes
+4. Rollback occurs on failure
+
+### Delete
+
+1. Message is removed optimistically
+2. API delete is triggered
+3. Rollback occurs on failure
+
+---
+
+## Rendering Rules
+
+- Root message is rendered first.
+- Replies follow in order of insertion.
+- Admin replies align right by default.
+- Non-admin messages align left.
+- Editing state replaces the bubble with an editor.
+
+---
+
+## Behavioral Notes
+
+- Component copies `initialMessages` internally to avoid mutation.
+- Prop updates to `initialMessages` fully reset local state.
+- Dropdown actions are generated per message.
+- Admin avatar is resolved in priority:
+
+  1. Cookie value
+  2. `adminProfile.profileImage`
+  3. Default placeholder
+
+---
+
+## Component Code
+
+```tsx
+import React, { useEffect, useRef, useState } from "react";
+import ChatBubble from "./chat-bubble";
+import { v4 as uuidv4 } from "uuid";
+import Image from "next/image";
+import { SendHorizontal } from "lucide-react";
+import Cookies from "js-cookie";
+
+type Author = "user" | "admin" | "other";
+
+export type Message = {
+  id: string;
+  author: Author;
+  profileImage?: string;
+  userName: string;
+  comment: string;
+  time: string;
+  date: string;
+};
+
+interface ChatSystemProps {
+  initialMessages?: Message[]; // first message treated as root original comment
+  adminProfile?: { name: string; profileImage?: string };
+  // Component-level handlers (page supplies implementations that call APIs)
+  createReply?: (args: {
+    parent: Message;
+    text: string;
+  }) => Promise<{ id?: string; createdAt?: string; comment?: string } | void>;
+  editMessage?: (args: { messageId: string; text: string }) => Promise<void>;
+  deleteMessage?: (args: { messageId: string }) => Promise<void>;
+
+  // Backwards compatible callbacks (optional)
+  onDelete?: (msg: Message) => Promise<void> | void;
+  onEdit?: (msg: Message) => Promise<void> | void;
+  onReply?: (parent: Message, reply: Message) => Promise<void> | void;
+
+  repliesAlwaysRight?: boolean;
+  sendButtonLabel?: string | null;
+  sendButtonIcon?: React.ReactNode;
+}
+
+const defaultAdmin = {
+  name: "Admin",
+  profileImage: "/placeholder-admin.png",
+};
+
+export default function ChatSystem({
+  initialMessages = [],
+  adminProfile = defaultAdmin,
+  createReply,
+  editMessage,
+  deleteMessage,
+  onDelete,
+  onEdit,
+  onReply,
+  repliesAlwaysRight = true,
+  sendButtonLabel = null,
+  sendButtonIcon,
+}: ChatSystemProps) {
+  // initialize messages safely (copy)
+  const [messages, setMessages] = useState<Message[]>(() =>
+    (initialMessages || []).map((m) => ({ ...m }))
+  );
+
+  useEffect(() => {
+    setMessages((initialMessages || []).map((m) => ({ ...m })));
+  }, [initialMessages]);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const replyInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const adminImageFromCookie = Cookies.get("admin_image_url");
+  const adminAvatar =
+    adminImageFromCookie ||
+    adminProfile?.profileImage ||
+    "/placeholder-admin.png";
+
+  // dropdown options
+  const dropdownOptionsGenerator = (msg: Message) => [
+    { label: "Reply", onClick: () => handleStartReply(msg.id) },
+    { label: "Edit", onClick: () => handleStartEdit(msg) },
+    { label: "Delete", onClick: () => handleDelete(msg) },
+  ];
+
+  // --- local helper actions ---
+
+  function handleStartReply(parentId: string) {
+    setReplyToId(parentId);
+    setReplyText("");
+    setTimeout(() => replyInputRef.current?.focus(), 50);
+  }
+
+  function handleStartEdit(msg: Message) {
+    setEditingId(msg.id);
+    setEditingText(msg.comment);
+  }
+
+  async function handleDelete(msg: Message) {
+    // optimistic remove
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+
+    try {
+      if (deleteMessage) {
+        await deleteMessage({ messageId: msg.id });
+      } else if (onDelete) {
+        await onDelete(msg);
+      }
+      // success — nothing further
+    } catch (e) {
+      // rollback
+      setMessages(previous);
+      console.error("delete failed", e);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editingId) return;
+    const previous = messages;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === editingId ? { ...m, comment: editingText } : m))
+    );
+
+    const edited = messages.find((m) => m.id === editingId);
+    setEditingId(null);
+    setEditingText("");
+
+    try {
+      if (editMessage && edited) {
+        await editMessage({ messageId: edited.id, text: editingText });
+      } else if (onEdit && edited) {
+        await onEdit({ ...edited, comment: editingText });
+      }
+    } catch (e) {
+      // rollback on failure
+      setMessages(previous);
+      console.error("edit failed", e);
+    }
+  }
+
+  async function handleSendReply() {
+    if (!replyText.trim()) return;
+    const parent =
+      messages.find((m) => m.id === replyToId) ?? messages[0] ?? null;
+    if (!parent) return;
+
+    // optimistic local message
+    const newMsg: Message = {
+      id: uuidv4(),
+      author: "admin",
+      profileImage: adminProfile.profileImage,
+      userName: adminProfile.name,
+      comment: replyText.trim(),
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      date: new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
+    };
+
+    const previous = messages;
+    setMessages((prev) => [...prev, newMsg]);
+    setReplyText("");
+    setReplyToId(null);
+
+    try {
+      // prefer createReply prop for API call; fallback to onReply
+      if (createReply) {
+        const serverResp = await createReply({ parent, text: newMsg.comment });
+        // if server returned canonical id/timestamps, patch the local message
+        if (serverResp && (serverResp as any).id) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === newMsg.id
+                ? {
+                    ...m,
+                    id: (serverResp as any).id,
+                    comment: (serverResp as any).comment ?? m.comment,
+                  }
+                : m
+            )
+          );
+        }
+      } else if (onReply) {
+        await onReply(parent, newMsg);
+      }
+    } catch (e) {
+      // rollback optimistic add on failure
+      setMessages(previous);
+      console.error("reply failed", e);
+    }
+  }
+
+  // render single bubble
+  const renderBubble = (m: Message, index: number) => {
+    const isRoot = index === 0;
+    const alignRight =
+      !isRoot && repliesAlwaysRight ? true : m.author === "admin";
+    const wrapperClass = alignRight ? "justify-end" : "justify-start";
+    const bubbleBg = alignRight ? "bg-neutral-800" : "bg-neutral-700";
+    const borderColor = alignRight
+      ? "border border-neutral-700"
+      : "border border-neutral-600";
+
+    return (
+      <div key={m.id} className={`flex ${wrapperClass} mb-3`}>
+        <ChatBubble
+          profileImage={m.profileImage || "/placeholder-user.png"}
+          userName={m.userName}
+          comment={m.comment}
+          time={m.time}
+          date={m.date}
+          bgColor={bubbleBg}
+          borderColor={borderColor}
+          textColor="text-white"
+          labelId={`chat-${m.id}`}
+          labelText={m.id}
+          isChecked={false}
+          showCheckbox={false}
+          dropdownOptions={dropdownOptionsGenerator(m)}
+          onDelete={() => handleDelete(m)}
+          commentId={m.id}
+        />
+      </div>
+    );
+  };
+
+  const effectiveIcon = sendButtonIcon ?? <SendHorizontal size={16} />;
+
+  return (
+    <div className="w-full">
+      <div className="space-y-2">
+        {messages.map((m, idx) => {
+          if (editingId === m.id) {
+            return (
+              <div key={m.id} className="flex justify-start mb-3">
+                <div className="w-full max-w-2xl p-4 bg-neutral-900 rounded">
+                  <textarea
+                    className="w-full p-2 bg-transparent border rounded text-white"
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    rows={4}
+                  />
+                  <div className="mt-2 flex gap-2 justify-end">
+                    <button
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditingText("");
+                      }}
+                      className="px-3 py-1 rounded border"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      className="px-3 py-1 rounded bg-blue-600 text-white"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return renderBubble(m, idx);
+        })}
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-2 text-sm text-neutral-400">
+          {replyToId ? `Admin Comment` : "Write your reply"}
+        </div>
+
+        <div className="flex items-center bg-[#202020] border border-neutral-800 rounded-2xl p-3 py-2 gap-3">
+          <div className="flex-shrink-0">
+            <Image
+              src={adminAvatar}
+              alt={adminProfile?.name || "Admin"}
+              width={36}
+              height={36}
+              className="rounded-full object-cover"
+            />
+          </div>
+
+          <div className="flex-1">
+            <textarea
+              ref={replyInputRef}
+              placeholder="Write text here ..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              className="w-full bg-neutral-950 resize-none text-sm border border-neutral-800 text-neutral-200 placeholder:text-neutral-500 px-2 py-3 min-h-[44px] leading-snug rounded-lg transition-colors focus:outline-none focus:ring-0 focus:border-neutral-700"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendReply();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  handleSendReply();
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex-shrink-0">
+            <button
+              onClick={handleSendReply}
+              aria-label={sendButtonLabel ?? "Send"}
+              title={sendButtonLabel ?? "Send"}
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition ${
+                sendButtonLabel
+                  ? "bg-green-600 text-white"
+                  : "bg-neutral-800 text-white"
+              }`}
+            >
+              {effectiveIcon}
+            </button>
+          </div>
+        </div>
+
+        {replyToId && (
+          <div className="mt-2 flex justify-end">
+            <button
+              onClick={() => {
+                setReplyToId(null);
+                setReplyText("");
+              }}
+              className="px-3 py-1 rounded border text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Customization
+
+- **Styling**: Override via `ChatBubble` or container styles.
+- **API Integration**: Use `createReply`, `editMessage`, `deleteMessage`.
+- **Layout**: Control alignment using `repliesAlwaysRight`.
+- **UX**: Customize send button icon and label.
+
+---
+
+## Modification Guidelines
+
+- Do not mutate `messages` directly.
+- Preserve optimistic update + rollback pattern.
+- Keep root message as index `0`.
+- Prefer new handler props over legacy callbacks.
+- Avoid coupling API logic directly inside the component.
+
+---
+
+This component provides a safe, extensible foundation for admin and internal
+communication workflows.
