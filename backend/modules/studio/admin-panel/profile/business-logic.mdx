@@ -1,0 +1,66 @@
+---
+title: Business Logic
+description: This document defines the rules governing Studio Owner onboarding, verification, and lifecycle management.
+---
+
+## 1. Onboarding Workflow
+
+When a Studio Owner completes registration:
+
+1. The profile appears in the **Admin Profile Management** list.
+2. The initial status is set to **Pending Review**.
+3. All associated Studios are **Unpublished** by default.
+
+## 2. Review & Approval Process
+
+Admins can open a detailed view (DIM/Modal) to review:
+
+- Personal Details (Name, Contact, Email).
+- Business Documents (KYC).
+- Listed Studios associated with the owner.
+
+### Decision Matrix
+
+| Action         | Condition                       | Outcome                                                   |
+| :------------- | :------------------------------ | :-------------------------------------------------------- |
+| **Approve**    | KYC valid + Contract Successful | Profile active; Studios can be published.                 |
+| **Reject**     | Invalid documents/Fake info     | Profile rejected; Owner notified via Email.               |
+| **Deactivate** | Misbehavior / Policy violation  | Profile marked INACTIVE; All studios hidden from website. |
+
+## 3. KYC & Razor Pay Integration
+
+The KYC process is tied directly to payment eligibility:
+
+1. **Contract Initiation:** Admin reviews KYC docs. If valid, Admin triggers a Razor Pay contract.
+2. **Verification Logic:**
+   - If Razor Pay returns **Success**: KYC status = `Approved`. Owner can now receive payments.
+   - If Razor Pay returns **Fail**: KYC status = `Rejected`. Admin must re-evaluate or ask for new docs.
+
+## 4. Administrative Power Levels
+
+### Super Admin
+
+- **Payment Agreements:** Exclusive power to add or modify payment terms/commissions based on 1-on-1 discussions with owners.
+- **System Overrides:** Can reactivate profiles deactivated by standard admins.
+
+### Admin
+
+- **Review:** Can view and audit all owner details and studio listings.
+- **Enforcement:** Can **Deactivate** any owner profile for misbehavior.
+- **Impact:** Deactivating an owner performs a **Cascade Unpublish** on all studios owned by that individual.
+
+## 5. Studio Visibility Logic
+
+Studio visibility on the public website is dependent on the Owner's Profile status:
+
+- `Profile: Approved` + `Studio: Published` = **Visible**
+- `Profile: Inactive` = **Hidden** (regardless of studio status)
+- `Profile: Pending/Rejected` = **Hidden**
+
+## 6. API Permissions
+
+Every operation is gated by permissions:
+
+- **List Profiles:** `GET /api/v1/admin/profiles` (Allowed: Admin, Super Admin)
+- **Update Status:** `PATCH /api/v1/admin/profiles/:id/status` (Allowed: Admin, Super Admin)
+- **Manage Agreements:** `POST /api/v1/admin/agreements` (Allowed: Super Admin ONLY)

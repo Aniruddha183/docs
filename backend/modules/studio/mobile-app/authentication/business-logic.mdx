@@ -1,0 +1,83 @@
+---
+title: "Business Logics"
+description: "Architectural specification for Studio Owner identity management and session authorization."
+---
+
+## Business Rules
+
+- **Identity Uniqueness**: A Studio Owner is uniquely identified by a system-generated ID (SOID).
+- **Credential Integrity**: One email address or one mobile number cannot be linked to multiple Studio Owner accounts.
+- **Cool-off Period**: Accounts marked for deletion are restricted from all authentication activities for a period of 15 days.
+- **Verification Requirement**: No session tokens are issued without successful validation from an external Identity Provider (Google) or internal OTP verification.
+- **OTP Expiration**: Manually generated OTPs are time-bound (10 Min) and valid for a single verification attempt only.
+- **Session Hierarchy**: Every authenticated session must provide a multi-token stack including access, identity, and refresh tokens to maintain persistent mobile access.
+- **Onboarding State**: The authentication response must explicitly communicate the completion status of the owner's profile.
+
+---
+
+## State Flow
+
+The lifecycle of a **Studio Owner Account** identity:
+
+**UNREGISTERED** → **PENDING_VERIFICATION** → **ACTIVE**
+
+- **UNREGISTERED**: The initial state where no SOID or Cognito identity exists.
+- **DRAFT**: The owner is verified the otp, an SOID is assigned, and valid tokens are issued.
+- **UNDER REVIEW**: The owner is completed the onboarding steps and sent for review.
+- **APPROVED**: The owner's profile is now verified by ADMIN, satisfied all parameters.
+- **REJECTED**: The owner's profile get rejected in case of any misleading name, about or profile picture.
+- **DELETED (COOLDOWN)**: Terminal state for 15 days where the SOID is preserved but authentication is rejected.
+- **ARCHIVED**: Final state after the 15-day cooldown where the identity is fully removed from plateform.
+
+**Allowed Transitions:**
+
+- `UNREGISTERED` → `DRAFT` (Via Signup)
+- `DRAFT` → `UNDER REVIEW` (Via Onboarding)
+- `UNDER REVIEW` → `APPROVE` OR `REJECTED` (Via Admin Review)
+- `APPROVE` → `DELETED` (Via Account Deletion)
+- `DELETED` → `APPROVED` (Via Recovery within 15 days)
+
+---
+
+## Business Logic
+
+### Social Identity Registration (Google)
+
+1. The system receives verified identity claims from the Social Identity Provider.
+2. The system checks the database for existing records linked to the provided email.
+3. If no record exists, the system invokes the ID Generation logic to create a unique SOID.
+4. The system synchronizes the identity with the AWS Cognito User Pool.
+5. A persistent Owner record is created in the database.
+6. The system issues the full token stack (Access, ID, Refresh) and returns the onboarding status.
+
+### Social Identity Login (Google)
+
+1. The system validates the provided social identity tokens.
+2. The system verifies the account status is not in the 15-day deletion cooldown.
+3. The system retrieves the existing SOID and associated profile data.
+4. The system refreshes the Cognito session and returns the token stack.
+
+### SMS Identity Initiation (OTP)
+
+1. The system receives a mobile number and country code.
+2. For registration: The system verifies the number is not already associated with an SOID.
+3. For login: The system verifies the number exists and is not in cooldown.
+4. The system generates a cryptographically secure numeric code.
+5. The system stores the code with a Time-To-Live (TTL) and the associated hash code for mobile auto-retrieval.
+6. The system dispatches the code through the SMS gateway provider.
+
+### SMS Identity Verification
+
+1. The system retrieves the stored OTP based on the provided mobile number.
+2. The system compares the user-submitted code with the stored value.
+3. If the code matches and is not expired, the system clears the OTP from the cache.
+4. For new users, the system executes the ID Generation and Cognito synchronization logic.
+5. The system promotes the account state to ACTIVE.
+6. The system generates and returns the token stack.
+
+### Session Termination (Logout)
+
+1. The system receives the SOID and the current session identifiers.
+2. The system invalidates the refresh token within the AWS Cognito User Pool.
+3. The system clears any local session-tracking metadata.
+4. The mobile application is notified to purge all stored JWTs.

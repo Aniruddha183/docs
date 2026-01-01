@@ -1,0 +1,47 @@
+---
+title: Architecture
+description: Technical design for slot management, invitation logic, and session delivery.
+---
+
+# Booking & Invitation Architecture
+
+The booking module is a high-concurrency system designed to manage real-time inventory for both physical studio space and digital live events.
+
+## 1. Inventory & Slot Engine
+
+- **Slot Logic:** Offline bookings are handled in 1-hour atomic blocks.
+- **Concurrency Control:** When a user selects a slot, a "Temporary Lock" (Redis-based) is placed for 10 minutes to allow the user to complete the Razorpay transaction without the slot being taken by others.
+- **Seat Management:** For both Offline and Live sessions, the system tracks `available_capacity`. Each "Invite Friend" action increments the `booked_seats` count for that specific transaction.
+
+## 2. Notification & Invitation Service
+
+This service handles the social aspect of the booking:
+
+- **Email Dispatcher:** Sends booking confirmations and invitations.
+- **Onboarding Trigger:** If an invited email is not found in the `users` table, a unique onboarding link is generated for `fitnearn.com`.
+- **Reminder Cron:** A background job scans upcoming sessions and sends alerts at `T-24h`, `T-1h`, and `T-15m`.
+
+## 3. Data Schema Highlights
+
+### Booking Table
+
+| Field          | Type   | Description                                         |
+| :------------- | :----- | :-------------------------------------------------- |
+| `id`           | UUID   | Primary Key                                         |
+| `booking_type` | Enum   | OFFLINE_SLOT, LIVE_SESSION                          |
+| `payment_id`   | String | Razorpay Transaction ID (Null if Free Live Session) |
+| `qr_code`      | String | Encrypted hash for offline verification             |
+| `meeting_link` | String | Encrypted URL for online sessions                   |
+
+### Participants Table
+
+| Field        | Type   | Description                   |
+| :----------- | :----- | :---------------------------- |
+| `booking_id` | UUID   | Link to parent booking        |
+| `email`      | String | Participant email             |
+| `status`     | Enum   | INVITED, REGISTERED, ATTENDED |
+
+## 4. Security & Access Logic
+
+- **Online Links:** The `meeting_link` is protected by a time-gate. The API will not return the decrypted link until `session_start_time - 5 minutes`.
+- **QR Integrity:** QR codes are generated using a short-lived JWT containing the `booking_id` and `user_id`.

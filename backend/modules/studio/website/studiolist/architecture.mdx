@@ -1,0 +1,52 @@
+---
+title: Architecture
+description: Technical design for discovery, proximity search, and the review ecosystem.
+---
+
+# Studio Listing & Review Architecture
+
+This module manages how users discover studios and interact with them through bookings and social feedback loops.
+
+## 1. Discovery Engine (Search & Filter)
+
+The search infrastructure uses Geospatial indexing to handle proximity-based queries.
+
+- **Geospatial Query:** Uses `PostGIS` or `MongoDB 2dsphere` to calculate distance.
+- **Radius:** Defaulted to a 5KM radius from the user's geo-coordinates.
+- **Ranking Logic:** Results are sorted using a multi-factor algorithm:
+  1. **Likes:** Studios liked by the user are hoisted to the top.
+  2. **Proximity:** Nearest studios within the 5KM range.
+  3. **Status:** Only `Published` studios with `Approved` owners are indexed.
+
+## 2. Component Structure
+
+- **Listing View:** A grid/list component with lazy-loaded images and quick-info tags (Category, Rating).
+- **Studio Detail Page:** A dynamic route (`/studio/:id`) fetching:
+  - `Amenities` & `Services` arrays.
+  - `Review` sub-collection.
+  - `LiveSession` and `Slot` availability calendars.
+- **Review System:** A decoupled service that validates booking completion before allowing write operations.
+
+## 3. Data Models
+
+### Like/Favorite Model
+
+| Field        | Type      | Description                         |
+| :----------- | :-------- | :---------------------------------- |
+| `user_id`    | UUID      | Foreign Key to User                 |
+| `studio_id`  | UUID      | Foreign Key to Studio               |
+| `created_at` | Timestamp | Used to sort recently liked studios |
+
+### Review Model
+
+| Field        | Type    | Description                        |
+| :----------- | :------ | :--------------------------------- |
+| `booking_id` | UUID    | Reference to the completed session |
+| `rating`     | Integer | 1 to 5 scale                       |
+| `comment`    | Text    | User feedback                      |
+| `media`      | Array   | S3 links to user-uploaded photos   |
+
+## 4. Integrity Constraints
+
+- **One-Time Review:** A composite unique key exists on `(user_id, booking_id)` to prevent multiple reviews for a single session.
+- **Status Filter:** The API middleware automatically appends `where status = 'PUBLISHED'` to all public listing queries.

@@ -1,0 +1,183 @@
+---
+title: "API Documentation"
+description: "This section outlines the API endpoints for managing **Studio booking sessions** in the FitnEarn platform.."
+---
+
+# Studio Booking Management
+
+This section outlines the API endpoints for managing **Studio booking sessions** in the FitnEarn platform.
+
+---
+
+### 1. Get Studio Session List
+
+- **Method**: `GET`
+- **Endpoint**: `/sessionList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIO_BOOKINGS`
+
+- **Query Parameters (optional)**:
+
+  - `sortBy`: `A-Z | Z-A`
+  - `startDate`, `endDate`: `YYYY-MM-DD`
+  - `stage`: (string) Session status
+  - `category`: (string)
+  - `categories`: (comma-separated string)
+  - `bookingType`: (string)
+  - `bookingId`: (string)
+  - `studioId`: (string)
+  - `ownerId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "bookedSessions": [ ... ],
+  "totalSessions": 5,
+  "message": "Booking Sessions fetched successfully"
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request` – Invalid date range
+  - `404 Not Found` – No sessions matched
+  - `500 Internal Server Error` – Unexpected failure
+
+---
+
+### 2. Get Studio Session By ID
+
+- **Method**: `GET`
+- **Endpoint**: `/session/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_BOOKING`
+
+- **Path Parameters**:
+
+  - `sessionId`: (string) Session ID
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "bookingId": "SESSION1234",
+    "studioId": "STU1234",
+    "category": "Yoga",
+    "sessionStartTime": "2024-01-01T08:00:00Z",
+    "status": "Completed",
+    "creator": { ... },
+    "userPaymentInfo": [ ... ],
+    "participants": [ ... ],
+    "refunds": [ ... ],
+    "paymentComments": [],
+    ...
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session or Booking not found
+  - `500 Internal Server Error` – Internal error
+
+---
+
+### 3. Cancel Studio Booking
+
+Cancels an upcoming booked session and adds a strike to the studio owner's account.
+
+- **Method**: `PATCH`
+- **URL**: `/session/cancell/:sessionId`
+- **Middleware**: `authenticateAdminToken(), authorize('CANCEL_STUDIO_BOOKING')`
+- **Controller**: `cancelStudioSession`
+- **URL Parameters**:
+  - `sessionId` (string): Unique session identifier (required)
+- **Request Body**:
+
+  - `reason` (string): Cancellation reason (required)
+
+- **Example Request**:
+
+```json
+{
+  "reason": "Studio maintenance required"
+}
+```
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Booking cancelled successfully",
+  "sessionId": "SESSION001"
+}
+```
+
+- **Error Responses**:
+
+  - `404 Not Found`: Session not found / Session can not be Cancell at "Completed" stage
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`
+
+### 4. Edit Studio Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/session/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO_BOOKING`
+
+- **Request Body**:
+
+```json
+{
+  "sessionId": "SESSION1234",
+  "updates": {
+    "status": "Cancelled",
+    "category": "Fitness"
+  }
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session updated successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session not found
+  - `500 Internal Server Error` – Update error
+
+---
+
+### 5. Delete Studio Session
+
+- **Method**: `DELETE`
+- **Endpoint**: `/session/delete/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO_BOOKING`
+
+- **Path Parameters**:
+
+  - `sessionId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio session and all associated data deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found` – Session not found
+  - `500 Internal Server Error` – Deletion failed
+
+---

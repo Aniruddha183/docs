@@ -1,0 +1,59 @@
+---
+title: Business Logic
+description: Business rules, validation logic, and administrative workflows for Studios.
+---
+
+# Business Logic: Studio Listing
+
+This document outlines the rules governing how studios are reviewed, published, and managed by the Admin team.
+
+## 1. The Listing Lifecycle
+
+### Phase A: Submission
+
+1. An owner creates a studio. It resides in **Draft** until they formally click "Submit for Review."
+2. Once submitted, it appears in the Admin Panel's **Under Review** queue.
+
+### Phase B: Admin Review
+
+Admins must inspect the studio details (images, pricing, description).
+
+- **Approval Rule:** A studio **CANNOT** be approved if the Owner's profile or KYC is not yet approved.
+- **Rejection Rule:** If an admin rejects a studio, they **must** provide a reason (e.g., "Blurry photos," "Invalid address"). This reason is sent via notification to the Owner App.
+
+## 2. Public Availability
+
+- A studio becomes "Public" (bookable by users) **ONLY** when its status is `APPROVED`.
+- If a studio is in any other state (Draft, Under Review, Rejected, Deactivated), it is stripped from search results and direct links.
+
+## 3. Administrative Operations
+
+### Studio Deactivation
+
+Admin has the power to **Deactivate** a studio at any time if:
+
+- Illegal content is found on the studio wall.
+- Multiple user complaints are received.
+- The studio no longer meets platform standards.
+  _Effect:_ The studio remains in the database for record-keeping but is immediately removed from the public website.
+
+### Editing & Management
+
+- **Manual Overrides:** Admins can edit studio details (correcting typos, updating categories) to maintain platform quality.
+- **Analytics:** Admins can view performance metrics (Total bookings, Revenue generated, Page views) for each studio to identify top-performing partners.
+- **Review Management:** Admins can view all user-submitted reviews and ratings to monitor studio quality.
+
+## 4. Validation Rules Summary
+
+| Trigger                   | Logic                                                                    |
+| :------------------------ | :----------------------------------------------------------------------- |
+| **On Approval**           | Check `owner.stage`. If not "Approved", block approval and notify admin. |
+| **On Rejection**          | `rejectReason` field is mandatory.                                       |
+| **On Owner Deactivation** | All associated studios must automatically inherit a `Inactive` state.    |
+| **On Deactivation**       | Cancel or flag upcoming bookings associated with that studio.            |
+
+## 5. Permission Matrix
+
+- **View Listings:** All Admins.
+- **Edit/Review Studios:** Support Admins and Super Admins.
+- **Delete/Deactivate Studios:** Super Admins or Compliance Officers only.

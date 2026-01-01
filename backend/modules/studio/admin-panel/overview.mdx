@@ -1,0 +1,91 @@
+# Studio Management
+
+The **Studio Management** is the central nervous system of the platform. It orchestrates the lifecycle of owners, their physical studios, live session, and the financial settlements between the platform and the studio owners.
+
+## 1. System Ecosystem
+
+- **Owner App:** For studio registration, listing creation, live session scheduling, and QR scanning.
+- **Customer Website:** For discovering studios, booking slots, and attending live sessions.
+- **Admin Panel:** The control center where admins review, approve, moderate, and settle payments.
+
+---
+
+## 2. Core Sub-Module Lifecycles
+
+### A. Studio Owner & KYC Lifecycle
+
+The entry point for all operations. No studio can go live without a verified owner.
+
+1. **Onboarding:** Owner registers via App $\rightarrow$ Status: `PENDING`.
+2. **KYC & Razar Pay:** Owner submits documents $\rightarrow$ Admin triggers Razar Pay Contract.
+3. **Verification:** Contract Success = `APPROVED`.
+4. **Enforcement:** Admin can move status to `INACTIVE` to instantly unpublish all owner content due to misbehavior.
+
+### B. Studio Listing Lifecycle
+
+Manages the physical presence of studios on the platform.
+
+1. **Creation:** Owner creates listing $\rightarrow$ Status: `DRAFT`.
+2. **Review:** Owner submits $\rightarrow$ Status: `UNDER_REVIEW`.
+3. **Approval:** Admin verifies details **IF** Owner is `APPROVED` $\rightarrow$ Status: `PUBLISHED`.
+4. **Visibility:** Only `PUBLISHED` studios appear on the Website.
+
+### C. Live Sessions Lifecycle
+
+A high-compliance, two-step verification process for digital/interactive events.
+
+1. **Creation:** Admin or Owner initiates $\rightarrow$ Status: `UNDER_REVIEW`.
+2. **Review Step:** Assigned Admin reviews content $\rightarrow$ Status: `IN_REVIEW`.
+3. **Approval Step:** Senior Admin sets Price, Seats, and Meeting Link $\rightarrow$ Status: `APPROVED`.
+4. **Execution:** Moderator joins to validate $\rightarrow$ Status: `COMPLETED`.
+
+### D. Offline Booking Lifecycle
+
+The transactional flow for physical studio usage.
+
+1. **Booking:** User selects 1-hour slot $\rightarrow$ Pays via Razorpay.
+2. **Validation:** User receives QR Code.
+3. **Check-in:** Owner scans QR via Studio App to verify and allow entry.
+4. **Refund Logic:**
+   - $> 24$ hours: Automatic Refund allowed.
+   - $< 24$ hours: No Refund.
+
+---
+
+## 3. Financial & Payment Lifecycle
+
+This lifecycle manages the flow of money from user bookings to owner payouts.
+
+| Stage              | Trigger                    | Action                                                               |
+| :----------------- | :------------------------- | :------------------------------------------------------------------- |
+| **Escrow**         | User Booking               | Payment held by platform (Status: `SUCCESSFUL`).                     |
+| **Payout Request** | Session/Booking Completion | Owner requests funds via App.                                        |
+| **Audit**          | Admin Review               | Admin views "Auto-filled" amount based on **Owner Agreement**.       |
+| **Settlement**     | Admin Approval             | Admin proceeds with payment or "Degrades" amount if issues occurred. |
+| **Cancellation**   | Refund/Dispute             | Admin cancels payment and notifies stakeholders.                     |
+
+---
+
+## 4. Permissions & Access Control (RBAC)
+
+To perform actions within this module, an admin account must have specific permissions assigned.
+
+| Action                          | Required Permission | Allowed Roles                   |
+| :------------------------------ | :------------------ | :------------------------------ |
+| **View Profiles/Listings**      | `studio:read`       | Support, Admin, Super Admin     |
+| **Approve KYC / Razor Pay**     | `kyc:manage`        | Compliance Officer, Super Admin |
+| **Edit/Deactivate Studio**      | `studio:write`      | Manager, Admin, Super Admin     |
+| **Assign Session Reviewer**     | `session:assign`    | Manager, Super Admin            |
+| **Finalize Session Price/Link** | `session:approve`   | Approver, Super Admin           |
+| **Manual Refund/Cancellation**  | `booking:refund`    | Finance Admin, Super Admin      |
+| **Manage Payment Agreements**   | `agreement:master`  | Super Admin Only                |
+| **Process Payouts**             | `payout:execute`    | Finance Admin, Super Admin      |
+
+---
+
+## 5. Global Business Rules
+
+1. **The Chain of Trust:** If an Owner's profile is deactivated, all their Studios, Live Sessions, and Upcoming Bookings are automatically suspended or hidden.
+2. **Mandatory Rejection Reasons:** No Admin can reject a KYC, Studio, or Live Session without providing a text-based reason for the owner.
+3. **Online Validation:** All online sessions **must** have a meeting link and an assigned moderator before the "Approved" state can be triggered.
+4. **Strike Policy:** Every "Studio Cancelled" booking adds a strike to the owner's profile; 3 strikes trigger an automatic review for deactivation.

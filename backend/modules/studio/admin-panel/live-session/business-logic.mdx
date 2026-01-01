@@ -1,0 +1,67 @@
+---
+title: Business Logic
+description: Business rules, administrative workflows, and post-session analytics.
+---
+
+# Business Logic & State Flow
+
+This document defines the operational rules for the Live Session module, focusing on the multi-step approval process and financial settlements.
+
+## 1. The Multi-Step Review Workflow
+
+### Phase 1: Creation & Assignment
+
+- **Owners** can create sessions which land in **Under Review**.
+- **Admins** can create sessions and must assign them to a Studio.
+- The state moves to **In Review** only when a specific Admin (or self) is assigned as the Reviewer.
+
+### Phase 2: The Reviewer's Role
+
+- Reviewers audit the content (Title, Description, Media).
+- **Internal Drafts:** Reviewers can save their progress/comments without changing the public state.
+- Once satisfied, the Reviewer moves the session to **Pending Approval**.
+
+### Phase 3: The Approver's Role
+
+Only the **Approver** has the authority to finalize the session. They must fill in mandatory commercial and technical fields:
+
+- **Seat Limit:** Maximum participants.
+- **Pricing & Discounts:** Final cost to the user.
+- **Meeting Link:** (Mandatory for Online sessions).
+- **Outcome:** The session becomes **Approved** and is immediately visible on the platform for booking.
+
+## 2. Live Monitoring & Moderation
+
+- **Moderator Rule:** For online sessions, a moderator must be present to validate the session.
+- **Admin Visibility:** During the "Approved" state, admins can track:
+  - Real-time booking counts.
+  - User participant details.
+  - Payment logs and refund statuses.
+
+## 3. Post-Session Analytics
+
+Once the session status moves to **Completed**, the Admin Panel unlocks a comprehensive analytics dashboard:
+
+- **Engagement:** Likes, Shares, and User Queries.
+- **Attendance:** Number of users who attended vs. "Not Attended."
+- **Financials:** Total revenue, cancelled bookings, and net performance.
+
+## 4. Payment & Settlement Logic
+
+The payment process is not automatic; it is triggered by the owner:
+
+1. **Request:** Owner raises a "Payment Request" post-completion.
+2. **Auto-Fill:** The system fetches the **Owner Agreement** (e.g., 80/20 split) and calculates the amount based on successful bookings.
+3. **Admin Verification:**
+   - **Proceed:** Admin approves the payment based on the data.
+   - **Cancel/Block:** If the session was fraudulent or violated terms, the admin can cancel the payment and notify the owner/users.
+
+## 5. Business Rules Summary
+
+| Feature               | Rule                                                                                           |
+| :-------------------- | :--------------------------------------------------------------------------------------------- |
+| **Visibility**        | Sessions are only visible to users in `APPROVED` state.                                        |
+| **Field Restriction** | Only Approvers can set Price and Meeting Links.                                                |
+| **Rejection**         | Rejection requires a mandatory reason visible to the owner.                                    |
+| **Permissions**       | Only Admins with `live_session_approver` scope can transition status from Pending to Approved. |
+| **Online Meetings**   | If `session_type == ONLINE`, a `meeting_link` must be present before approval.                 |

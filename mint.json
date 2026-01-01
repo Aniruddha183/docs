@@ -274,39 +274,107 @@
             }
           ]
         },
-
         {
           "group": "Studio Module",
           "pages": [
             "backend/modules/studio/overview",
-            "backend/modules/studio/db-schema",
+            "backend/modules/studio/database-schema",
             "backend/modules/studio/layers-breakdown",
-            "backend/modules/studio/shared-utilities",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/modules/studio/admin-panel/overview",
+                {
+                  "group": "Profile & KYC",
+                  "pages": [
+                    "backend/modules/studio/admin-panel/profile/architecture",
+                    "backend/modules/studio/admin-panel/profile/api-documentation",
+                    "backend/modules/studio/admin-panel/profile/business-logic"
+                  ]
+                },
+                {
+                  "group": "Studio List",
+                  "pages": [
+                    "backend/modules/studio/admin-panel/studiolist/architecture",
+                    "backend/modules/studio/admin-panel/studiolist/api-documentation",
+                    "backend/modules/studio/admin-panel/studiolist/business-logic"
+                  ]
+                },
+                {
+                  "group": "Live Session",
+                  "pages": [
+                    "backend/modules/studio/admin-panel/live-session/architecture",
+                    "backend/modules/studio/admin-panel/live-session/api-documentation",
+                    "backend/modules/studio/admin-panel/live-session/business-logic"
+                  ]
+                },
+                {
+                  "group": "Studio Booking",
+                  "pages": [
+                    "backend/modules/studio/admin-panel/booking/architecture",
+                    "backend/modules/studio/admin-panel/booking/api-documentation",
+                    "backend/modules/studio/admin-panel/booking/business-logic"
+                  ]
+                }
+              ]
+            },
             {
               "group": "Mobile App",
               "pages": [
-                "modules/studio/mobile-app/architecture",
-                "modules/studio/mobile-app/api-documentation",
-                "modules/studio/mobile-app/business-logic",
-                "modules/studio/mobile-app/frontend-integration"
+                "backend/modules/studio/mobile-app/overview",
+                {
+                  "group": "Authentication",
+                  "pages": [
+                    "backend/modules/studio/mobile-app/authentication/architecture",
+                    "backend/modules/studio/mobile-app/authentication/api-documentation",
+                    "backend/modules/studio/mobile-app/authentication/business-logic"
+                  ]
+                },
+                {
+                  "group": "Studio List",
+                  "pages": [
+                    "backend/modules/studio/mobile-app/studiolist/architecture",
+                    "backend/modules/studio/mobile-app/studiolist/api-documentation",
+                    "backend/modules/studio/mobile-app/studiolist/business-logic"
+                  ]
+                },
+                {
+                  "group": "Sessions",
+                  "pages": [
+                    "backend/modules/studio/mobile-app/session/architecture",
+                    "backend/modules/studio/mobile-app/session/api-documentation",
+                    "backend/modules/studio/mobile-app/session/business-logic"
+                  ]
+                },
+                {
+                  "group": "Home & Transaction",
+                  "pages": [
+                    "backend/modules/studio/mobile-app/home/api-documentation"
+                  ]
+                }
               ]
             },
             {
               "group": "Website",
               "pages": [
-                "modules/studio/website/architecture",
-                "modules/studio/website/api-documentation",
-                "modules/studio/website/business-logic",
-                "modules/studio/website/frontend-integration"
-              ]
-            },
-            {
-              "group": "Admin Panel",
-              "pages": [
-                "modules/studio/admin-panel/architecture",
-                "modules/studio/admin-panel/api-documentation",
-                "modules/studio/admin-panel/business-logic",
-                "modules/studio/admin-panel/frontend-integration"
+                "backend/modules/studio/website/overview",
+                {
+                  "group": "Studio List",
+                  "pages": [
+                    "backend/modules/studio/website/studiolist/architecture",
+                    "backend/modules/studio/website/studiolist/api-documentation",
+                    "backend/modules/studio/website/studiolist/business-logic"
+                  ]
+                },
+                {
+                  "group": "Studio Booking",
+                  "pages": [
+                    "backend/modules/studio/website/booking/architecture",
+                    "backend/modules/studio/website/booking/api-documentation",
+                    "backend/modules/studio/website/booking/business-logic"
+                  ]
+                }
               ]
             }
           ]

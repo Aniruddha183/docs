@@ -1,0 +1,29 @@
+---
+title: Architecture
+description: Technical design and data flow for the Studio lifecycle and management.
+---
+
+# Studio Listing Architecture
+
+This document defines the system architecture for managing studio listings, including state transitions and integration with the Owner Profile module.
+
+## 1. System Overview
+
+The Studio Listing module manages the lifecycle of a studio from initial draft to public availability. It acts as a gatekeeper to ensure content quality and owner compliance before a studio is visible to end-users.
+
+## 2. State Machine (Status Flow)
+
+The studio transitions through the following states:
+
+- **DRAFT:** Initial state when an owner starts creating a listing.
+- **UNDER_REVIEW:** Submitted by the owner; pending admin action.
+- **APPROVED:** Verified by admin; visible on the public platform.
+- **REJECTED:** Denied by admin; requires corrections (includes rejection reason).
+- **DEACTIVATED:** Hidden from public view by admin due to policy violations.
+
+## 3. Cross-Module Dependency
+
+The architecture implements a **Hard Lock** on the `APPROVED` status.
+
+- **Dependency:** `Studio.status` cannot transition to `APPROVED` unless `Owner.stage === 'APPROVED'`.
+- **Implementation:** Backend middleware validates the owner's KYC and profile status during the studio approval API call.

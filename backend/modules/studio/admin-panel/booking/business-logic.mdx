@@ -1,0 +1,74 @@
+---
+title: Business Logic & Rules
+description: Detailed workflows for cancellations, refunds, QR check-ins, and settlements.
+---
+
+# Business Logic & State Flow: Offline Bookings
+
+## 1. The Booking Workflow
+
+1. **Selection:** User selects a 1-hour slot.
+2. **Validation:** System checks availability.
+3. **Invitation:** User adds details for participants/friends.
+4. **Checkout:** User pays via Razorpay.
+5. **Confirmation:** System notifies User, Participants, and Studio Owner. A unique QR code is issued to the user.
+
+## 2. Cancellation & Refund Rules
+
+The system enforces strict financial rules based on the timing of the cancellation.
+
+### User Cancellation
+
+- **> 24 Hours before start:** Full refund initiated automatically.
+- **< 24 Hours before start:** No refund (Payment status remains Successful; Booking status moves to User Cancelled).
+
+### Studio/Owner Cancellation
+
+- **Anytime:** User receives a full refund.
+- **Penalty:** The Owner's account receives a **"Strike."** Multiple strikes may lead to profile deactivation (refer to Profile Module docs).
+
+### Admin Cancellation
+
+- Admins have the power to cancel any session and manually trigger or override refund logic based on specific user queries.
+
+## 3. Check-in Process
+
+- **Validation:** When the user arrives at the studio, the owner scans the QR code via the Studio App.
+- **Verification:**
+  - **Valid:** Check-in successful; booking moves toward "Completed" status.
+  - **Invalid:** App alerts owner (Expired, wrong studio, or already used).
+
+## 4. Payment Settlement (Owner Payout)
+
+Post-completion, the owner must request their earnings:
+
+1. **Request:** Owner clicks "Request Payment" in the app.
+2. **Admin Review:** Admin opens the settlement page.
+3. **Calculation:** The system **Auto-fills** the amount based on the pre-discussed Owner Agreement (e.g., Studio Price minus Platform Fee).
+4. **Admin Override:** Admin can manually adjust the amount or cancel the payout if a dispute is raised, providing a mandatory reason.
+
+## 5. State Flow Diagrams
+
+### Booking Status Flow
+
+- **UPCOMING:** Payment successful, waiting for slot time.
+- **COMPLETED:** QR scanned and session time elapsed.
+- **USER_CANCELLED:** Cancelled by the user.
+- **STUDIO_CANCELLED:** Cancelled by the owner (triggers strike).
+- **ADMIN_CANCELLED:** Force-cancelled by the platform.
+
+### Payment Status Flow
+
+- **PENDING:** Checkout initiated.
+- **SUCCESSFUL:** Razorpay webhook confirmed.
+- **CANCELLED:** Payment failed or refund processed.
+
+## 6. Business Rules Summary
+
+| Action               | Rule                                                                           |
+| :------------------- | :----------------------------------------------------------------------------- |
+| **Slot Duration**    | Always 1 hour; no partial bookings.                                            |
+| **Reviews**          | Users can only leave a review **after** status is `COMPLETED`.                 |
+| **Refund Threshold** | Exactly 24 hours. (e.g., 23h 59m = No Refund).                                 |
+| **Owner Payout**     | Only allowed for `COMPLETED` bookings with `SUCCESSFUL` payments.              |
+| **Admin Visibility** | Admin can view all participant names and payment timestamps for every booking. |

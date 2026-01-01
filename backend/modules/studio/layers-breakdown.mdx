@@ -1,1 +1,51 @@
-adfasd
+# Lambda Layer Architecture Breakdown
+
+The system is divided into three logical layers to manage dependencies and shared logic effectively.
+
+| Layer A: Infra Layer (GLOBAL)                                       | Layer B: Domain-Local Utilities (Studio)                                                       | Layer C: Cross-Domain Capability (SEPARATE STACK)                                            |
+| :------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
+| **Focus:** Generic AWS wrappers, security, and low-level utilities. | **Focus:** Logic, validation, and helper functions specific to the **Studio** business domain. | **Focus:** Orchestration between different modules (User/Studio) and 3rd party integrations. |
+| `logger`                                                            | `calculateDistance`                                                                            | `generateOTP`                                                                                |
+| `uploadImage` (raw upload only)                                     | `getAddressCoordinates`                                                                        | `razorpay` (payment & refund)                                                                |
+| `deleteImageFromS3` (key)                                           | `getSessionStatus`                                                                             | `sendStudioNotification`                                                                     |
+| `uploadEncryptedDataToS3`                                           | `checkAvailability`                                                                            | `sendAppNotification`                                                                        |
+| `generatePresignedUrl`                                              | `extractTime`                                                                                  | `addUserBookedSession`                                                                       |
+| `decryptDataKeyWithKMS`                                             | `checkUpcomingSession`                                                                         | `removeUserBookedSession`                                                                    |
+|                                                                     | `cancelAllSessionsForEntity`                                                                   |                                                                                              |
+|                                                                     | `studioSlotBook`                                                                               |                                                                                              |
+|                                                                     | `deleteStudio`                                                                                 |                                                                                              |
+|                                                                     | `extractAdmin`                                                                                 |                                                                                              |
+|                                                                     | `authenticateStudioToken`                                                                      |                                                                                              |
+
+---
+
+## Detailed Layer Descriptions
+
+### 1. Layer A: Infra Layer (The Foundation)
+
+These functions are **context-agnostic**. They do not contain any business rules regarding studios or users. They are primarily used for interacting with AWS Infrastructure (S3, CloudWatch, KMS).
+
+- **Reusability:** Extremely High. Used by every Lambda in the project.
+- **Deployment:** Updated rarely (only when infra config changes).
+
+### 2. Layer B: Domain-Local Utilities (Studio Logic)
+
+This layer contains the "Brain" of the Studio module. It handles the math, coordinate transformations, and studio-specific status checks required by both the Admin Panel and the Owner App.
+
+- **Reusability:** High within the Studio/Admin domain.
+- **Deployment:** Updated whenever studio business rules (like slot timing or distance calculation) change.
+
+### 3. Layer C: Cross-Domain Capability (The Bridge)
+
+This is a **Separate Stack** because it often involves heavy 3rd party SDKs (like Razorpay) or needs to modify data across two different database domains (e.g., adding a session to a User's profile after a Studio booking).
+
+- **Reusability:** High for platform-wide features like Notifications and Payments.
+- **Deployment:** Managed as an independent stack to prevent breaking the core studio logic during payment gateway updates.
+
+---
+
+## Usage Guidelines for Developers
+
+1.  **Avoid Circular Dependencies:** Layer B should import from Layer A, but Layer A should **never** import from Layer B.
+2.  **Keep it Lean:** If a utility is used by only one Lambda, keep it inside that Lambda. Move it to a **Layer** only when it is shared by 2 or more functions.
+3.  **Cross-Module Updates:** When performing an action that affects both a User and a Studio (like a booking), always use the utilities in **Layer C** to ensure data consistency across both domains.
