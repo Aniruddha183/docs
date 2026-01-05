@@ -1,0 +1,334 @@
+---
+title: "Coach Post Module API Documentation"
+description: "REST API reference for Coach Post Module (create, delete, list, search, and fetch posts)."
+---
+
+# Coach Post Module
+
+This document describes **coach-facing APIs** for creating, updating, deleting, listing and searching coach posts. Every endpoint below explicitly lists **required headers, URL params, query params, and request bodies** so the frontend and SDKs can call them correctly. The doc strictly follows the routes implemented in the router and documents only those endpoints.
+
+---
+
+## Base URL
+
+/api/fitnearn/web/coach/post
+
+
+---
+
+## Required Headers (typical)
+
+| Header            | Type   | Description                                                                 |
+| ----------------- | ------ | --------------------------------------------------------------------------- |
+| `Authorization`   | string | `Bearer <JWT>` — identity token; many controllers read/verify this header.  |
+| `Content-Type`    | string | `application/json` (or `multipart/form-data` when uploads are enabled)     |
+| `x-refresh-token` | string | *Optional* — some controllers optionally read for refresh flows            |
+| `x-username`      | string | *Optional* — used in a few controller flows                                |
+
+> Note: Some routes are not protected at router-level; controllers may still require/validate `Authorization`. Always send the bearer token when calling create/delete endpoints.
+
+---
+
+Middleware & Utilities
+
+multer (configured in postRouter.ts) — memoryStorage, fileSize limit 50 MB and a fileFilter that allows images and videos depending on fieldname (the router currently has the upload configured but the image upload route is commented out — helpers remain in controller).
+
+PostModel, ProfileModel — Mongoose models used to persist and fetch posts and coach profile info.
+
+deleteS3File, uploadImageToS3, uploadImage, getPresignedUploadUrl — helpers used to upload/delete media in S3 (controller uses these for image/video handling).
+
+generateUniqueSequence — used to generate unique postId when creating new posts.
+
+moment-timezone — used to compute time ranges (day/week/month) and filters for list endpoints.
+
+randomUUID / crypto — used for generating temporary identifiers in media flows.
+
+logger — structured logging used on errors.
+
+shootMail — used to send coach notification emails when a post is submitted for review.
+
+---
+
+### 1. Create Post
+
+* **Method**: `POST`  
+* **URL**: `/api/fitnearn/web/coach/post/create`  
+* **Controller**: `createPost`
+
+**Required Headers**
+
+- `Authorization: Bearer <JWT>` (controller expects identity token — include it)
+
+**Request Body (JSON)**
+
+```json
+{
+  "coachId": "COACH001",        // required
+  "message": "Post text",       // optional, recommended
+  "postId": "POST0001",         // optional — provide to update an existing post
+  "status": "published",        // optional — "published" | "draft"
+  "imageMimeType": "image/png", // optional — used when using presigned uploads
+  "videoMimeType": "video/mp4", // optional
+  "action": "publish"           // optional controller-flag
+}
+```
+---
+---
+## Functioning
+If postId exists in the request body the controller runs an update flow (updates DB fields and media keys if provided). If postId is not present the controller creates a new Post record:
+
+Uses generateUniqueSequence to make postId when creating.
+
+If imageMimeType or videoMimeType are provided the controller will call the S3 helpers (getPresignedUploadUrl / uploadImage) to store media and persist imageUrl/videoUrl and imageKey/videoKey on the post record.
+
+Sets lifecycle fields (state / stage) based on action (e.g., action === 'submit' → In Review / Under Review).
+
+If action === 'submit', sends a notification/email to the coach using shootMail (mail errors are logged but do not block the response).
+
+Upserts the post (findOneAndUpdate with upsert: true) so create and update share the same DB call path.
+
+Validates coachId and (if present) postId ownership.
+
+If postId missing, generates a new postId via generateUniqueSequence.
+
+Persists post content and media references (images / video keys) into PostModel.
+
+If imageMimeType / videoMimeType provided, controller may return presigned upload details to the client so the client can upload media directly to S3.
+
+When status is published, triggers any configured notification flows.
+
+
+**Request Body** (example)
+
+```json
+{
+  "coachId": "COH00012",         // required
+  "message": "Post message text",// optional / content
+  "postId": "POST00001",         // optional; if provided, controller treats as update
+  "status": "published|draft",   // optional
+  "imageMimeType": "image/jpeg", // optional — used by controller to request presigned upload & upload
+  "videoMimeType": "video/mp4",  // optional
+  "action": "submit|save"        // optional — 'submit' triggers 'In Review' stage/email
+}
+```
+
+**Success Response** (example)
+
+```json
+{
+  "success": true,
+  "message": "Post created successfully",
+  "data": { /* PostModel object */ }
+}
+```
+
+**Common error responses** (controller)
+
+* `400 Bad Request` — missing required coachId (controller logs and returns an error in that case).
+* `500 Internal Server Error` — on DB/S3 or unexpected errors:
+  ```json
+  { "success": false, "error": true, "message": "Error creating or updating coach post: <error.message>" }
+  ```
+
+### 2. Delete Post
+
+* **Method**: `DELETE`
+* **URL**: `/api/fitnearn/web/coach/post/delete/:postId`
+* **Controller**: `deletePost`
+
+**URL Params**:
+
+* `postId` — (string) ID of the post to delete
+
+**Headers**:
+
+* `Authorization: Bearer <token>` — controller checks for an identity token and returns 401 if missing.
+
+Functioning (brief)
+
+Validates presence of an identity token in the Authorization header. If missing, returns 401.
+
+Finds the post by postId. If not found returns 404.
+
+Calls deleteS3File (helper) to remove the post image (if imageKey exists), then deletes the post document (findOneAndDelete).
+
+Returns a success confirmation once S3 deletion and DB deletion complete.
+
+**Success response**
+
+```json
+{ "success": true, "message": "Post: <postId> has been deleted successfully" }
+```
+
+**Common error responses** (controller)
+
+* `401 Unauthorized` — missing Authorization header:
+  ```json
+  { "success": false, "message": "Unauthorized access" }
+  ```
+* `404 Not Found` — post not found:
+  ```json
+  { "success": false, "message": "post not found" }
+  ```
+* `500 Internal Server Error` — on S3/DB errors:
+  ```json
+  { "success": false, "error": true, "message": "Error deleting post: <error.message>" }
+  ```
+
+### 3. Search Posts (by text)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/post/search`
+* **Controller**: `searchPost`
+
+**Query params**:
+
+* `search` (string) — search text (regex search against message)
+* `publishedId` (string) — publisher/coach id to scope the search
+
+Functioning (brief)
+
+Builds a case-insensitive RegExp from search.
+
+Queries `PostModel.find({ publisherId: publishedId, message: { $regex: re } })`.
+
+Returns matching posts.
+
+**Success response**
+
+```json
+{ "success": true, "data": [ /* array of posts matching query */ ] }
+```
+
+**Common error responses**
+
+* `500 Internal Server Error`:
+  ```json
+  { "success": false, "error": true, "message": "Error searching Post: <error.message>" }
+  ```
+
+### 4. Get Posts by Coach + Status (filtered list)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/post/:coachId/:status`
+* **Controller**: `getPostsByStatus`
+
+**URL params**:
+
+* `coachId` — coach identifier (publisherId)
+* `status` — post status filter (e.g. 'published' | 'draft' | 'inReview' — controller expects a status string)
+
+**Query params**:
+
+* `by` — optional time/aggregation filter (examples used in controller: day, week, month, popular, most_like, trending; controller logic uses these to tweak query)
+
+Functioning (brief)
+
+Reads status and coachId from URL.
+
+Optionally uses req.query.by to apply time-based filters using moment (last 1 day / 7 days / 30 days) or popularity filters.
+
+Builds a MongoDB query accordingly, queries PostModel.find(query) and returns the list.
+
+**Success response**
+
+```json
+{ "success": true, "data": [ /* posts array */ ] }
+```
+
+**Common error responses**
+
+* `500 Internal Server Error`:
+  ```json
+  { "success": false, "error": true, "message": "Error Posts By State: <error.message>" }
+  ```
+
+### 5. Get Posts by Coach (all / filtered)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/post/:coachId`
+* **Controller**: `getPostsByCoachId`
+
+**URL params**:
+
+* `coachId` — coach identifier (publisherId)
+
+**Query params**:
+
+* `filter` — optional filter strings used by controller (day, week, month, popular, most_like, trending, etc.)
+
+Functioning (brief)
+
+Builds a query based on filter (time windows via moment or popularity sorts).
+
+Fetches posts with PostModel.find(query).
+
+Returns posts belonging to the coach (publisherId = coachId) matching the filter.
+
+**Success response**
+
+```json
+{ "success": true, "data": [ /* posts array */ ] }
+```
+
+**Common error responses**
+
+* `501 Internal Server Error` — controller returns:
+  ```json
+  { "success": false, "error": true, "message": "internal server error" }
+  ```
+
+### 6. Get Post By ID
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/post/get/:postId`
+* **Controller**: `getPostById`
+
+**URL params**:
+
+* `postId` — the post identifier
+
+Functioning (brief)
+
+Looks up PostModel.findOne({ postId }).
+
+If found, returns the full post document; if not found returns 404.
+
+**Success response**
+
+```json
+{ "success": true, "data": { /* post object */ } }
+```
+
+**Common error responses**
+
+* `404 Not Found`:
+  ```json
+  { "success": false, "message": "Post not found" }
+  ```
+* `500 Internal Server Error`:
+  ```json
+  { "message": "Error getting post by id: <error.message>", "success": false, "error": true }
+  ```
+
+---
+## Implementation / behavior notes & clarifications
+
+Create vs Update: The createPost controller uses postId in the body to determine update vs create behavior. When updating it will update imageUrl/videoUrl/imageKey/videoKey if media results are present. When creating, it generates a unique postId.
+
+Media flow: The router currently does not expose the imageUpload route (it was present as a commented-out route). The createPost controller expects imageMimeType / videoMimeType fields to trigger the presigned upload flow — the controller will call S3 helpers to get presigned URLs or upload images (depending on client usage). If your frontend uploads images directly, use the presigned upload helper path implemented in controller (client → presigned URL → direct S3 PUT). If you prefer server-side multipart uploads, uncomment and wire the router's upload middleware and the imageUpload controller.
+
+Auth: Several controller functions check the Authorization header (delete, image upload). If missing, the controller returns 401. Some flows have commented-out auth checks (e.g., createPost) — coordinate with your auth middleware in express if you want all coach endpoints protected by authenticateCoachToken.
+
+Search & filter: searchPost uses a case-insensitive regex against the post message. Use publishedId to scope searches to a specific coach.
+
+Logging: All controllers log error details using a centralized logger. Production systems should ensure the logger is configured to not leak sensitive data.
+
+| Method | Endpoint (full)                                 | Description                                                              |
+| ------ | ----------------------------------------------- | ------------------------------------------------------------------------ |
+| POST   | `/api/fitnearn/web/coach/post/create`           | Create or update a coach post (supports media via presigned upload flow) |
+| DELETE | `/api/fitnearn/web/coach/post/delete/:postId`   | Delete a post by `postId` (requires `Authorization` token)               |
+| GET    | `/api/fitnearn/web/coach/post/search`           | Search posts by `search` query and `publishedId`                         |
+| GET    | `/api/fitnearn/web/coach/post/:coachId/:status` | Get posts for a coach filtered by `status` and optional `by` time filter |
+| GET    | `/api/fitnearn/web/coach/post/:coachId`         | Get all posts for a coach (optional `filter` query param)                |
+| GET    | `/api/fitnearn/web/coach/post/get/:postId`      | Get post details by `postId`                                             |

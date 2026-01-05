@@ -311,6 +311,26 @@
           ]
         },
         {
+          "group": "Post Module",
+          "pages": [
+            "backend/modules/coach/overview",
+            "backend/DB-Schema/Post-module-db-schema",
+
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-post-management"
+              ]
+            },
+            {
+              "group": "Coach App",
+              "pages": [
+                "backend/Coach/coach-post-api-doc"        
+              ]
+            }
+          ]
+        },
+        {
           "group": "CMS Module",
           "pages": [
             "backend/modules/cms/overview",

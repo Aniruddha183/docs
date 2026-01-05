@@ -1,0 +1,424 @@
+---
+title: "Admin Post Management API Documentation"
+description: "REST API reference for Admin Post Management (create/edit/reviews, approval, versioning, admin comments, image uploads, and fetching)."
+---
+
+# Admin Post Management
+
+Admin-facing REST APIs to manage coach/coach-post content: upload post media, review (reviewer → approver) flows, approve/reject posts, versioning, edit review comments, and fetch posts / admin review comments.
+
+---
+
+## Base URL
+
+/api/fitnearn/web/admin/post-management
+
+
+---
+
+## Required headers (common)
+
+| Header           | Type   | Description |
+| ---------------- | ------ | ----------- |
+| `Authorization`  | string | Bearer JWT token identifying the admin (e.g. `Bearer <token>`). Required for endpoints that act on or modify posts. |
+| `x-refresh-token`| string | Optional but used when upload helpers require refresh flow for uploads. |
+| `x-username`     | string | Optional header used by upload helpers for logging/auditing. |
+| `Content-Type`   | string | `application/json` or `multipart/form-data` for uploads. |
+
+> Many controllers perform an internal identity token check by parsing the `Authorization` header and expect `x-refresh-token`/`x-username` when media uploads are involved.
+
+---
+
+## Middleware & utilities used
+
+* `idGenerationMiddleware('RVW')` — generates review comment IDs for reviewer/approver actions.
+* `multer` (memory storage) — used to accept single/multipart uploads (image field).
+* `uploadImage(...)` — utility that uploads a file buffer to S3 and returns `{ location, key }`.
+* `generateUniqueSequence('POST')` — used when generating a new `postId` for newly created posts.
+* Logging: `logger` is used throughout to capture errors and events.
+* Email utility: `shootMail` used in approval flows (sending notifications / emails).
+
+---
+
+## Models referenced 
+
+This module operates primarily on these documents (model names used in controllers):
+
+* `PostModel` — main post document (the published/draft versions).
+* `AdminPostReview` — stores reviewer/approver comments and audit trail per post.
+* `AdminPost` — tracks admin’s created posts (adminId -> posts array).
+* `UserModel` / `ProfileModel` — used to resolve admin/author names where required.
+
+Detailed DB schemas are in the companion DB Schema `.mdx` file (provided after this API doc).
+
+---
+
+## Endpoints
+
+> Each endpoint lists: method, path, middleware (if present in `postManagementRouter`), controller, request shape (params/query/body/headers where relevant), short **Functioning** explanation, example success response and common error responses (derived from controller logic).
+
+---
+
+### 1. Create / Edit Admin Post (NOTE: route commented in router — controller exists)
+
+> _The router file had a commented-out create route; the controller `createAdminPost` is present. Keep in mind the router must enable this route to be callable. Documented for completeness._
+
+* **Method:** `POST` (if enabled)
+* **URL:** `/api/fitnearn/web/admin/post-management/create`
+* **Middleware:** (if enabled) `upload.single('thumbnail')` (multer) — accepts `thumbnail` and other files via `req.files`.
+* **Controller:** `createAdminPost`
+
+**Required Headers**
+* `Authorization` (Bearer token) — controller checks and extracts `identityToken`.
+* (Optional) `x-refresh-token`, `x-username` — used when calling `uploadImage`.
+
+**Request (multipart/form-data)** — controller accepts files and body:
+* Body fields:
+  * `adminId` (string) — required
+  * `message` (string) — post body / description
+  * `postId` (string) — optional; if present updates existing post; otherwise a new post is created
+  * `status` (string) — optional; used to set `state`
+* Files (optional):
+  * `thumbnail` (image file)
+  * `video` (video file) — controller supports video upload if provided
+
+**Functioning (brief)**
+* Verifies `Authorization` token and that `adminId` exists.
+* If `postId` present → update flow:
+  * Uploads any supplied media via `uploadImage` and sets `imageUrl/imageKey` and/or `videoUrl/videoKey` on the post.
+  * Updates fields provided (message, state etc.) via `PostModel.findOneAndUpdate`.
+* If no `postId` → create flow:
+  * Generates a `POST` sequence id using `generateUniqueSequence('POST')` and builds a new `postId`.
+  * Uploads any media, creates the `PostModel` document, and pushes the `postId` into `AdminPost` (per admin).
+* Returns created/updated post document.
+
+**Success response (200)**
+
+```json
+{
+  "success": true,
+  "data": { /* PostModel */ },
+  "message": "Post created/Edited successfully"
+}
+
+Common errors
+
+401 Unauthorized — missing/invalid Authorization header.
+
+400 Bad Request — missing adminId.
+
+404 Not Found — admin not found (if provided adminId invalid).
+
+500 Internal Server Error — DB or S3 upload failures.
+
+### 2. Upload Admin Image
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/post-management/image-upload`
+* **Middleware**: `upload.single('image')` (multer memory storage)
+* **Controller**: `imageUpload`
+
+**Headers**
+
+* `Authorization` required (controller validates identity token)
+* `x-refresh-token` and `x-username` are optional and accepted for upload helpers.
+
+**Request**
+
+* `multipart/form-data` with field:
+  * `image` — file to upload
+
+**Functioning**
+
+* Accepts an image file in `req.file`, calls `uploadImage` helper to upload it to S3 under the Admin upload context.
+* Returns the S3 location (public URL) and key to the caller. This endpoint is useful for UI editors to upload images and receive immediate URLs for embedding.
+
+**Success Response** (200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "location": "https://...s3.amazonaws.com/.../image.jpg",
+    "key": "uploads/admin/POST00001/..."
+  }
+}
+```
+
+**Errors**
+
+* `401 Unauthorized` — missing/invalid token.
+* `400 Bad Request` — no file provided or invalid file type (multer will block non-image if configured).
+* `500` — S3/upload failure.
+
+### 3. Reviewer — Add Reviewer Comment / Review Post (Stage 1)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/post-management/review`
+* **Middleware**: `idGenerationMiddleware('RVW')` (generates generatedId for the review comment)
+* **Controller**: `adminReviewPost` (named adminReviewPost in controller file)
+
+**Request Body** (JSON)
+
+* `postId` (string) — post to review
+* `adminId` (string) — reviewer admin id
+* `comment` (string) — review text
+* `action` (string) — 'save' | 'request_changes' | 'pass_to_approver' (controller accepts these types)
+* (Optional) `meta` or other fields used by the controller
+
+**Functioning**
+
+* Verifies the post exists.
+* Creates or updates an `AdminPostReview` record for the `postId`. The reviewer comment object includes the `commentId` (from `idGenerationMiddleware`), comment text, admin metadata and timestamps.
+* If `action === 'save'`: comment is saved as draft (does not lock the review).
+* If `action === 'request_changes'`: reviewer marks review as requesting changes; the post may stay in reviewer state with flags.
+* If `action === 'pass_to_approver'`: the function appends the reviewer comment, sets lock where appropriate, and moves the workflow to approver stage.
+* Adds an audit history entry into the post (controller pushes review/decision into history arrays in some flows).
+
+**Success Response** (200)
+
+```json
+{ "success": true, "message": "Review saved", "data": {/* AdminPostReview */} }
+```
+
+**Errors**
+
+* `400 Bad Request` — invalid/missing postId or adminId.
+* `404` — post not found.
+* `500` — DB errors.
+
+### 4. Approver — Approve / Reject / Take Action (Stage 2)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/post-management/approve`
+* **Middleware**: `idGenerationMiddleware('RVW')`
+* **Controller**: `adminApprovePost`
+
+**Request Body** (JSON)
+
+* `postId` (string) — post being acted upon
+* `approverAdminId` (string) — approver admin id
+* `comment` (string) — approver comment
+* `action` (string) — 'save' | 'approve' | 'reject' | 'retire' (controller handles approve/deny/retire flows)
+* `shouldPublish` (boolean) — optional: controller may publish on approve
+* `sendNotifications` (boolean) — optional: triggers shootMail or other notifications
+
+**Functioning**
+
+* Validates approver identity and that a review exists for this post.
+* If `action === 'save'` → saves an approver draft comment (does not lock).
+* If final (approve / reject / retire / deny) → sets corresponding approver arrays in `AdminPostReview`, sets `lock: true` for that stage and updates the main `PostModel` document state/status.
+* On approve: controller updates the `PostModel` state/status to Active/Published depending on workflow, may set `publishedAt` and triggers `shootMail` or notification side-effects.
+* On reject or deny: sets state/status accordingly and notifies the author/admin.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "message": "Post approved" , "data": {/* updated objects */} }
+```
+
+**Common errors**
+
+* `404` — post not found or review record missing.
+* `409` — review lock already true (can't edit).
+* `500` — processing error (email/send failure or DB error).
+
+### 5. Edit Admin Review Comment
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/web/admin/post-management/comment-edit`
+* **Middleware**: none listed in router (controller expects admin headers)
+* **Controller**: `editAdminComment`
+
+**Request Body** (JSON)
+
+* `postId` (string)
+* `commentId` (string) — comment id contained in the `AdminPostReview` arrays
+* `adminId` (string)
+* `adminType` (string) — 'reviewer' | 'approver'
+* `comment` (string) — updated text
+* `commentType` (string, optional) — for approver edits: 'approve' | 'retire' | 'deny' (used to pick the right approver array)
+
+**Functioning**
+
+* Locates the comment inside `AdminPostReview` for the specified `postId` and `adminType`.
+* Updates the specific comment text and timestamps. Controller enforces that edits may only be performed while the related review lock is false; otherwise it returns an error.
+* Returns the updated `AdminPostReview` document.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "data": {/* updated AdminPostReview */} }
+```
+
+**Errors**
+
+* `400` — invalid adminType
+* `404` — comment not found
+* `409` — lock prevents editing (controller checks lock state)
+* `500` — DB error
+
+### 6. Create a Post Version
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/admin/post-management/version/:postId`
+* **Middleware**: none listed in router; controller ensures post exists
+* **Controller**: `versionPost`
+
+**URL Params**
+
+* `postId` (string) — the base post id to version. If `postId` already has :V suffix, the controller uses it to compute next version.
+
+**Functioning**
+
+* Fetches the specified `PostModel` entry.
+* Verifies there is no conflicting under-review version.
+* Clones the post object, increments version and appends `:V<n>` to `postId` for the new version (e.g. POST0001:V2).
+* Sets new document state: 'Draft', status: 'Inactive', updates timestamps and saves the version as a new `PostModel` entry.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "message": "post version created successfully", "data": { /* new PostModel */ } }
+```
+
+**Errors**
+
+* `404` — original post not found
+* `409` — a version already under review (controller checks and may return appropriate response)
+* `500` — DB error
+
+### 7. Get Admin Posts (by admin)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/post-management/get-admin-post/:adminId`
+* **Controller**: `getAdminPosts`
+
+**URL Params**
+
+* `adminId` (string)
+
+**Query Params** (optional) — controller inspects incoming query params for filtering/pagination but primary route expects adminId.
+
+**Functioning**
+
+* Finds posts created/owned by the admin (the controller queries `PostModel` with publisherId / publisher metadata).
+* Returns paginated results (or full list depending on query params).
+
+**Success Response** (200)
+
+```json
+{ "success": true, "data": [ /* array of PostModel */ ], "total": 100, "page": 1 }
+```
+
+**Errors**
+
+* `404` — admin or posts not found (controller returns empty set rather than 404 commonly)
+* `500` — DB error
+
+### 8. Get Post by PostId
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/post-management/get-post/:postId`
+* **Controller**: `getPostById` (controller directly returns PostModel)
+
+**URL Params**
+
+* `postId` (string)
+
+**Functioning**
+
+* Returns full post document including media refs, versioning info and any review references.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "data": { /* PostModel */ } }
+```
+
+**Errors**
+
+* `404` — post not found
+* `500` — DB error
+
+### 9. Get Filtered / All Admin Posts
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/post-management/get-all`
+* **Controller**: `getFilteredPosts`
+
+**Query Params** (examples)
+
+* `status` (string) — e.g. Draft | Published | Under Review
+* `page`, `limit`, `sort`, `adminId`, `search`, `from`, `to` etc. — controller supports common filter patterns
+
+**Functioning**
+
+* Builds query filters based on the query params and returns a paginated list of posts matching those filters.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "data": [/* posts */], "page": 1, "limit": 20, "total": 345 }
+```
+
+**Errors**
+
+* `400` — invalid query param values
+* `500` — DB error
+
+### 10. Get Admin Review Comments (for UI)
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/admin/post-management/get-admin-comments`
+* **Controller**: `getAdminComments`
+
+**Query Params**
+
+* `postId` (string) — required (controller expects postId in req.query)
+
+**Functioning**
+
+* Fetches the `AdminPostReview` document for the post and returns reviewer and approver comment arrays and timestamps for display in admin UIs.
+
+**Success Response** (200)
+
+```json
+{ "success": true, "data": { /* AdminPostReview document */ } }
+```
+
+**Errors**
+
+* `404` — post not found (if postId invalid)
+* `500` — DB error
+
+## Example error & success formats (from controller behavior)
+
+**Generic success**
+
+```json
+{ "success": true, "data": { /* payload */ }, "message": "Text message" }
+```
+
+**Generic error**
+
+```json
+{ "success": false, "message": "Descriptive error string" }
+```
+
+Controller-specific statuses include: `401` (Unauthorized), `400` (Bad request), `404` (Not found), `409` (Conflict/locked), and `500` (Server errors).
+
+---
+# Summary Table
+
+| Method | Endpoint                   | Description                                |
+| ------ | -------------------------- | ------------------------------------------ |
+| POST   | `/version/:postId`         | Create a new version of a post             |
+| POST   | `/image-upload`            | Upload an image (returns S3 URL/key)       |
+| POST   | `/review`                  | Reviewer: add/save review comment (id gen) |
+| PATCH  | `/approve`                 | Approver: save/approve/reject (id gen)     |
+| PATCH  | `/comment-edit`            | Edit admin review comment                  |
+| GET    | `/get-admin-post/:adminId` | Get posts for an admin                     |
+| GET    | `/get-post/:postId`        | Get a single post by id                    |
+| GET    | `/get-all`                 | Get all / filtered posts                   |
+| GET    | `/get-admin-comments`      | Get admin review comments for a post       |

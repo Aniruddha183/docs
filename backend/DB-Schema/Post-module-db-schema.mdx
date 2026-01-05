@@ -1,0 +1,152 @@
+---
+title: "Admin Post Management — DB Schema & TypeScript interfaces"
+description: "Model schemas and TypeScript interfaces used by Admin Post Management module (PostModel, AdminPostReview, AdminPost, Profile minimal)."
+---
+
+# Admin Post Management — DB Schema
+
+This document lists the primary models used by the Admin Post Management module and provides full TypeScript interface definitions which reflect the fields referenced in the `adminPostManagementController.ts` controller. Use these interfaces as a starting point — adjust types/optional flags according to your Mongoose schemas or database definitions.
+
+---
+
+## 1. `PostModel` (Post / Post Version)
+
+**Purpose:** Stores post content, metadata, media references and lifecycle fields. Versions are represented by `postId` suffix like `POST0001:V2`.
+
+```ts
+export interface IPostHistoryItem {
+  byAdminId?: string;           // admin who performed action
+  byUserId?: string;            // user (if any) who performed action
+  action: string;               // e.g. "created"|"updated"|"approved"|"rejected"|"versioned"
+  note?: string;                // optional note for the action
+  date: Date;
+}
+
+export interface IPostMedia {
+  imageUrl?: string;
+  imageKey?: string;
+  videoUrl?: string;
+  videoKey?: string;
+  altText?: string;
+  mimeType?: string;
+}
+
+export interface IPostModel {
+  _id?: string;
+  postId: string;               // unique id: e.g. POST00001 or POST00001:V2
+  title?: string;
+  slug?: string;
+  summary?: string;
+  message?: string;             // main body used in controller (`message`)
+  content?: any;                // rich content / blocks if used
+  publisherId?: string;         // admin ID / coach ID who created this
+  publisherType?: 'ADMIN'|'COACH'|'USER'|string;
+  authorName?: string;
+  tags?: string[];
+  category?: string;
+  readingTime?: number;
+
+  media?: IPostMedia;           // combined media object
+  imageUrl?: string;            // convenience fields (controller used these)
+  imageKey?: string;
+  videoUrl?: string;
+  videoKey?: string;
+
+  version?: number;             // integer version
+  state?: 'Draft'|'Under Review'|'Approved'|'Published'|'Inactive'|'Cancelled'|string;
+  status?: 'Active'|'Inactive'|string;
+
+  isVersioned?: boolean;
+  previousVersionId?: string;   // reference to previous version (postId)
+
+  reviewerAdmin?: string;       // admin id assigned as reviewer
+  approverAdmin?: string;       // admin id assigned as approver
+
+  history?: IPostHistoryItem[]; // chronological actions
+
+  createdAt?: Date;
+  updatedAt?: Date;
+  publishedAt?: Date;
+
+  // counts & metrics (optional)
+  viewCount?: number;
+  likeCount?: number;
+  commentCount?: number;
+
+  // flexible fields for any future metadata
+  meta?: Record<string, any>;
+}
+```
+
+---
+## 2. `AdminPostReview` (Admin Review & Approval Tracking)
+
+**Purpose:** Stores reviewer/approver comments, decisions, and audit trail for each post. Tracks both reviewer and approver stages with locking semantics.
+
+```ts
+export interface IAdminReviewComment {
+  commentId: string;              // unique ID for this comment
+  comment: string;                // review/approval comment text
+  createdAt: Date;
+  updatedAt: Date;
+  lock?: boolean;                 // indicates if comment is finalized
+  action?: string;                // e.g. "save"|"request_changes"|"approve"|"reject"
+}
+
+export interface IAdminPostReview {
+  _id?: string;
+  postId: string;                 // reference to the post being reviewed
+  reviewer?: {
+    adminId: string;
+    comments: IAdminReviewComment[];
+    completedAt?: Date;
+    status?: string;                // e.g. "in_progress"|"completed"
+  };
+  approver?: {
+    adminId: string;
+    comments: IAdminReviewComment[];
+    completedAt?: Date;
+    status?: string;                // e.g. "in_progress"|"completed"
+  };
+  stage?: string;                 // current workflow stage
+  lock?: boolean;                  // indicates if review/approval is finalized
+  createdAt?: Date;
+  updatedAt?: Date;
+  meta?: Record<string, any>;      // additional metadata
+}
+```
+
+## 3. `AdminPost` (Admin's Created Posts)
+
+**Purpose:** Tracks posts created by admins, linking admin IDs to their posts.
+
+```ts
+export interface IAdminPost {
+  _id?: string;
+  adminId: string;                // admin who owns these posts
+  postIds: string[];               // array of post IDs created by this admin
+  totalPosts?: number;             // count of posts
+  createdAt?: Date;
+  updatedAt?: Date;
+  meta?: Record<string, any>;      // additional metadata
+}
+```
+
+## 4. `Profile` (Minimal Profile Reference)
+
+**Purpose:** Minimal profile information referenced in post management.
+
+```ts
+export interface IProfile {
+  _id?: string;
+  userId: string;                  // user ID
+  name?: string;
+  email?: string;
+  avatar?: string;                 // profile image URL
+  role?: string;                   // user role
+  createdAt?: Date;
+  updatedAt?: Date;
+  meta?: Record<string, any>;      // additional metadata
+}
+```
+```
