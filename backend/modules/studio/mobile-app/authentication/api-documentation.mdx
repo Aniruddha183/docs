@@ -1,0 +1,556 @@
+---
+title: "API Documentation"
+description: "REST API reference for Studio App Authentication."
+---
+
+This document outlines the API endpoints available to **Studios** for authenticating in Studio App.
+
+## Base URL
+
+```
+/api/fitnearn/app/studio
+```
+
+## Middleware
+
+### `idGenerationMiddleware('SOID')`
+
+- **Purpose**: Generates a unique Studio Owner ID (`SOIDxxxxx`) for new owner registrations.
+- **Usage**: Required in Owner registration endpoints.
+
+---
+
+## Endpoints
+
+### 1. Google Registration (Signup)
+
+Registers a new coach using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/register`
+- **Middleware**: `idGenerationMiddleware('SOID')`
+- **Controller**: `studioGoogleRegistrationSignup`
+- **Request Body**:
+  - `email` (string): Owner's email (required)
+  - `awsUserName` (string): AWS username (required)
+  - `accessToken`, `authToken`, `refreshToken` (string, optional): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Owner registered successfully",
+    "user": { ...ownerObject },
+    "genToken": { ...tokenObject }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Missing or duplicate email
+  - `500 Internal Server Error`: Registration failure
+
+---
+
+### 2. Google Login
+
+Logs in a studio using Google OAuth.
+
+- **Method**: `POST`
+- **URL**: `/google/login`
+- **Controller**: `studioOwnerGoogleRegistrationSignin`
+- **Request Body**:
+  - `email` (string): Studio's email (required)
+  - `refreshToken` (string): Google OAuth tokens (required)
+  - `accessToken`, `authToken`(string): Google OAuth tokens
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "User signed in successfully",
+    "phoneNumberAdded": boolean
+    "genToken": { ...stringenObject },
+    "newTokens": {
+      access_token: { ...string }
+      id_token: { ...string }
+      refresh_token: { ...string }
+    },
+    "ownerData": { ...coachObject }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Incorrect Email, User doesn't exist
+  - `403 Not Found`: Profile is deleted, Not allowed to login next 15 days
+  - `500 Internal Server Error`
+
+---
+
+### 3. OTP Registration
+
+Generates an OTP for a new owner registration using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/register`
+- **Controller**: `studioOwnerRegisterUsingOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `409 Bad Request`: Mobile number already registered
+  - `500 Internal Server Error`
+
+---
+
+### 4. OTP Login
+
+Generates an OTP for login using mobile number.
+
+- **Method**: `POST`
+- **URL**: `/otp/login`
+- **Controller**: `studioOwnerLoginUsingOtp`
+- **Request Body**:
+  - `mobileNumber` (string): Owner's mobile number
+  - `countryCode` (string): Country code
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Incorrect number, User doesn't exist
+  - `500 Internal Server Error`
+
+---
+
+### 5. Resend OTP
+
+Resend an OTP for registration or login.
+
+- **Method**: `POST`
+- **URL**: `/otp/resend`
+- **Controller**: `resendOTP`
+- **Request Body**:
+  - `mobileNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `action` (string): Action type (e.g., 'register', 'login')
+  - `hashCode` (string): Hash code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP generated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 6. Logout
+
+Logs out the currently authenticated coach.
+
+- **Method**: `GET`
+- **URL**: `/logout/:ownerId`
+- **Controller**: `studioLogout`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Logout successful"
+  }
+  ```
+- **Error Responses**:
+  - `500 Internal Server Error`
+
+---
+
+### 7. Verify OTP
+
+Verifies an OTP for registration or login.
+
+- **Method**: `GET`
+- **URL**: `/otp/verify`
+- **Controller**: `verifyOTP`
+- **Query Params**:
+  - `phoneNumber` (string): Studio's mobile number
+  - `countryCode` (string): Country code
+  - `otp` (string): OTP code
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "OTP verified successfully",
+    "genToken": { ...tokenObject },
+    "access_token": "...",
+    "id_token": "...",
+    "refresh_token": "...",
+    "ownerId": "COHxxxxx"
+    "onBoardComplete": boolean
+    "phoneNumberAdded": boolean
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid or expired OTP
+  - `500 Internal Server Error`
+
+---
+
+### 8. Update Owner Profile
+
+Updates studio owner profile information including name, bio, and profile image.
+
+- **Method**: `PATCH`
+- **URL**: `/updateProfile/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `updateProfile`
+- **Request Body**:
+  - `name` (string): Studio owner's name
+  - `about` (string): Bio/description about the studio owner
+  - `profileImage`(string): Profile image URL
+  - `key`(string): S3 image key for the uploaded image
+- **Success Response**:
+
+```json Success Response
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "ownerId": "STO00001",
+    "name": "John Studio",
+    "about": "Experienced fitness studio owner",
+    "email": "john@studio.com",
+    "phoneNumber": 1234567890,
+    "imageUrl": "https://s3.amazonaws.com/...",
+    "phoneNumberAdded": true
+  }
+}
+```
+
+- **Error Responses**:
+  - `404 Bad Request`: Owner ID is required
+  - `404 Not Found`: Your profile is Suspended or Inactive
+  - `500 Internal Server Error`
+
+---
+
+## Notes
+
+- All endpoints are designed for studio authentication and registration flows.
+- Google OAuth endpoints require valid Google tokens.
+- OTP endpoints require valid phone/email and OTP codes.
+- The `idGenerationMiddleware('SOID')` ensures unique owner IDs for new registrations.
+
+---
+
+# Profile API Documentation
+
+---
+
+This document outlines the API endpoints available to **Studios** for Profile in Studio App.
+
+## Middleware
+
+### `authenticateStudioToken()`
+
+- **Headers (for user authorization)**:
+
+  -- `genToken` (string): GenToken to verify the user (required)
+
+- **Purpose**: Validates JWT token and authenticates studio owner requests.
+- **Usage**: Required in all protected studio owner endpoints.
+
+### `upload.single(<fieldName>)`
+
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Purpose**: Handles file upload using multer to S3
+- **Usage**: Required for generating image/attachment URLs for queries
+
+---
+
+## Endpoints
+
+### 1. Get Owner Profile
+
+Retrieves complete studio owner profile with KYC status and onboarding progress.
+
+- **Method**: `GET`
+- **URL**: `/getProfile/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `getOwnerById`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "nextScreen": "home",
+    "profile": {
+      "ownerId": "STO00001",
+      "name": "John Studio",
+      "about": "Fitness studio owner...",
+      "email": "john@studio.com",
+      "phoneNumber": 1234567890,
+      "profileImage": "https://...",
+      "key": "image-key",
+      "stage": "Under Review",
+      "kycStage": "Verified",
+      "phoneNumberAdded": true,
+      "onBoardingComplete": false
+    },
+    "reason": {
+      "ownerId": "STO00001",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: Profile not found
+  - `500 Internal Server Error`
+
+---
+
+### 2. Request Phone Number Update
+
+Initiates phone number update process by sending OTP to the new number.
+
+- **Method**: `POST`
+- **URL**: `/requestupdate/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `requestNumberUpdate`
+- **Request Body**:
+  - `number` (string): Studio's mobile number
+  - `countryCode` (string): Country code (eg. "91")
+  - `hashCode` (string): Hash code
+- **Success Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "OTP sent to 879XXXXXX"
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Bad Request`: Invalid inputs
+  - `404 Not Found`: Owner not found
+  - `409 Conflit `: This Phone Number Already Exist
+  - `500 Internal Server Error`
+
+---
+
+### 3. Verify Updated Phone Number
+
+Verifies OTP and updates the studio owner's phone number.
+
+- **Method**: `POST`
+- **URL**: `requestupdate/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `verifyUpdatedPhoneNumber`
+- **Request Body**:
+  - `otp` (string): OTP code received via SMS
+  - `phoneNumber` (string):New phone number (without country code)
+  - `countryCode` (string): Country code (e.g., "91")
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Phone number updated successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Bad Request`: Missing required fields
+  - `404 Not Found`: Owner not found
+  - `409 Conflit `: This Phone Number Already Exist
+  - `500 Internal Server Error`
+
+---
+
+### 4. Delete Account (Soft Delete)
+
+Soft deletes a studio owner account by marking it as deleted.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteAccount/:ownerId`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `resendOTP`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Account deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Bad Request`: There are upcoming session in this Studio
+  - `404 Not Found`: Owner not found or already deleted
+  - `500 Internal Server Error`
+
+## KYC Management Endpoints
+
+### 1. Upload KYC Identity Documents
+
+Uploads and encrypts KYC documents including selfie, ID proof front, and ID proof back images. Supports both initial KYC submission and re-KYC processes.
+
+- **Method**: `POST`
+- **URL**: `/kyc/idsUpload`
+- **Middleware**: `authenticateStudioToken()`, `upload.fields()`
+- **Controller**: `encryptOwnerImageData`
+- **Content-Type**: `multipart/form-data`
+- **Headers**:
+  - `Authorization` (string): Bearer token (required)
+  - `x-refresh-token` (string): Refresh token for AWS Cognito (required)
+  - `x-username` (string): Cognito username (required)
+- **Form Fields**:
+
+  - `ownerId` (string): Unique studio owner identifier (required)
+  - `tag` (string): Document type - "IDProof" or "PAN" (required)
+  - `nationality` (string): Owner's nationality - "Indian" or "Foreigner" (required)
+  - `nature` (string): Upload nature - "kyc" or "rekyc" (optional)
+  - `selfieImage` (file): Selfie image of the owner (required)
+  - `frontImage` (file): Front side of ID document (required)
+  - `backImage` (file): Back side of ID document (required)
+
+- **File Requirements**:
+
+  - Supported formats: JPEG, PNG, PDF
+  - Maximum file size: 2MB As configured in upload middleware
+  - Images are encrypted before storage
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Documents uploaded securely"
+}
+```
+
+- **Error Responses**:
+
+  - `400 Bad Request`: No file uploaded / Owner Id missing
+  - `401 Unauthorized`: Authorization Token Missing / Missing Refresh token or username
+  - `404 Not Found`: Your account doesn't exist anymore
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`: Image upload failed / Session expired, please log in again
+
+- **Process Flow**:
+  1. Validates uploaded files and authentication tokens
+  2. Checks owner account status
+  3. Uploads selfie image (if provided) to S3 via Cognito integration
+  4. Encrypts and uploads ID document images to S3
+  5. Stores encryption metadata (IV, auth tag, encrypted key)
+  6. Updates or creates KYC profile with document URLs and keys
+  7. Sets KYC stage to "Under Review"
+
+---
+
+### 2. Add KYC Banking Details
+
+Adds encrypted banking or payment details to complete the KYC process. Supports both Indian bank accounts and international PayPal accounts.
+
+- **Method**: `PATCH`
+- **URL**: `/kyc/addkycdetails`
+- **Middleware**: `authenticateStudioToken()`
+- **Controller**: `addKYCDetails`
+- **Request Body (Indian Nationality)**:
+
+  - `ownerId` (string): Unique studio owner identifier (required)
+  - `ifscCode` (string): Bank IFSC code (required for Indian)
+  - `accountNumber` (string): Bank account number (required for Indian)
+  - `accountHolderName` (string): Name on bank account (required)
+  - `phoneNumber` (string): Contact phone number (required)
+
+- **Request Body (Foreign Nationality)**:
+
+  - `ownerId` (string): Unique studio owner identifier (required)
+  - `payPalId` (string): PayPal account ID/email (required for Foreigner)
+  - `currency` (string): Preferred currency code (e.g., "USD", "EUR") (required for Foreigner)
+  - `phoneNumber` (string): Contact phone number (required)
+
+- **Example Request (Indian)**:
+
+```json
+{
+  "ownerId": "OWN001",
+  "ifscCode": "SBIN0001234",
+  "accountNumber": "1234567890",
+  "accountHolderName": "John Doe",
+  "phoneNumber": "+919876543210"
+}
+```
+
+- **Example Request (Foreigner)**:
+
+```json
+{
+  "ownerId": "OWN001",
+  "payPalId": "johndoe@example.com",
+  "currency": "USD",
+  "phoneNumber": "+1234567890"
+}
+```
+
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "KYC details added, Sent for review"
+}
+```
+
+- **Error Responses**:
+
+  - `400 Bad Request`: Invalid nationality
+  - `404 Not Found`: Your account doesn't exist anymore
+  - `409 Conflict`: Your account is deleted
+  - `500 Internal Server Error`: Session expired, please log in again
+
+- **Security Features**:
+  - Bank account numbers encrypted using AES encryption
+  - IFSC codes encrypted using AES encryption
+  - PayPal IDs encrypted using AES encryption
+  - All sensitive data stored in encrypted format
+  - Currency set to "INR" by default for Indian accounts
+
+---
+
+## Encryption & Security
+
+### Document Encryption
+
+- All ID documents encrypted using AES-256-GCM
+- Unique encryption key generated per document
+- Encryption metadata stored separately:
+  - `iv`: Initialization Vector
+  - `authTag`: Authentication Tag
+  - `encryptedKey`: Encrypted encryption key
+
+### Banking Data Encryption
+
+- Account numbers encrypted using AES encryption with secret key
+- IFSC codes encrypted using AES encryption
+- PayPal IDs encrypted using AES encryption
+- Encryption keys stored securely in environment variables
+
+## Business Rules
+
+1. **KYC Verification Required**: Studio owner must have verified KYC to raise payment requests
+2. **Account Status**: Owner account must not be deleted
+3. **Duplicate Prevention**: Cannot raise payment request if one already exists for the session
+4. **Processing Time**: Payments are processed within 2-4 business days
+5. **Unique Payment ID**: Each payment request receives a unique ID with prefix "PID"
+6. **Payment requests**: Payment Request can only be raised for completed sessions
+
+---

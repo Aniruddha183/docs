@@ -1,0 +1,46 @@
+---
+title: "Studio Management Architecture"
+description: "High-level architectural workflow for studio lifecycle management, compliance, and administrative oversight."
+---
+
+## Module Overview
+
+The Studio Management module handles the end-to-end lifecycle of a physical fitness facility within the platform. It decouples the **Creation (Owner)**, **Validation (System)**, and **Verification (Admin)** phases to ensure data integrity and quality control before a studio goes live.
+
+## Architectural Components
+
+- **Studio Workbench**: A staging area where owners can partially save studio data without affecting the live marketplace.
+- **Compliance Engine**: Manages the association of legal certificates to studio entities, ensuring every listing has a verifiable provider and validity period.
+- **Review Pipeline**: An asynchronous state-management system that moves studios between the Owner's control and the Admin's oversight.
+- **Session Protection Layer**: A safety mechanism that prevents the deletion of active studios if they contain future financial or service obligations (upcoming sessions).
+
+## Lifecycle Workflow
+
+```mermaid
+graph TD
+    A[Studio Owner] -->|Create/Save| B(Draft State)
+    B -->|Attach| C[Certificates]
+    B -->|Submit| D{Review Pipeline}
+
+    subgraph Admin_Panel [Administrative Oversight]
+        D -->|Manual Audit| E[Admin Reviewer]
+        E -->|Approve| F[Verified State]
+        E -->|Reject| G[Denied State]
+    end
+
+    G -->|Re-edit| B
+    F -->|Request Deletion| H[Deletion Queue]
+    B -->|Immediate Delete| I[Purged]
+
+    style F fill:#d4edda,stroke:#28a745
+    style G fill:#f8d7da,stroke:#dc3545
+    style B fill:#fff3cd,stroke:#ffc107
+```
+
+## Data Synchronization
+
+- **Draft Persistence**: Changes are saved locally to the database but are excluded from the public discovery API.
+- **Identity Injection**: The `authenticateStudioToken` ensures every studio is strictly bound to a `SOID` (Studio Owner ID), preventing cross-tenant data access.
+- **Certificate Binding**: Certificates are treated as child entities. A studio cannot move to a "Verified" state without valid certification data.
+
+---

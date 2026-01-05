@@ -1,0 +1,265 @@
+---
+title: "API Documentation"
+description: "This section outlines the API endpoints for managing **studio owners** in the FitnEarn platform."
+---
+
+# Owner Profile Management
+
+This section outlines the API endpoints for managing **studio owners** in the FitnEarn platform.
+
+---
+
+### 1. Get Studio Owner List
+
+- **Method**: `GET`
+- **Endpoint**: `/profileList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_OWNERS`
+- **Query Parameters (Optional)**:
+  `ownerId`: string
+  `ownerName`: string
+  `studioName`: string
+  `city`: string
+  `status`: string
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": [ {owner data} ],
+  "totalProfiles": 2
+}
+```
+
+- **Error Responses**:
+
+`404 Not Found` – No owners found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 2. Get Studio Owner By ID
+
+- **Method**: `GET`
+- **Endpoint**: `/profileDetail/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "profile": {profile object},
+    "reason": {
+      "ownerId": "string",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+}
+```
+
+- **Error Responses**:
+
+`404 Not Found` – Profile not found
+`500 Internal Server Error` – Query failed
+
+---
+
+### 3. Delete Studio Owner
+
+- **Method**: `DELETE`
+- **Endpoint**: `/profile/delete/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Studio owner and all associated data deleted successfully"
+}
+```
+
+**Error Responses**:
+
+`404 Not Found` – Owner not found
+`500 Internal Server Error` – Deletion failed
+
+---
+
+### 4. Edit Studio Owner Profile
+
+- **Method**: `PATCH`
+- **Endpoint**: `/profile/edit/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_OWNER`
+- **Path Parameters**:
+  `ownerId`: string
+
+- **Request Body**:
+
+```json
+{
+  "name": "string",
+  "about": "string",
+  "livePerSession": number,
+  "bookingPerSession": number
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Owner profile updated successfully",
+  "data": {
+    "ownerId": "string",
+    "name": "string",
+    "about": "string",
+    "livePerSession": number,
+    "bookingPerSession": number
+  }
+}
+```
+
+- **Error Responses**:
+
+`404 Not Found` – Profile not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 4. Deactivate Owner Profile
+
+- **Method**: `PATCH`
+- **Endpoint**: `/profile/deactivate`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_OWNER`
+
+- **Request Body**:
+
+```json
+{
+  "ownerId": "string",
+  "action": "boolean",
+  "status": `"Active" or "Inactive"`
+}
+```
+
+- **Response**
+
+```json - Checking before deactivation
+{
+  "success": true,
+  "message": "2 upcoming sessions found.",
+  "upcomingSessions": 2,
+  "sessionIds": ["LSS00001", "LSS00002"]
+}
+```
+
+```json - Deactivated profile
+{
+  "success": true,
+  "message": "Profile is Deactivated",
+  "cancelledSessions": ["LSS00001", "LSS00002"]
+}
+```
+
+```json - Re-activated profile
+{
+  "success": true,
+  "message": "Owner Profile reactivated successfully."
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Profile not found
+- `500 Internal Server Error` – Update failed
+
+---
+
+### 5. Get All KYC Profiles
+
+- **Method**: `GET`
+- **Endpoint**: `/kyc/profileList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_KYC`
+- **Query Parameters (Optional)**: -`name`: string -`userId`: string -`kycTokenId`: string -`nationality`: string -`stage`: string
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": [ {KYC profile} ],
+  "totalProfiles": 2
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – No KYC profile found
+- `500 Internal Server Error` – Query failed
+
+---
+
+### 6. Get KYC Profile Detail
+
+- **Method**: `GET`
+- **Endpoint**: `/kyc/profileDetail/:ownerId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_KYC`
+- **Path Parameters**:
+  `ownerId`: string
+- **Query Parameters (Optional)**:
+  `decrypt`: boolean (to get decrypted values and S3 URLs)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "response": {
+      "status": "Verified",
+      "approver": { "USR_ID": "string", "name": "string" },
+      "stage": "Approved",
+      "holderName": "string",
+      "kycTokenId": "string",
+      "ownerId": "string",
+      "phoneNumber": "string",
+      "nationality": "Indian",
+      "refId": "N/A",
+      "profileImage": "url",
+      "accountNumber": "***********",
+      "ifscCode": "***********",
+      "payPalId": "***********",
+      "idProof": { "frontImageUrl": "url", "backImageUrl": "url" },
+      "panCard": { "frontImageUrl": "url", "backImageUrl": "url" }
+    },
+    "reason": {
+      "ownerId": "string",
+      "approvalComments": [],
+      "rejectionComments": []
+    }
+  }
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Profile not found
+- `500 Internal Server Error` – Fetch failed
+
+---

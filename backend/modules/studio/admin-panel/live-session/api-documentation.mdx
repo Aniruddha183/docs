@@ -1,0 +1,448 @@
+---
+title: "API Documentation"
+description: "This section outlines the API endpoints for managing **studio live sessions** in the FitnEarn platform."
+---
+
+# Live Session Management
+
+This section outlines the API endpoints for managing **studio live sessions** in the FitnEarn platform.
+
+---
+
+### 1. Create Live Session Draft
+
+- **Method**: `POST`
+- **Endpoint**: `/LS/create`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Request Body**:
+
+```json
+{
+  "ownerId": "USR00001",
+  "sessionName": "Morning Yoga",
+  "description": "Energizing morning yoga session",
+  "studioId": "STUDIO001",
+  "intensity": "Medium",
+  "calories": 300,
+  "equipment": "Yoga Mat",
+  "thumbnail": "image-url",
+  "sessionType": "Yoga",
+  "category": "Fitness",
+  "level": "Beginner",
+  "focusArea": "Flexibility",
+  "sessionDate": "2025-07-10",
+  "sessionTime": "06:00 AM",
+  "duration": 60,
+  "sessionLink": "https://zoom.us/123",
+  "address": "Online"
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Morning Yoga is Created",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Studio not found
+- `500 Internal Server Error` – Creation failed
+
+---
+
+### 2. Send Live Session for Review
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/sendForReview/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session submitted for review",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Update failed
+
+---
+
+### 3. Assign Reviewer to Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/assignReviewer/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "reviewer": "ADMIN00002"
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Reviewer assigned successfully",
+  "sessionId": "LSS00001"
+  "reviewer": "ADMIN00002"
+}
+```
+
+- **Error Responses**:
+
+- `400 Bad Request` – Required fields are missing
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
+
+---
+
+### 4. Assign Approver to Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/assignApprover/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_APPROVER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "approver": "ADMIN00002"
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Approver assigned successfully",
+  "sessionId": "LSS00001"
+  "approver": "ADMIN00002"
+}
+```
+
+- **Error Responses**:
+
+- `400 Bad Request` – Required fields are missing
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
+
+---
+
+### 5. Request for Live Session Approval
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/requestForApproval/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_REVIEWER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "reviewerId": "USR00002",
+  "reason": "Content looks good",
+  "isVisible": true
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Request for approval sent",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Failed to update
+
+---
+
+### 6. Approve or Reject Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/approve/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_APPROVER`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "seats": 10,
+  "price": 200,
+  "discountRate": 10,
+  "reason": "Looks professional",
+  "approverId": "USR00003",
+  "type": "approve",
+  "isVisible": true
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session approve successfully",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+- `400 Bad Request` – Invalid type
+- `500 Internal Server Error` – Update failed
+
+---
+
+### 7. Cancel Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/cancel/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CANCEL_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Request Body**:
+
+```json
+{
+  "reason": "Low registrations",
+  "adminId": "USR00004",
+  "isVisible": true
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session cancelled successfully with Reason",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Update failed
+
+---
+
+### 8. Edit Live Session
+
+- **Method**: `PATCH`
+- **Endpoint**: `/LS/edit/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO_LIVE_SESSION`
+- \*\*Path Parameter
+  `sessionId`: (string)
+
+- **Request Body**: _(Only editable fields depending on session state)_
+
+```json
+{
+  "duration": 90,
+  "focusArea": "Strength",
+  "address": "New Studio Location"
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session updated successfully.",
+  "sessionId": "LSS00001"
+}
+```
+
+- **Error Responses**:
+
+`404 Not Found` – Session not found
+`500 Internal Server Error` – Update failed
+
+---
+
+### 9. Copy Live Session
+
+- **Method**: `POST`
+- **Endpoint**: `/LS/copy/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Session copied successfully",
+  "sessionId": "LSS00002"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Copy failed
+
+---
+
+### 10. Get All Live Sessions (Filterable)
+
+- **Method**: `GET`
+- **Endpoint**: `/LS/list`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIO_LIVE_SESSIONS`
+- **Query Params**:
+- `sortBy`: `A-Z` | `Z-A`
+- `startDate`, `endDate`: Date range
+- `sessionId`, `studioId`, `ownerId`, `sessionName`, `category`, `stage`, `stages`
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "data": [ { ...sessionData } ],
+  "totalSessions": 5
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – No matching sessions
+- `500 Internal Server Error` – Query failed
+
+---
+
+### 11. Get Live Session by ID
+
+- **Method**: `GET`
+- **Endpoint**: `/LS/getDetail/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": { ... },
+    "comments": { ... }
+  }
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Query failed
+
+---
+
+### 12. Get Live Session participants
+
+- **Method**: `GET`
+- **Endpoint**: `/LS/getParticipantDetails/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO_LIVE_SESSION`
+
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "sessionid" : "LSS00001",
+  "totalParticipants": 10
+  "data": {
+    "refundAllowed": ture
+    "participants": {
+      "userId" : "USR00001",
+      "userName":"User",
+      "email":"example@email.com",
+      "isAttended":true
+    },
+    "bookings": { ... }
+    "refunds": { ... }
+  }
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error`
+
+---
+
+### 13. Delete Live Session
+
+- **Method**: `DELETE`
+- **Endpoint**: `/LS/delete/:sessionId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO_LIVE_SESSION`
+- **Path Parameters**:
+  `sessionId`: (string)
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "message": "Live session and all associated data deleted successfully"
+}
+```
+
+- **Error Responses**:
+
+- `404 Not Found` – Session not found
+- `500 Internal Server Error` – Deletion failed
+
+---

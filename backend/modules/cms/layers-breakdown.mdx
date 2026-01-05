@@ -1,182 +1,178 @@
 ---
-title: "CMS Backend Layers Breakdown"
-description: "Internal layering and responsibility breakdown of the CMS backend (Lambda)."
+title: "CMS Lambda Layers Breakdown"
+description: "Layer-wise classification of middleware and functions used in the CMS module."
 ---
 
-# CMS Backend Layers Breakdown
+# CMS Lambda Layers Breakdown
 
 ## Purpose
 
-This document describes the **internal structure of the CMS backend**, focusing on **how responsibilities are separated across layers** within the Lambda/service implementation.
+This document explains **how the CMS module uses shared Lambda layers**, and **why each function belongs to a specific layer**.
 
-It explains **where logic lives**, **how requests flow internally**, and **how admin and public routes diverge**, without documenting API contracts or business rules.
+The goal is to make it clear:
 
----
+- What is global infrastructure
+- What is access-control capability
+- What is CMS-specific
+- What does NOT exist for CMS
 
-## High-Level Layering
-
-The CMS backend follows a **layered architecture** to ensure separation of concerns:
-
-1. Routing Layer
-2. Controller Layer
-3. Middleware Layer
-4. Service Layer
-5. Model / Persistence Layer
-
-Each layer has a **single, well-defined responsibility**.
+This prevents incorrect sharing or refactoring in the future.
 
 ---
 
-## 1️⃣ Routing Layer
+## Layer A — Platform / Infra Layer (GLOBAL)
 
-### Responsibility
+### Definition
 
-- Defines HTTP routes
-- Maps routes to controllers
-- Applies middleware chains
+Pure technical utilities that are:
 
-### Characteristics
+- Domain-agnostic
+- Permission-agnostic
+- Reusable across all backend modules
 
-- Separate routing for:
-  - Admin APIs
-  - Public APIs
-- No business logic
-- No database access
-
-### Notes
-
-- Admin routes attach authentication and authorization middleware
-- Public routes expose read-only endpoints without auth
+These utilities **do not know who is calling them or why**.
 
 ---
 
-## 2️⃣ Controller Layer
+### CMS Usage
 
-### Responsibility
+#### `idGenerationMiddleware`
 
-- Acts as the **entry point for request handling**
-- Extracts request data (params, body, query)
-- Delegates processing to services
-- Formats API responses
+**Why it belongs here**
 
-### Characteristics
+- Generates unique IDs
+- Does not know about CMS, Admin, Content, or permissions
+- Used across multiple backend modules
+- No business rules or side effects
 
-- One controller method per API action
-- No direct database access
-- No permission logic beyond invoking middleware
-
-### What controllers should NOT do
-
-- Implement business rules
-- Validate permissions
-- Perform complex data transformations
+**Conclusion**
+✔ Correctly classified as **Layer A (Global Infra)**
 
 ---
 
-## 3️⃣ Middleware Layer
+## Layer B — Domain Layer Utilities (CMS Domain)
 
-### Responsibility
+### Definition
 
-- Cross-cutting concerns applied before controller execution
-
-### Common Middleware Responsibilities
-
-- Authentication (admin routes)
-- Authorization (permission checks)
-- ID generation (for content creation)
-- Request validation (basic structural checks)
-
-### Notes
-
-- Middleware blocks execution early on failure
-- Business behavior is not implemented here
+Functions that encode **CMS-specific business rules or workflows**.
 
 ---
 
-## 4️⃣ Service Layer
+### CMS Usage
 
-### Responsibility
+❌ **None**
 
-- Implements **core operational logic**
-- Coordinates data creation, updates, and retrieval
-- Applies type-driven behavior
+**Why**
 
-### Characteristics
+- CMS does not have domain-level utilities in middleware form
+- CMS business logic lives in controllers/services, not shared helpers
+- No reusable CMS-only utilities extracted at this layer
 
-- Receives validated input from controllers
-- Interacts with models
-- Returns normalized results to controllers
-
-### Service Layer Boundaries
-
-- No HTTP concerns
-- No direct response formatting
-- No authentication logic
+**Conclusion**
+✔ Layer B exists conceptually  
+✔ Currently **empty for CMS**
 
 ---
 
-## 5️⃣ Model / Persistence Layer
+## Layer C — Cross-Domain Capability Layer (SEPARATE STACK)
 
-### Responsibility
+### Definition
 
-- Defines database schema
-- Handles persistence and retrieval of CMS content
+Logic that represents a **business capability**, not a utility.
+These functions:
 
-### Characteristics
-
-- Uses schema-defined constraints
-- No awareness of API consumers (admin or public)
-- No business decision-making
-
----
-
-## Admin vs Public Flow (Internal)
-
-### Admin Flow
-
-- Route → Auth Middleware → Permission Middleware → Controller → Service → Model
-
-### Public Flow
-
-- Route → Controller → Service → Model
-
-The **same service and model layers** are reused for both flows.
+- Are meaningful in business terms
+- Apply permissions or identity
+- Can be reused by multiple admin-facing modules
+- Cause security or access side effects
 
 ---
 
-## Error Handling Flow
+### CMS Usage
 
-- Validation and permission errors are handled at middleware level
-- Operational errors are propagated from service layer
-- Controllers format errors into API responses
-- Database errors do not leak raw details to consumers
+#### `authenticateAdminToken`
 
----
+**Why it belongs here**
 
-## Design Constraints
-
-- No layer should bypass another layer
-- Controllers must not access models directly
-- Services must not depend on request/response objects
-- Models must not contain business logic
+- Enforces admin authentication
+- Knows about admin identity
+- Used across **admin modules**, not just CMS
+- Has security and business impact
 
 ---
 
-## Non-Goals
+#### `authorize`
 
-This document does **not** describe:
+**Why it belongs here**
 
-- API endpoint definitions
-- Business rules or content behavior
-- Frontend or platform-specific logic
-- Infrastructure or deployment configuration
+- Enforces permission-based access
+- Understands business permissions (`CREATE_CONTENT`, `READ_CONTENT`, etc.)
+- Used only for admin-facing routes
+- Affects system behavior, not just request formatting
+
+**Important Clarification**
+
+- Although used only in admin APIs, this is still a **capability**, not CMS logic
+- CMS is a **consumer**, not the owner
+
+**Conclusion**
+✔ Both correctly belong to **Layer C**
 
 ---
 
-## Related Documentation
+## Layer D — Isolation Layer (CONCEPTUAL)
 
-- CMS Overview
-- Architecture Guide
-- Database Schema
-- Admin API Documentation
-- Public API Documentation
+### Definition
+
+Intentional duplication to avoid coupling.
+
+---
+
+### CMS Usage
+
+❌ **None**
+
+**Why**
+
+- CMS does not duplicate access logic
+- CMS relies on shared admin capabilities instead
+- No CMS-specific reimplementation of auth or permissions
+
+---
+
+## Route Flow Mapping (For Clarity)
+
+### Admin Routes
+
+```
+
+authenticateAdminToken  →  authorize  →  idGenerationMiddleware  →  CMS Controller
+
+```
+
+- Layer C → Layer C → Layer A → CMS logic
+
+---
+
+### Public Routes
+
+```
+
+CMS Controller
+
+```
+
+- No authentication
+- No permissions
+- No shared layers involved
+
+---
+
+## Summary Table
+
+| Layer   | Purpose             | CMS Functions                         |
+| ------- | ------------------- | ------------------------------------- |
+| Layer A | Global Infra        | `idGenerationMiddleware`              |
+| Layer B | CMS Domain          | None                                  |
+| Layer C | Access / Capability | `authenticateAdminToken`, `authorize` |
+| Layer D | Isolation           | None                                  |

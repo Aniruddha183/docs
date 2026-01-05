@@ -1,0 +1,54 @@
+---
+title: Architecture
+description: This document outlines the technical structure of the Profile and KYC management system within the Admin Panel.
+---
+
+## 1. System Overview
+
+The module acts as a bridge between the **Studio Owner App/Web** and the **Customer-facing Website**. It ensures that only verified and compliant owners can list their studios.
+
+## 2. Component Diagram
+
+- **Admin Frontend:** React/Next.js interface for data visualization and action triggers.
+- **Backend API:** Node.js microservice handling business logic and permissions.
+- **Database:** MongoDB for profile and KYC data.
+- **Third-Party Integration:** RazorPay for contract creation and payment processing.
+
+## 3. Data Models
+
+### Owner Profile
+
+| Field         | Type    | Description                                    |
+| :------------ | :------ | :--------------------------------------------- |
+| `ownerId`     | SOID001 | Primary Key                                    |
+| `stage`       | Enum    | Draf, Under Review, Approved, Rejected         |
+| `status`      | Enum    | Active, Inactive                               |
+| `isVerified`  | Boolean | True if KYC + Razor Pay contract is successful |
+| `kycVerified` | Enum    | True if KYC + Razor Pay contract is successful |
+| `kycStatus`   | Enum    | Not Started, In-Process, Verified, Failed      |
+
+### KYC & Razor Pay Contract
+
+| Field                | Type   | Description                                 |
+| :------------------- | :----- | :------------------------------------------ |
+| `razorpayContactId`  | String | Unique ID from Razor Pay                    |
+| `document_urls`      | Array  | S3 links to ID proofs/Business registration |
+| `razorpayFundStatus` | String | SUCCESS, FAILED, PENDING                    |
+
+## 4. Logical Flow
+
+1. **Data Ingestion:** When an owner registers, a record is created in `owner_profiles` with status `PENDING`.
+2. **Review Pipeline:** Admin UI fetches profiles via `GET /admin/profiles`.
+3. **External Sync:**
+   - Admin initiates Razor Pay contract via `POST /contracts/Razor-pay`.
+   - Webhook listens for `contract.success` from Razor Pay.
+   - On success, `kyc_status` updates to `VERIFIED`.
+
+## 5. Security & RBAC
+
+Access is controlled via Middleware using JWT and Scopes:
+
+- `profile:read`: Standard Admin
+- `profile:write`: Senior Admin
+- `agreement:manage`: Super Admin Only
+- `profile:deactivate`: Admin/Super Admin

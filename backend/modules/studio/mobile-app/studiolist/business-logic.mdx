@@ -1,0 +1,69 @@
+---
+title: "Studio Domain Specifications"
+description: "Business rules, state transitions, and logic for the Studio Management module."
+---
+
+## Business Rules
+
+- **State-Locked Editing**: A studio can only be edited if its current state is `DRAFT` or `DENIED`.
+- **Tax Standardization**: All studio listings are subject to a fixed default tax rate of 18% unless manually overridden by the system.
+- **Deletion Constraint**: A studio cannot be deleted if there are active or upcoming sessions linked to it.
+- **Verification Dependency**: A studio must have a valid `studioId` and mandatory operational hours before it can be submitted for review.
+- **Certificate Integrity**: Every certificate must have a `validityFrom` date that is earlier than the `validityTo` date.
+- **Read-Only Enforcement**: Once a studio reaches the `VERIFIED` state, the owner cannot modify details without an administrative status reset.
+- **Graceful Deletion**: Deletion of a `VERIFIED` studio is not immediate; it triggers a background query for administrative approval to ensure session reconciliation.
+
+---
+
+## State Flow
+
+The lifecycle of a **Studio Listing**:
+
+**DRAFT** → **UNDER_REVIEW** → **VERIFIED** | **DENIED**
+
+- **DRAFT**: The initial or "Edit" state. The studio is invisible to end-users.
+- **UNDER_REVIEW**: The studio is locked for the owner and pending administrative audit.
+- **VERIFIED**: Terminal "Live" state. The studio is visible on the platform and open for bookings.
+- **DENIED**: Rejection state. The studio is returned to the owner with comments for correction.
+- **DELETION_PENDING**: A transitional state for verified studios awaiting administrative removal.
+
+**Allowed Transitions:**
+
+- `DRAFT` → `UNDER_REVIEW` (Via Submission)
+- `UNDER_REVIEW` → `VERIFIED` (Via Admin Approval)
+- `UNDER_REVIEW` → `DENIED` (Via Admin Rejection)
+- `DENIED` → `DRAFT` (Via Owner Modification)
+- `VERIFIED` → `DELETION_PENDING` (Via Removal Request)
+
+---
+
+## Business Logic
+
+### 1. Studio Creation and Iteration
+
+1. The system checks if the owner's account is in an active, non-deleted state.
+2. If a unique identifier is provided, the system retrieves the existing record; otherwise, a new entity is initialized.
+3. The system captures descriptive, geographic, and financial data.
+4. The studio state is set to `DRAFT`.
+5. The system calculates the `priceAfterDiscount` based on the provided base rate and discount percentage.
+
+### 2. Certification Compliance
+
+1. The system validates that the provided `ownerId` and `studioId` are valid and linked.
+2. Upon upload, a unique certificate ID is generated.
+3. The system stores the document reference and the validity duration.
+4. The certificate is linked to the studio entity, enabling the review submission trigger.
+
+### 3. Submission for Audit
+
+1. The system verifies that all mandatory fields (Address, Operational Hours, Pricing) are populated.
+2. The system checks for the presence of at least one valid certificate.
+3. The studio state is transitioned from `DRAFT` to `UNDER_REVIEW`.
+4. Modification access is revoked for the Studio Owner.
+
+### 4. Studio Deletion Protocol
+
+1. The system checks for upcoming sessions associated with the `studioId`.
+2. If upcoming sessions exist, the request is rejected.
+3. If the state is `DRAFT`, `UNDER_REVIEW`, or `DENIED`, the system performs an immediate permanent removal.
+4. If the state is `VERIFIED`, the system marks the studio as `DELETION_PENDING` and routes a request to the administrative queue for final reconciliation.

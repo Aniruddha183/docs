@@ -1,0 +1,309 @@
+---
+title: "API Documentation"
+description: "This document outlines the API endpoints for Studio List in the FitEarn Admin Console."
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/admin/studio
+```
+
+## Middleware
+
+### `authenticateAdminToken()`
+
+- **Headers (for user authorization)**:
+  -- `genToken` (string): GenToken to verify admin (required)
+
+- **Purpose**: Validates JWT token and authenticates admin user requests.
+- **Usage**: Required in all protected admin endpoints.
+
+### `authenticateAdminToken(<permission name)`
+
+- **Purpose**: Validates admin user permission & boundries.
+- **Usage**: Required in all protected admin endpoints.
+
+### `idGenerationMiddleware(<prefix>)`
+
+- **Output** : ADMINXXXXX
+- **Purpose**: Generates unique query IDs for issue reporting.
+- **Usage**: Applied to report creation endpoints.
+
+### `upload.single(<fieldName>)`
+
+- **Headers (for file upload)**:
+  - `Authorization` (string): Bearer token (required if uploading file)
+  - `x-refresh-token` (string): Refresh token (required if uploading file)
+  - `x-username` (string): Username (required if uploading file)
+- **Purpose**: Handles file upload using multer to S3
+- **Usage**: Required for generating image/attachment URLs for queries
+
+## Endpoints
+
+---
+
+### 1. Get Studio List
+
+- **Method**: `GET`
+- **Endpoint**: `/studioList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `GET_STUDIOS`
+
+- **Query Parameters** (all optional):
+
+  - `studioId`: (string)
+  - `ownerId`: (string)
+  - `name`: (string)
+  - `city`: (string)
+  - `ownerName`: (string)
+  - `services`: (string, comma-separated)
+  - `studioType`: (string, comma-separated)
+  - `status`: (string)
+  - `sortBy`: (`A-Z` | `Z-A`)
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "studioId": "STU001",
+        "name": "StudioX",
+        "status": "Active",
+        "ownerName": "John Doe",
+        "ownerId": "OWN001",
+        "city": "Delhi",
+        "studioType": ["Yoga"],
+        "services": ["Cardio", "Meditation"],
+        "createdAt": "2024-05-01T08:30:00Z"
+      }
+    ],
+    "totalStudios": 1
+  }
+  ```
+
+- **Error Responses**:
+  - `500 Internal Server Error` – DB or fetch error
+
+---
+
+### 2. Get Studio By ID
+
+- **Method**: `GET`
+- **Endpoint**: `/details/:studioId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_STUDIO`
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio data fetched successfully",
+    "data": {
+      "studio": {
+        "studioId": "STU001",
+        "name": "StudioX",
+        "address": "Locality, City, Pincode",
+        "geometry": { "lat": 28.123, "lng": 77.123 },
+        "certificates": [
+          { "certificateId": "CERT01", "certificateURL": "https://s3..." }
+        ]
+      },
+      "comments": {
+        "approvalComments": [],
+        "rejectionComments": [],
+        "cancelledComments": []
+      }
+    }
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB error
+
+---
+
+### 3. Edit Studio
+
+- **Method**: `PATCH`
+- **Endpoint**: `/edit`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_STUDIO`
+
+- **Request Body**:
+
+  ```json
+  {
+    "studioId": "STU001",
+    "updates": {
+      "name": "Updated Name",
+      "status": "Inactive"
+    }
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio updated successfully",
+    "data": {updated studio object}
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB update error
+
+---
+
+### 4. Delete Studio (Single)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/delete/:studioId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO`
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studio and all associated data deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `404 Not Found` – Studio not found
+  - `500 Internal Server Error` – DB or cascade deletion error
+
+---
+
+### 5. Delete Studios (Bulk)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/deleteMany`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_STUDIO`
+
+- **Request Body**:
+
+  ```json
+  {
+    "studioIds": ["STU001", "STU002"]
+  }
+  ```
+
+- **Response**:
+
+  ```json
+  {
+    "success": true,
+    "message": "Studios and related data deleted successfully"
+  }
+  ```
+
+- **Error Responses**:
+  - `400 Bad Request` – Empty or invalid studioIds array
+  - `500 Internal Server Error` – Cascade deletion or DB error
+
+---
+
+### 6. Add Certificate
+
+Uploads and adds a certificate for the studio owner.
+
+- **Method**: `POST`
+- **URL**: `/addCertificate`
+- **Middleware**: `authenticateAdminToken`, `idGenerationMiddleware('CERT')`
+- **Controller**: `uploadCertificate`
+- **Request Body**:
+  - `ownerId` (string): Unique studio owner identifier (required)
+  - `name` (string): Name of the certificate (required)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (required)
+  - `key` (string): S3 key for the certificate file (required)
+  - `validityFrom` (Date): Date when certificate was issued (required)
+  - `validityTo` (Date): Certificate expiry date (required)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate uploaded successfully",
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Studio not found
+  - `500 Internal Server Error`
+
+---
+
+### 7. Edit Certificate
+
+Updates an existing certificate.
+
+- **Method**: `PATCH`
+- **URL**: `/editCertificate`
+- **Middleware**: `authenticateAdminToken`
+- **Controller**: `editCertificate`
+- **Request Body**:
+  - `certificateId` (string): Unique certificate identifier (required)
+  - `name` (string): Name of the certificate (optional)
+  - `provider` (string): Name of the certificate provider (required)
+  - `image` (string): URL of the uploaded certificate (optional)
+  - `key` (string): S3 key for the certificate file (optional)
+  - `validityFrom` (Date): Date when certificate was issued (optional)
+  - `validityTo` (Date): Certificate expiry date (optional)
+  - `studioId` (Datstringe): belonging studioId (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate updated successfully"
+  "data": [{...certificateObject}]
+}
+```
+
+- **Error Responses**:
+  - `400 Bad Request`: All fields are required.
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`
+
+---
+
+### 8. Delete Certificate
+
+Deletes a certificate from the system.
+
+- **Method**: `DELETE`
+- **URL**: `/deleteCertificate`
+- **Middleware**: `authenticateStudioToken`
+- **Controller**: `deleteCertificate`
+- **Request Body**:
+  - `studioId` (string): studioId identifier (required)
+  - `certificateId` (string): certificate identifier (required)
+- **Success Response**:
+
+```json
+{
+  "success": true,
+  "message": "Certificate deleted successfully"
+}
+```
+
+- **Error Responses**:
+  - `404 Not Found`: Certificate not found
+  - `500 Internal Server Error`
+
+---

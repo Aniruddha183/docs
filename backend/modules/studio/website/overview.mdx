@@ -1,0 +1,101 @@
+This documentation is designed to give a newly onboarded engineer a 360-degree view of the **Studio User Experience (UX) and Feature Logic**.
+
+---
+
+# Studio Module: User-Facing Documentation
+
+Welcome to the Studio Module. This module is the core revenue driver of the platform, allowing users to discover, book, and attend both physical studio slots and curated live sessions.
+
+## 1. Discovery & Search Logic
+
+The discovery engine is built on **Geospatial Proximity** and **Attribute Filtering**.
+
+- **Location-Based Search:** By default, the system filters studios within a **5KM radius** of the user's current or selected location.
+- **Filtering Engine:** Users can narrow down results based on:
+  - Category (e.g., Dance, Yoga, Recording).
+  - Amenities (e.g., WiFi, AC, Parking).
+  - Price Range.
+  - Ratings/Reviews.
+- **Studio Details:** Each studio profile serves as a storefront containing high-res images, service lists, operational hours, and historical user reviews.
+
+---
+
+## 2. Booking Workflows
+
+There are two distinct paths for a user to "check out."
+
+### A. Slot-Based Booking (Offline Only)
+
+This is for users who want to rent the physical space for personal or group use.
+
+- **Granularity:** Time is divided into **1-hour fixed slots**.
+- **Validation:** When a user selects a slot, the system performs a real-time availability check. If the slot is locked by another user's pending payment or already booked, the system prevents the "Proceed" action.
+- **Invitations:** Users can add "Friends" to the booking. This increases the participant count but stays within the studio's capacity limits.
+- **Check-in:** Upon successful payment, a **QR Code** is generated. The user must present this at the studio for the owner to scan via the Studio App.
+
+### B. Live Sessions (Online or Offline)
+
+These are specific events created and hosted by the Studio Owner.
+
+- **Discovery:** Found under the "Sessions" tab within a Studio profile.
+- **Participation:** Unlike slot bookings, these are group events with multiple participants.
+- **Attendance:**
+  - **Online:** A "Join" button appears in the user's "My Sessions" tab exactly at the start time.
+  - **Offline:** User visits the studio location (Standard QR check-in).
+
+---
+
+## 3. Pricing & Discount Engine
+
+The module calculates the final payable amount based on the user's **Subscription Tier**.
+
+| User Type           | Discount Applied | Logic                                                                                      |
+| :------------------ | :--------------- | :----------------------------------------------------------------------------------------- |
+| **Normal User**     | Base Discount    | Standard promotional codes or platform-wide offers.                                        |
+| **Subscribed User** | Premium Discount | A higher percentage/flat discount applied automatically via the `user_subscription` check. |
+
+- **Gateway:** All transactions are processed via **Razorpay**.
+- **State:** A booking is only moved to `Upcoming` once the Razorpay Webhook confirms `Payment.Captured`.
+
+---
+
+## 4. Cancellation & Refund Policy
+
+The system strictly enforces a **24-hour temporal gate** for refunds.
+
+| Scenario               | Cancellation Time         | Refund Status                     |
+| :--------------------- | :------------------------ | :-------------------------------- |
+| **User-Initiated**     | $> 24$ hours before start | **100% Refund** initiated.        |
+| **User-Initiated**     | $< 24$ hours before start | **No Refund** (Amount forfeited). |
+| **Owner-Initiated**    | Any time                  | **100% Refund** + Owner Strike.   |
+| **Platform-Initiated** | Any time                  | **100% Refund**.                  |
+
+---
+
+## 5. Post-Booking Lifecycle
+
+Once a booking is created, it follows this technical path:
+
+1.  **My Sessions Tab:** Users track all upcoming and past activities here.
+2.  **Live State:** For online sessions, the "Join" link becomes active at the session's `start_time`.
+3.  **Support (Query System):**
+    - Users can raise a "Query Ticket" if they face issues (e.g., studio was closed, link didn't work).
+    - **Time Limit:** Tickets must be raised within **48 hours** of the session's completion. After 48 hours, the "Raise Query" button is programmatically disabled.
+4.  **Feedback Loop:** After the session status hits `Completed`, the user is prompted to leave a rating and review for the studio.
+
+---
+
+## 6. Technical Checklist for Developers
+
+If you are working on this module, keep these constraints in mind:
+
+- **Race Conditions:** Ensure the 1-hour slot availability check uses a locking mechanism (Redis or DB level) to prevent double bookings during the payment window.
+- **Timezones:** Always store and compare session times in **UTC**, converting to local time only on the frontend.
+- **QR Security:** The QR code should contain a signed token to prevent users from spoofing check-ins.
+- **Webhooks:** The refund logic for "Owner Cancellation" must be triggered via a background worker to ensure the user is compensated even if the owner's app crashes.
+
+---
+
+## 7. User State Flow
+
+`Search` $\rightarrow$ `View Studio` $\rightarrow$ `Select Slot/Session` $\rightarrow$ `Availability Check` $\rightarrow$ `Apply Subscription Discount(Auto)` $\rightarrow$ `Razorpay Payment` $\rightarrow$ `Generate QR/Join Link` $\rightarrow$ `Completion` $\rightarrow$ `Review/Query (48hr window)`

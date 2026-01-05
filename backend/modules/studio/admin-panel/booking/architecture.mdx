@@ -1,0 +1,29 @@
+---
+title: Architecture
+description: Technical infrastructure for slot management, Razorpay integration, and QR verification.
+---
+
+# Offline Booking Architecture
+
+This module handles real-time slot availability, payment processing, and secure physical check-ins at studio locations.
+
+## 1. Booking Engine & Slot Management
+
+The system operates on a **Fixed-Slot Architecture**:
+
+- **Granularity:** 1-hour increments.
+- **Validation:** A locking mechanism ensures that a slot is marked "Pending" during the checkout process to prevent double-booking.
+- **Availability Check:** Before proceeding to payment, a real-time query validates `slot_status` against the `bookings` table.
+
+## 2. Component Diagram
+
+- **Frontend (Web):** User interface for slot selection and friend invitations.
+- **Admin Panel:** Centralized dashboard for booking oversight and manual overrides.
+- **Studio App:** Mobile interface for owners to scan and validate QR codes.
+- **Razorpay Integration:** Handles secure transactions and webhook-based payment confirmation.
+
+## 4. Security & QR Verification
+
+1. **Generation:** Upon `SUCCESSFUL` payment, the backend generates a signed JWT/Hash.
+2. **Rendering:** The User App converts this hash into a QR code.
+3. **Decryption:** The Studio App scans the code, sends the hash to the server, and verifies it against the `booking_id` and `current_timestamp`.

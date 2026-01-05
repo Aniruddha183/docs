@@ -1,0 +1,209 @@
+---
+title: "Business Logic & State Flow"
+description: "The rules governing session lifecycles, strike systems, and booking verifications."
+---
+
+## Session States & Stages
+
+### Live Session States
+
+- `Draft`: Initial creation state
+- `New`: Sent for review but not yet reviewed
+- `In Review`: Under admin review
+- `Pending Approval`: Awaiting final approval
+- `Approved`: Approved and ready to go live
+- `Rejected`: Rejected by admin
+- `Completed`: Session finished
+- `Cancelled`: Cancelled by owner or admin
+- `Payment Pending`: Awaiting payment processing
+- `Payment Successful`: Payment completed
+- `Payment Cancelled`: Payment cancelled
+- `Closed`: Session ended
+
+### Live Session Stages
+
+- `Create`: Initial creation stage
+- `Under Review`: Submitted for review
+- `Complete`: All details finalized
+- `Closed`: Session ended
+
+### Studio Booking Status
+
+- `Upcoming`: Session scheduled and confirmed
+- `Completed`: Session finished successfully
+- `Studio Rejected`: Cancelled by studio owner
+- `User Cancelled`: Cancelled by user or system
+- `Closed`: Session ended
+
+### Studio Booking Stage
+
+- `Active`: Session is active
+- `Closed`: Session is closed
+
+---
+
+## Slot Management
+
+### Automatic Slot Booking
+
+- System automatically manages time slots to prevent double bookings
+- Slots are created when sessions are scheduled
+- Slots include: date, start time, end time, session ID, and session type
+- Slots are removed when sessions are cancelled or deleted
+
+### Time Slot Validation
+
+- Checks for conflicts with existing bookings before creating/updating sessions
+- Prevents overlapping sessions for the same owner
+- Returns error if requested slot is unavailable
+
+---
+
+## Strike System
+
+### When Strikes Are Added
+
+- Cancelling an approved live session
+- Cancelling an upcoming booked session
+
+### Strike Impact
+
+- Accumulation of strikes may affect account standing
+- Visible in owner's profile
+- May trigger account restrictions if threshold of 3 strikes exceeded
+
+---
+
+## Price Calculation
+
+### Live Sessions
+
+- **Online**: Based on owner's `livePerSessionPayement` rate
+- **Offline**: Based on studio's `pricePerHour` rate
+- Tax rate: Fixed at 18%
+
+### Booked Sessions
+
+- Price determined at booking time
+- Reflects studio's current pricing
+- May include discounts applied at booking
+
+---
+
+## Best Practices
+
+1. **Session Creation**:
+
+   - Always validate time slot availability before submitting
+   - Ensure all required fields are provided based on session type
+   - Upload clear, high-quality thumbnails
+   - Provide detailed descriptions to improve user engagement
+
+2. **Session Updates**:
+
+   - Only update changed fields to minimize data transfer
+   - Always provide session ID when editing
+   - Reschedule carefully as it resets state to Draft
+
+3. **Cancellations**:
+
+   - Provide clear reasons for cancellations
+   - Be aware that cancelling approved sessions adds strikes
+   - Cancel as early as possible to minimize user impact
+
+4. **Deletions**:
+   - Use deletion cautiously as it's irreversible
+   - Consider cancellation instead of deletion for approved sessions
+   - Ensure you have backup data if needed
+
+---
+
+## 1. Live Session Lifecycle (LS)
+
+### Creation Prerequisites
+
+- An owner **must** have at least one **Verified** and **Active** studio.
+- **Offline Sessions**: Owner must manually select a specific studio.
+- **Online Sessions**: The system automatically associates the primary verified studio to the session.
+
+### The 3-Step Creation Process
+
+1. **Details Entry**: Basic info (Name, Category, Intensity). Saved as `Draft`.
+2. **Scheduling**: Setting Date, Time, and Duration. The system validates slots here.
+3. **Review Submission**: The session moves to `Under Review`.
+   - _Note:_ Data is persisted at every step to prevent progress loss.
+
+### Review & Approval Logic
+
+1. **Submission**: Session state becomes `New` or `In Review`.
+2. **Admin Review**: Admin can:
+   - **Reject**: Provides comments. User sees `Denied` status and can edit the session to fix errors.
+   - **Approve**: Admin **must** add critical metadata: Meeting Link (if online), Price, Seats, and applicable Discounts.
+3. **Live Status**: Once approved, the session is visible to end users.
+
+---
+
+## 2. Studio Booking Logic
+
+Booking management handles individual or group offline facility usage. Unlike Live Sessions, these are user-driven.
+
+### Verification Flow
+
+- **No Approval Needed**: Owners do not approve bookings; they only manage them.
+- **QR Code Verification**:
+  1. User arrives at the studio with a generated QR code.
+  2. Owner uses the Studio App to scan the QR.
+  3. System verifies the `bookingId` and marks the user as "Attended."
+
+---
+
+## 3. State & Stage Definitions
+
+### Session States
+
+| State           | Description                                               |
+| :-------------- | :-------------------------------------------------------- |
+| **Draft**       | Internal to owner; editable.                              |
+| **In Progress** | UI mapping for `New`, `In Review`, or `Pending Approval`. |
+| **Approved**    | Live and bookable by users.                               |
+| **Cancelled**   | Terminated by owner/admin (triggering strike).            |
+| **Closed**      | Session completed or payment processed.                   |
+
+---
+
+## 4. The Strike System
+
+To ensure platform reliability, a penalty system governs cancellations.
+
+- **Trigger**: A strike is added if an owner cancels an **Approved** Live Session or an **Upcoming** Studio Booking.
+- **Threshold**:
+  - **3 Strikes within 1 Month** = Automatic Profile Deactivation.
+- **Logic**: Cancellations must include a `reason`. This is recorded in `cancelledComments` for admin auditing.
+
+---
+
+## 5. Pricing & Payments
+
+### Price Calculation
+
+- **Online LS**: Calculated based on the owner’s global `livePerSessionPayment` rate.
+- **Offline LS**: Calculated based on the studio's `pricePerHour` rate.
+- **Taxation**: A fixed rate of **18%** is applied to all calculated totals.
+
+### Payment Eligibility
+
+- **Eligible**: Only sessions with the status `Completed`.
+- **Ineligible**: `Denied` or `Cancelled` sessions are excluded from the owner’s payment requests/wallet.
+
+---
+
+## 6. Deletion Policy (Cascading)
+
+Deleting a session is a destructive "Hard Delete":
+
+1. Removes the S3 Thumbnail.
+2. Clears entries from the `BookedSlots` registry.
+3. Deletes all associated `UserBookings` and triggers `Refund` records.
+4. Removes all internal `ReviewComments`.
+
+---

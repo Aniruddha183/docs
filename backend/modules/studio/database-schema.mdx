@@ -1,0 +1,720 @@
+# Studio Module - Database Schema Documentation
+
+## Overview
+
+This document describes the MongoDB collections used in the Studio module. The schema supports studio owner profiles, KYC verification, session bookings, live sessions, and administrative workflows.
+
+**Database**: MongoDB  
+**Total Collections**: 9  
+**Last Updated**: December 2025
+
+---
+
+## Collections Summary
+
+| Collection             | Purpose                                  | Primary Key          | Related Collections        |
+| ---------------------- | ---------------------------------------- | -------------------- | -------------------------- |
+| `StudioOwnerProfile`   | Studio owner account and profile data    | `ownerId`            | Studio, StudioKYCDetails   |
+| `ProfileStrike`        | Violation tracking for studio owners     | Auto-generated `_id` | StudioOwnerProfile         |
+| `OTP`                  | One-time passwords for authentication    | Auto-generated `_id` | -                          |
+| `StudioKYCDetails`     | KYC verification documents and status    | `kycTokenId`         | StudioOwnerProfile         |
+| `StudioSession`        | User booking history for studio sessions | `userId`             | Studio, StudioOwnerProfile |
+| `StudioProfileSession` | Active login sessions for studio owners  | Auto-generated `_id` | StudioOwnerProfile         |
+| `Studio`               | Studio venue profiles and metadata       | `studioId`           | StudioOwnerProfile, Review |
+| `StudioComment`        | Admin comments on sessions/bookings      | `sessionId`          | StudioLiveSession          |
+| `BookedSlot`           | Time slot reservations for studios       | `ownerId`            | StudioOwnerProfile         |
+| `StudioLiveSession`    | Live session/class listings              | `sessionId`          | Studio, StudioOwnerProfile |
+
+---
+
+## 1. StudioOwnerProfile Collection
+
+**Purpose**: Stores studio owner account information, verification status, and linked studios.
+
+### Schema Definition
+
+| Field                      | Type          | Required | Default       | Description                                             |
+| -------------------------- | ------------- | -------- | ------------- | ------------------------------------------------------- |
+| `ownerId`                  | String        | Yes      | -             | Unique owner identifier                                 |
+| `name`                     | String        | No       | -             | Owner's full name                                       |
+| `about`                    | String        | No       | -             | Owner bio/description                                   |
+| `email`                    | String        | No       | -             | Contact email                                           |
+| `countryCode`              | String        | No       | "91"          | Phone country code                                      |
+| `phoneNumber`              | Number        | No       | -             | Contact phone number                                    |
+| `profileImage`             | String        | No       | -             | S3 URL for profile photo                                |
+| `registerVia`              | String (enum) | No       | -             | Registration method: "Google" \| "Number"               |
+| `key`                      | String        | No       | -             | S3 key for profile image                                |
+| `stage`                    | String (enum) | No       | "Draft"       | Verification stage (see below)                          |
+| `status`                   | String (enum) | No       | "Active"      | Account status: "Active" \| "Inactive"                  |
+| `deletedAt`                | Date          | No       | -             | Soft delete timestamp                                   |
+| `notification`             | String (enum) | No       | "OFF"         | Notification preference: "ON" \| "OFF"                  |
+| `appType`                  | String (enum) | Yes      | "Studio"      | App source: "Website" \| "Admin" \| "Coach" \| "Studio" |
+| `awsUserName`              | String        | No       | -             | AWS Cognito username                                    |
+| `isVerified`               | Boolean       | No       | false         | Email/phone verification status                         |
+| `kycVerified`              | Boolean       | No       | false         | KYC completion status                                   |
+| `kycStatus`                | String (enum) | No       | "Not Started" | KYC workflow state (see below)                          |
+| `onBoardingComplete`       | Boolean       | No       | false         | Onboarding completion flag                              |
+| `lastLogin`                | Date          | No       | -             | Last login timestamp                                    |
+| `livePerSessionPayment`    | Number        | No       | 0             | Revenue per live session                                |
+| `bookingPerSessionPayment` | Number        | No       | 0             | Revenue per booking session                             |
+| `taxType`                  | String        | No       | "GST"         | Tax classification                                      |
+| `taxRate`                  | Number        | No       | 18            | Tax percentage                                          |
+| `agreement`                | Object        | No       | -             | Contract details (see sub-schema)                       |
+| `agreementValid`           | Boolean       | No       | false         | Contract validity flag                                  |
+| `razorpayContactId`        | String        | No       | -             | Razorpay contact identifier                             |
+| `razorpayFundId`           | String        | No       | -             | Razorpay fund account ID                                |
+| `razorpayFundStatus`       | String        | No       | -             | Fund account status                                     |
+| `razorpayFundType`         | String        | No       | -             | Fund account type                                       |
+| `razorpayContactType`      | String (enum) | No       | "Studio"      | Contact classification                                  |
+| `studios`                  | Array[String] | No       | []            | References to Studio collection                         |
+| `rejectReason`             | ObjectId      | No       | -             | Reference to rejection reason document                  |
+| `approveReason`            | ObjectId      | No       | -             | Reference to approval reason document                   |
+| `createdAt`                | Date          | Auto     | -             | Record creation timestamp                               |
+| `updatedAt`                | Date          | Auto     | -             | Last modification timestamp                             |
+
+### Enum Values
+
+**stage**: `"Draft"` \| `"Under Review"` \| `"Approved"` \| `"Rejected"` \| `"Suspended"` \| `"Deleted"`
+
+**kycStatus**: `"Not Started"` \| `"In-Process"` \| `"Verified"` \| `"Failed"`
+
+**razorpayContactType**: `"employee"` \| `"Coach"` \| `"Studio"` \| `"vendor"` \| `"customer"`
+
+### Agreement Sub-Schema
+
+| Field           | Type   | Description                 |
+| --------------- | ------ | --------------------------- |
+| `agreementURL`  | String | S3 URL for signed agreement |
+| `agreementName` | String | Document filename           |
+| `agreementKey`  | String | S3 object key               |
+| `validFrom`     | Date   | Contract start date         |
+| `validTo`       | Date   | Contract expiry date        |
+
+### Constraints & Indexes
+
+**Unique Constraints**:
+
+- `ownerId` (unique index)
+
+**Indexes**:
+
+```typescript
+{ ownerId: 1 } // Unique - primary lookup
+{ email: 1 } // Non-unique - email search
+{ ownerId: 1, stage: 1, status: 1 } // Compound - filtered queries
+```
+
+**Index Purposes**:
+
+- `ownerId`: Fast profile retrieval by owner ID
+- `email`: Owner lookup by email for login/search
+- `ownerId + stage + status`: Admin dashboard filtering (e.g., "show all approved active owners")
+
+### Field Mutability
+
+**Immutable Fields** (never change after creation):
+
+- `ownerId`
+- `registerVia`
+- `createdAt`
+
+**Mutable Fields** (can be updated):
+
+- All other fields (profile data, status, stages, payment info)
+
+**Conditionally Mutable**:
+
+- `stage`: Only transitions through specific workflows (Draft → Under Review → Approved/Rejected)
+- `kycStatus`: Only updated via KYC verification process
+- `deletedAt`: Only set once during soft delete
+
+### Business Rules
+
+1. **Stage Transitions**:
+
+   - Draft → Under Review (owner submits profile)
+   - Under Review → Approved/Rejected (admin review)
+   - Approved → Suspended (policy violation)
+   - Any stage → Deleted (admin action)
+
+2. **KYC Requirements**:
+
+   - `kycVerified` must be true before stage can move to "Approved"
+   - `kycStatus` must be "Verified" before `kycVerified` can be set to true
+
+3. **Soft Delete**:
+   - `stage` set to "Deleted" and `deletedAt` timestamp recorded
+   - Record not physically removed from database
+
+---
+
+## 2. ProfileStrike Collection
+
+**Purpose**: Tracks violations and strikes against studio owners for policy enforcement.
+
+### Schema Definition
+
+| Field       | Type   | Required | Default      | Description                     |
+| ----------- | ------ | -------- | ------------ | ------------------------------- |
+| `ownerId`   | String | Yes      | -            | Reference to StudioOwnerProfile |
+| `reason`    | String | No       | -            | Violation description           |
+| `createdAt` | Date   | No       | `Date.now()` | Strike timestamp                |
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{ ownerId: 1 } // Lookup strikes by owner
+{ ownerId: 1, createdAt: -1 } // Recent strikes for owner
+```
+
+**Index Purposes**:
+
+- `ownerId`: Retrieve all strikes for an owner
+- `ownerId + createdAt`: Get chronological strike history
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `ownerId`
+- `reason`
+- `createdAt`
+
+**Note**: Strikes are append-only records and should never be modified.
+
+---
+
+## 3. OTP Collection
+
+**Purpose**: Temporary storage for one-time passwords during authentication.
+
+### Schema Definition
+
+| Field          | Type   | Required | Default | Description             |
+| -------------- | ------ | -------- | ------- | ----------------------- |
+| `mobileNumber` | Number | Yes      | -       | Phone number for OTP    |
+| `otp`          | Number | Yes      | -       | 4-6 digit OTP code      |
+| `createdAt`    | Date   | No       | -       | OTP generation time     |
+| `expiresAt`    | Date   | Yes      | -       | Auto-deletion timestamp |
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{
+  mobileNumber: 1;
+} // Lookup OTP by phone
+{
+  expiresAt: 1;
+} // TTL index for auto-deletion (expireAfterSeconds: 0)
+```
+
+**TTL (Time-To-Live)**: MongoDB automatically deletes documents when `expiresAt` is reached.
+
+### Field Mutability
+
+**Immutable Fields**: All fields (OTPs are single-use, never updated)
+
+### Business Rules
+
+1. **Expiration**: OTPs expire 5-10 minutes after creation
+2. **Single Use**: OTP marked as used or deleted after successful verification
+3. **Rate Limiting**: Max 3 OTP requests per phone number per hour (enforced at application level)
+
+---
+
+## 4. Studio KYC Collection
+
+**Purpose**: Stores encrypted KYC documents and bank details for studio owner verification.
+
+### Schema Definition
+
+| Field               | Type          | Required | Default        | Description                             |
+| ------------------- | ------------- | -------- | -------------- | --------------------------------------- |
+| `ownerId`           | String        | Yes      | -              | Reference to StudioOwnerProfile         |
+| `kycTokenId`        | String        | Yes      | -              | Unique KYC submission ID                |
+| `accountNumber`     | String        | No       | -              | Bank account number                     |
+| `ifscCode`          | String        | No       | -              | Bank IFSC code (India)                  |
+| `accountHolderName` | String        | No       | -              | Bank account holder name                |
+| `stage`             | String (enum) | Yes      | "Under Review" | KYC verification stage                  |
+| `verified`          | Boolean       | No       | false          | KYC approval status                     |
+| `reviewer`          | String        | No       | -              | Admin who reviewed KYC                  |
+| `ownerImage`        | Object        | No       | -              | Owner photo (URL + S3 key)              |
+| `idProof`           | Object        | No       | -              | Government ID document (see sub-schema) |
+| `panCard`           | Object        | No       | -              | PAN card document (see sub-schema)      |
+| `nationality`       | String        | Yes      | -              | Owner's nationality                     |
+| `payPalId`          | String        | No       | -              | PayPal account (for international)      |
+| `phoneNumber`       | Number        | No       | -              | Contact phone                           |
+| `currency`          | String        | No       | "INR"          | Payout currency                         |
+| `createdAt`         | Date          | Auto     | -              | Submission timestamp                    |
+| `updatedAt`         | Date          | Auto     | -              | Last update timestamp                   |
+
+### Enum Values
+
+**stage**: `"Under Review"` \| `"Approved"` \| `"Rejected"`
+
+### Document Sub-Schemas (idProof, panCard)
+
+| Field                             | Type   | Description                      |
+| --------------------------------- | ------ | -------------------------------- |
+| `frontImageUrl`                   | String | S3 URL for front image           |
+| `frontImageKey`                   | String | S3 object key                    |
+| `frontImageMetaData.iv`           | String | Encryption initialization vector |
+| `frontImageMetaData.authTag`      | String | Encryption auth tag              |
+| `frontImageMetaData.encryptedKey` | String | Encrypted encryption key         |
+| `backImageUrl`                    | String | S3 URL for back image            |
+| `backImageKey`                    | String | S3 object key                    |
+| `backImageMetaData`               | Object | Same structure as front          |
+
+**Note**: Documents are encrypted at rest using AES-256-GCM. Metadata required for decryption.
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{
+  ownerId: 1;
+} // Lookup KYC by owner
+{
+  kycTokenId: 1;
+} // Lookup by unique token
+```
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `ownerId`
+- `kycTokenId`
+- `createdAt`
+- `nationality` (cannot change after submission)
+
+**Mutable Fields**:
+
+- `stage`, `verified`, `reviewer` (admin updates)
+- Bank details (owner can update if rejected)
+- Documents (owner can re-upload if rejected)
+
+### Business Rules
+
+1. **Stage Transitions**:
+
+   - Under Review → Approved (admin verifies documents)
+   - Under Review → Rejected (documents invalid/incomplete)
+   - Rejected → Under Review (owner re-submits)
+
+2. **Document Security**:
+   - All documents encrypted before S3 upload
+   - Encryption keys stored in AWS Secrets Manager
+   - Only authorized admins can decrypt
+
+---
+
+## 5. StudioSession Collection
+
+**Purpose**: User booking history for studio sessions (both live and individual bookings).
+
+### Schema Definition
+
+| Field              | Type          | Required | Description                      |
+| ------------------ | ------------- | -------- | -------------------------------- |
+| `userId`           | String        | Yes      | Reference to User collection     |
+| `lastReminderSent` | Date          | No       | Last booking reminder timestamp  |
+| `sessions`         | Array[Object] | Yes      | Booking records (see sub-schema) |
+
+### Session Sub-Schema
+
+| Field               | Type          | Required | Default      | Description                                       |
+| ------------------- | ------------- | -------- | ------------ | ------------------------------------------------- |
+| `sessionId`         | String        | Yes      | -            | Unique session identifier                         |
+| `sessionTitle`      | String        | Yes      | -            | Session/class name                                |
+| `studioId`          | String        | Yes      | -            | Reference to Studio                               |
+| `studioName`        | String        | No       | -            | Denormalized studio name                          |
+| `ownerId`           | String        | Yes      | -            | Reference to StudioOwnerProfile                   |
+| `category`          | String        | Yes      | -            | Activity category (e.g., "Yoga", "Dance")         |
+| `sessionStartTime`  | Date          | Yes      | -            | Session start timestamp                           |
+| `sessionEndTime`    | Date          | Yes      | -            | Session end timestamp                             |
+| `sessionTimeSlot`   | String        | Yes      | -            | Formatted time slot (e.g., "10:00 AM - 11:00 AM") |
+| `sessionType`       | String (enum) | Yes      | -            | "Group" \| "Individual"                           |
+| `participantsEmail` | Array[String] | No       | []           | Confirmed attendee emails                         |
+| `invitedEmail`      | Array[String] | No       | []           | Invited user emails                               |
+| `bookedSeats`       | Number        | Yes      | -            | Number of seats booked                            |
+| `seats`             | Number        | Yes      | -            | Total available seats                             |
+| `discountAmount`    | Number        | No       | 0            | Discount in currency                              |
+| `discountRate`      | Number        | No       | 0            | Discount percentage                               |
+| `tax`               | Number        | Yes      | -            | Tax amount                                        |
+| `total`             | Number        | Yes      | -            | Subtotal before tax                               |
+| `grandTotal`        | Number        | Yes      | -            | Total after tax                                   |
+| `finalAmount`       | Number        | No       | 0            | Amount after discounts                            |
+| `bookedAt`          | Date          | No       | `Date.now()` | Booking timestamp                                 |
+| `paymentMode`       | String        | Yes      | -            | Payment method (e.g., "Razorpay", "PayPal")       |
+| `orderId`           | String        | No       | -            | Payment gateway order ID                          |
+| `transactionId`     | String        | Yes      | -            | Payment transaction ID                            |
+| `hasUserAttended`   | Boolean       | No       | false        | Attendance flag                                   |
+| `isSessionFree`     | Boolean       | No       | false        | Free session indicator                            |
+| `status`            | String        | Yes      | "UPCOMING"   | Booking status (enum at app level)                |
+| `requestPayment`    | Boolean       | No       | false        | Payment request flag                              |
+| `requestedDate`     | Date          | No       | -            | Payment request timestamp                         |
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{ "sessions.sessionId": 1 } // Lookup specific booking
+{ userId: 1, "sessions.studioId": 1 } // User bookings at studio
+{ "sessions.ownerId": 1 } // Owner's all bookings
+{ "sessions.sessionId": 1, "sessions.status": 1 } // Booking status queries
+{ "sessions.sessionStartTime": 1 } // Upcoming sessions
+{ "sessions.sessionEndTime": 1 } // Past sessions
+{ "sessions.ownerId": 1, "sessions.sessionStartTime": 1 } // Owner dashboard
+```
+
+**Index Purposes**:
+
+- Session-level indexes support fast booking lookups and status filtering
+- Time-based indexes enable calendar views and reminder systems
+- Compound indexes optimize dashboard queries
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `sessionId`
+- `bookedAt`
+- `transactionId`
+
+**Mutable Fields**:
+
+- `status` (UPCOMING → COMPLETED → CANCELLED)
+- `hasUserAttended` (marked by owner post-session)
+- `requestPayment`, `requestedDate` (payment flow)
+
+---
+
+## 6. Studio Profile Session Collection
+
+**Purpose**: Active authentication sessions for studio owners (JWT tokens and device info).
+
+### Schema Definition
+
+| Field          | Type   | Required | Default      | Description                     |
+| -------------- | ------ | -------- | ------------ | ------------------------------- |
+| `ownerId`      | String | Yes      | -            | Reference to StudioOwnerProfile |
+| `phone`        | Number | No       | -            | Phone number used for login     |
+| `userAgent`    | String | No       | -            | Browser/device user agent       |
+| `authToken`    | String | Yes      | -            | Session authentication token    |
+| `accessToken`  | String | Yes      | -            | Short-lived access token        |
+| `refreshToken` | String | Yes      | -            | Long-lived refresh token        |
+| `JWT_Token`    | String | Yes      | -            | JWT for API authentication      |
+| `createdAt`    | Date   | No       | `Date.now()` | Session creation time           |
+| `fcmToken`     | String | No       | -            | Firebase Cloud Messaging token  |
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{
+  ownerId: 1;
+} // Lookup sessions by owner
+```
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `ownerId`
+- `createdAt`
+
+**Mutable Fields**:
+
+- `accessToken`, `refreshToken` (token refresh flow)
+- `fcmToken` (updated when user changes device)
+
+### Business Rules
+
+1. **Session Expiry**: Access tokens expire in 1 hour, refresh tokens in 30 days
+2. **Multi-Device**: Multiple sessions allowed (one per device)
+3. **Logout**: Session record deleted on explicit logout
+
+---
+
+## 7. Studio Collection
+
+**Purpose**: Studio venue profiles, location data, services, and operational details.
+
+### Schema Definition
+
+| Field                | Type            | Required | Default    | Description                            |
+| -------------------- | --------------- | -------- | ---------- | -------------------------------------- |
+| `studioId`           | String          | Yes      | -          | Unique studio identifier               |
+| `name`               | String          | Yes      | -          | Studio name                            |
+| `studioType`         | Array[String]   | Yes      | -          | Categories (e.g., ["Yoga", "Pilates"]) |
+| `aboutStudio`        | String          | Yes      | -          | Studio description                     |
+| `address`            | Object          | No       | -          | Location details (see sub-schema)      |
+| `images`             | Array[String]   | No       | []         | S3 URLs for studio photos              |
+| `keys`               | Array[String]   | No       | []         | S3 object keys for images              |
+| `dayAvailability`    | Array[String]   | No       | []         | Operating days (e.g., ["Mon", "Tue"])  |
+| `operationalTime`    | Array[Object]   | No       | []         | Time slots per day                     |
+| `allTimeSlots`       | Array[String]   | No       | []         | All available time slots               |
+| `services`           | Array[String]   | No       | []         | Services offered                       |
+| `amenities`          | Array[String]   | No       | []         | Facilities (e.g., "Shower", "Parking") |
+| `currency`           | String          | No       | "INR"      | Pricing currency                       |
+| `pricePerHour`       | Number          | No       | 0          | Base hourly rate                       |
+| `priceAfterDiscount` | Number          | No       | 0          | Discounted price                       |
+| `isCoupon`           | Boolean         | No       | false      | Coupon active flag                     |
+| `discountRate`       | Number          | No       | 0          | Discount percentage (max 100)          |
+| `discountCoupon`     | String          | No       | "N/A"      | Coupon code                            |
+| `taxRate`            | Number          | No       | 18         | Tax percentage                         |
+| `shares`             | Number          | No       | 0          | Share count                            |
+| `sharedUsers`        | Array[String]   | No       | []         | Users who shared                       |
+| `reportedUsers`      | Array[String]   | No       | []         | Users who reported                     |
+| `freeTrial`          | Boolean         | No       | false      | Free trial availability                |
+| `status`             | String (enum)   | No       | "Inactive" | Operational status                     |
+| `state`              | String (enum)   | No       | "Draft"    | Verification state                     |
+| `rules`              | Array[String]   | No       | []         | Studio rules/policies                  |
+| `totalShares`        | Number          | No       | 0          | Total share count                      |
+| `ownerId`            | String          | No       | -          | Reference to StudioOwnerProfile        |
+| `certificateId`      | Array[ObjectId] | No       | []         | Certifications                         |
+| `checkinTime`        | Date            | No       | -          | Default check-in time                  |
+| `checkoutTime`       | Date            | No       | -          | Default check-out time                 |
+| `reviewIds`          | Array[String]   | No       | []         | References to Review collection        |
+| `thumbnailMediaId`   | Array[String]   | No       | []         | Featured media IDs                     |
+| `createdAt`          | Date            | Auto     | -          | Creation timestamp                     |
+| `updatedAt`          | Date            | Auto     | -          | Last update timestamp                  |
+
+### Enum Values
+
+**status**: `"Active"` \| `"Inactive"`
+
+**state**: `"Verified"` \| `"Under Review"` \| `"Denied"` \| `"Draft"`
+
+**dayAvailability**: `"Mon"` \| `"Tue"` \| `"Wed"` \| `"Thu"` \| `"Fri"` \| `"Sat"` \| `"Sun"`
+
+### Address Sub-Schema
+
+| Field                  | Type          | Description              |
+| ---------------------- | ------------- | ------------------------ |
+| `locality`             | String        | Neighborhood/area        |
+| `city`                 | String        | City name                |
+| `pincode`              | Number        | Postal code              |
+| `areaDescription`      | String        | Landmark description     |
+| `geometry.type`        | String        | Always "Point" (GeoJSON) |
+| `geometry.coordinates` | Array[Number] | [longitude, latitude]    |
+
+### Constraints & Indexes
+
+**Unique Constraints**:
+
+- `studioId` (unique index)
+
+**Indexes**:
+
+```typescript
+{ "address.geometry": "2dsphere" } // Geospatial queries
+{ studioId: 1 } // Unique - primary lookup
+{ ownerId: 1, state: 1, status: 1 } // Owner's studios filtered
+{ state: 1, status: 1, "address.geometry": "2dsphere" } // Map search
+```
+
+**Index Purposes**:
+
+- `2dsphere`: Location-based searches (e.g., "studios within 5km")
+- `ownerId + state + status`: Owner dashboard filtering
+- Compound geospatial: "Active verified studios near me"
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `studioId`
+- `createdAt`
+
+**Mutable Fields**:
+
+- All profile data (name, description, images, pricing)
+- `state` (workflow transitions)
+- `status` (owner can activate/deactivate)
+
+**Conditionally Mutable**:
+
+- `address.geometry`: Only changeable in "Draft" state (requires re-verification after)
+
+### Business Rules
+
+1. **State Transitions**:
+
+   - Draft → Under Review (owner submits)
+   - Under Review → Verified/Denied (admin review)
+   - Verified → Denied (policy violation)
+
+2. **Discount Validation**: `discountRate` cannot exceed 100%
+
+---
+
+## 8. Studio Comment Collection
+
+**Purpose**: Admin internal comments and notes on sessions, bookings, and KYC submissions.
+
+### Schema Definition
+
+| Field                  | Type                | Required | Description                               |
+| ---------------------- | ------------------- | -------- | ----------------------------------------- |
+| `sessionId`            | String              | Yes      | Reference to StudioLiveSession or booking |
+| `reviewComments`       | Array[CommentEntry] | No       | Admin review notes                        |
+| `refundComments`       | Array[CommentEntry] | No       | Refund processing notes                   |
+| `rejectionComments`    | Array[CommentEntry] | No       | Rejection reasons                         |
+| `approvalComments`     | Array[CommentEntry] | No       | Approval notes                            |
+| `paymentComments`      | Array[CommentEntry] | No       | Payment issue notes                       |
+| `cancelledComments`    | Array[CommentEntry] | No       | Cancellation notes                        |
+| `kycApprovalComments`  | Array[CommentEntry] | No       | KYC approval notes                        |
+| `kycRejectionComments` | Array[CommentEntry] | No       | KYC rejection reasons                     |
+
+### CommentEntry Sub-Schema
+
+| Field       | Type    | Required | Default      | Description         |
+| ----------- | ------- | -------- | ------------ | ------------------- |
+| `comment`   | String  | Yes      | -            | Comment text        |
+| `adminId`   | String  | Yes      | -            | Admin who posted    |
+| `isVisible` | Boolean | Yes      | true         | Visibility to owner |
+| `lock`      | Boolean | No       | false        | Edit lock flag      |
+| `date`      | Date    | Yes      | `Date.now()` | Comment timestamp   |
+
+### Constraints & Indexes
+
+**Unique Constraints**:
+
+- `sessionId` (unique index)
+
+**Indexes**:
+
+```typescript
+{
+  sessionId: 1;
+} // Unique - comment lookup by session
+```
+
+### Field Mutability
+
+**Immutable Fields**:
+
+- `sessionId`
+- Individual comments (append-only within arrays)
+
+**Mutable Fields**:
+
+- New comments can be added to arrays
+- `isVisible` can be toggled
+
+---
+
+## 9. BookedSlot Collection
+
+**Purpose**: Time slot reservations to prevent double-booking for studio owners.
+
+### Schema Definition
+
+| Field       | Type          | Required | Description                        |
+| ----------- | ------------- | -------- | ---------------------------------- |
+| `ownerId`   | String        | Yes      | Reference to StudioOwnerProfile    |
+| `slots`     | Array[Object] | Yes      | Booked time slots (see sub-schema) |
+| `createdAt` | Date          | Auto     | Creation timestamp                 |
+| `updatedAt` | Date          | Auto     | Last update timestamp              |
+
+### Slot Sub-Schema
+
+| Field         | Type          | Required | Description                |
+| ------------- | ------------- | -------- | -------------------------- |
+| `date`        | Date          | Yes      | Booking date               |
+| `startTime`   | Date          | Yes      | Slot start time            |
+| `endTime`     | Date          | Yes      | Slot end time              |
+| `sessionId`   | String        | Yes      | Reference to session       |
+| `sessionType` | String (enum) | Yes      | "LiveSession" \| "Booking" |
+
+### Constraints & Indexes
+
+**Indexes**:
+
+```typescript
+{ ownerId: 1 } // Owner's all bookings
+{ ownerId: 1, "slots.date": 1 } // Owner's bookings on date
+{ ownerId: 1, "slots.sessionId": 1 } // Specific session lookup
+{ "slots.date": 1, "slots.startTime": 1, "slots.endTime": 1 } // Time range queries
+```
+
+**Index Purposes**:
+
+- Prevent double-booking by checking overlapping time ranges
+- Support calendar views and availability checks
+
+### Field Mutability
+
+**Immutable Fields**: All slot fields (slots are append-only)
+
+**Business Rules**:
+
+1. **No Overlaps**: System validates no time slot overlaps before insertion
+2. **Auto-Cleanup**: Past slots can be archived after session completion
+
+---
+
+## 10. Studio Live Session Collection
+
+**Purpose**: Live class/session listings created by studio owners for group or individual bookings.
+
+### Schema Definition
+
+| Field              | Type          | Required | Default    | Description                        |
+| ------------------ | ------------- | -------- | ---------- | ---------------------------------- |
+| `sessionId`        | String        | No       | -          | Unique session identifier          |
+| `sessionName`      | String        | No       | -          | Session/class name                 |
+| `description`      | String        | No       | -          | Session description                |
+| `state`            | String (enum) | No       | "Draft"    | Lifecycle state                    |
+| `stage`            | String (enum) | No       | "Create"   | Workflow stage                     |
+| `status`           | String (enum) | No       | "Inactive" | Operational status                 |
+| `sessionType`      | String        | No       | -          | Activity type (e.g., "Yoga Class") |
+| `studioId`         | String        | No       | -          | Reference to Studio                |
+| `address`          | String        | No       | null       | Session location                   |
+| `sessionLink`      | String        | No       | null       | Virtual session link               |
+| `category`         | String        | No       | null       | Activity category                  |
+| `sessionLevel`     | String        | No       | null       | Difficulty level                   |
+| `focusArea`        | Array[String] | No       | null       | Target body areas                  |
+| `thumbnail`        | String        | No       | null       | S3 URL for thumbnail               |
+| `thumbnailMediaId` | String        | No       | null       | Reference to MediaManagement       |
+| `key`              | String        | No       | null       | S3 object key                      |
+| `intensity`        | String        | No       | null       | Workout intensity                  |
+| `calories`         | String        | No       | null       | Estimated calories burned          |
+| `equipment`        | String        | No       | null       | Required equipment                 |
+| `sessionStartTime` | Date          | No       | null       | Start timestamp                    |
+| `sessionEndTime`   | Date          | No       | null       | End timestamp                      |
+| `timeSlot`         | String        | No       | null       | Formatted time slot                |
+| `duration`         | String        | No       | null       | Session duration                   |
+| `seats`            | Number        | No       | null       | Total available seats              |
+| `bookedSeats`      | Number        | No       | 0          | Currently booked seats             |
+| `studioOwnerId`    | String        | Yes      | -          | Reference to StudioOwnerProfile    |
+| `likes`            | Number        | No       | 0          | User likes count                   |
+| `shares`           | Number        | No       | 0          | Share count                        |
+| `isCoupon`         | Boolean       | No       | false      | Coupon availability                |
+| `freeTrial`        | Boolean       | No       | false      | Free trial flag                    |
+| `report`           | Boolean       | No       | false      | Reported flag                      |
+| `bookingType`      | String (enum) | No       | -          | "Group" \| "Individual"            |
+| `price`            | Number        | No       | -          | Session price                      |
+| `discountRate`     | Number        | No       | 0          | Discount percentage                |
+| `taxRate`          | Number        | No       | 18         | Tax percentage                     |
+| `assignedTo`       | String        | No       | -          | Assigned reviewer                  |
+| `reviewer`         | String        | No       | -          | Current reviewer                   |
+| `approver`         | String        | No       | -          | Admin approver                     |
+| `lastReminderSent` | Date          | No       | null       | Last reminder timestamp            |
+| `participants`     | Array[String] | No       | []         | Booked user IDs                    |
+| `cancelledUsers`   | Array[String] | No       | []         | Users who cancelled                |
+| `reportedUsers`    | Array[String] | No       | []         | Users who reported                 |
+| `sharedUsers`      | Array[String] | No       | []         | Users who shared                   |
+| `attendance`       | Number        | No       | 0          | Attendance count (min: 0)          |
+| `createdBy`        | String        | No       | -          | Creator ID                         |
+| `createdByName`    | String        | No       | -          | Creator name                       |
+| `cancelledBy`      | String        | No       | -          | Who                                |

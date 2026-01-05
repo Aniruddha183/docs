@@ -1,0 +1,57 @@
+---
+title: "Architecture: Live Sessions & Bookings"
+description: "Technical structure, data flow, and integration patterns for Studio App's session management."
+---
+
+## Overview
+
+The Studio Management module is built on a Node.js/Express backend, utilizing a RESTful architecture to bridge the gap between Studio Owners, Admin Reviewers, and End Users.
+
+## System Components
+
+### 1. Middleware Layer
+
+- **`authenticateStudioToken()`**: A centralized security layer.
+  - Validates the `genToken` header (JWT).
+  - Hydrates the request object with `ownerId` and studio context.
+  - Ensures only verified and active studio owners can access management APIs.
+
+### 2. Data Persistence Layer
+
+- **Primary Database**: MongoDB (for session metadata, booking history, and comments).
+- **Blob Storage**: Amazon S3.
+  - Used for storing session thumbnails.
+  - Logic: When a thumbnail is updated via `POST /LS/create`, the system automatically replaces the old object in S3 using the provided `key`.
+
+### 3. Slot Management Engine
+
+This is a dedicated utility within the architecture that prevents resource conflict.
+
+- **Auto-Slotting**: Every time a session is "Approved" or "Created," the system creates an entry in a `BookedSlots` collection.
+- **Conflict Detection**: Before any `POST` or `PATCH` operation, the engine validates the `sessionDate`, `sessionTime`, and `duration` against existing slots for that specific `ownerId` or `studioId`.
+
+## API Categorization
+
+The module is divided into two distinct logical controllers:
+
+| Category               | Base URL Prefix | Key Responsibility                              |
+| :--------------------- | :-------------- | :---------------------------------------------- |
+| **Live Sessions (LS)** | `/LS/`          | Owner-created fitness content (Online/Offline). |
+| **Studio Bookings**    | `/booking/`     | User-initiated offline facility reservations.   |
+
+## Data Flow Diagram
+
+1. **Input**: Owner submits session data via mobile app (3-step form).
+2. **Validation**: Middleware checks Auth -> Controller checks Slot Availability -> Schema validates required fields.
+3. **State Management**: Data is saved as `Draft` until the `sendForReview` trigger.
+4. **Admin Interaction**: Admin updates the document with meeting links and pricing via the Admin Panel.
+5. **Output**: Approved sessions are indexed for the End User app.
+
+## Error Handling Standards
+
+- **400**: Validation/Business logic errors (e.g., Slot Unavailable).
+- **404**: Resource missing (e.g., Session/Studio not found).
+- **409**: Conflict (e.g., Account deleted/deactivated).
+- **500**: Unhandled server exceptions.
+
+---
