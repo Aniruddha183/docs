@@ -1,0 +1,186 @@
+---
+title: "Blog Architecture"
+description: "Complete Architecture for Blog module."
+---
+
+# Blog Module Architecture
+
+## Overview
+The Blog module is a comprehensive platform that enables users to share stories, experiences, and tips through the FitnEarn website. The architecture supports three distinct user types (website users, coach app users, and admin users) with a robust review and approval workflow.
+
+---
+
+## User Types and Roles
+
+### 1. Website Users (Standard Users)
+- Can create, edit, and submit blogs
+- Can view published blogs
+- Can like, comment, and report blogs (when authenticated)
+- Can share blogs with others
+
+### 2. Coach Users
+- Similar capabilities to standard users
+- Access through coach app
+- Can create and submit blogs following the same workflow
+
+### 3. Admin Users
+- Access to blog management panel
+- Perform review and approval actions
+- Two-tier review system: Reviewer (Stage 1) and Approver (Stage 2)
+- Analytics and reporting capabilities
+
+---
+
+## Core Architecture Components
+
+### 1. Blog Creation Flow
+- **Draft Creation**: Users can save blog progress with minimal required fields (title, description, thumbnail, tags)
+- **Rich Text Editor**: Supports content formatting and image uploads
+- **S3 Integration**: Images uploaded to S3 with public URLs stored in records
+- **BlogImage Model**: Tracks images associated with each blog for cleanup purposes
+
+### 2. Review and Approval Workflow
+
+#### Stage 1: Reviewer Process
+- **Mandatory Validation**: Reviewer validates all fields are filled and guidelines followed
+- **Edit Capability**: Reviewers can edit blog content fields
+- **Comment System**: Reviewers add feedback comments
+- **Save & Return**: Option to save comments and return later
+- **Transition Control**: Mandatory reviewer comment and assigned approver required for stage advancement
+
+#### Stage 2: Approver Process
+- **Dual Review**: Approver reviews both blog content and reviewer's comment
+- **Minor Edit Capability**: Approver can make minor fixes to blog fields
+- **Save & Return**: Option to save comments and return later
+- **Final Decision**: Approve or reject with reason
+- **State Management**: Rejected blogs return to author with denial reason
+
+### 3. Content States
+- **Draft**: Incomplete blog saved by user
+- **Under Review**: Sent for Stage 1 review
+- **Under Approval**: Sent for Stage 2 approval
+- **Denied**: Rejected by approver
+- **Published**: Approved and visible to public
+
+### 4. Access Control
+- **Guest Users**: Read-only access to published blogs
+- **Authenticated Users**: Full interaction capabilities (like, comment, report)
+- **Admin Authentication**: Token-based validation using `authenticatedAdminToken` middleware
+
+---
+
+## Data Models
+
+### 1. Blog Model
+- `blogId`: Unique identifier
+- `title`, `description`, `tags`
+- `thumbnailUrl`, `thumbnailKey`
+- `content`: Rich text content
+- `authorId`, `authorType`: User, Coach, or Admin
+- `state`: Draft, Under Review, Under Approval, Denied, Published
+- `reviewerId`, `approverId`
+- `createdAt`, `updatedAt`, `publishedAt`
+- `analytics`: Views, likes, comments, shares, reports
+
+### 2. BlogReview Model
+- `blogId`: Reference to blog
+- `reviewer`: Stage 1 review data
+- `approver`: Stage 2 review data
+- `stage`: Current workflow stage
+- `lock`: Review/approval finalization status
+
+### 3. BlogImage Model
+- `blogId`: Reference to blog
+- `imageUrls`: Array of image URLs associated with blog
+- `createdAt`: Timestamp for cleanup tracking
+
+### 4. BlogComment Model
+- `blogId`: Reference to blog
+- `commentId`: Unique identifier
+- `authorId`, `authorType`
+- `content`: Comment text
+- `parentId`: For nested replies
+- `isDeleted`: Soft delete flag
+- `createdAt`, `updatedAt`
+
+### 5. BlogLike Model
+- `blogId`: Reference to blog
+- `userId`: User who liked
+- `isLiked`: Like/unlike state
+- `createdAt`
+
+### 6. BlogReport Model
+- `blogId` or `commentId`: Reference to reported content
+- `reporterId`: User who reported
+- `reason`: Report category
+- `description`: Additional details
+- `status`: Pending, Resolved, Dismissed
+
+---
+
+## Core Operations
+
+### 1. User Blog Operations
+- **Create New Blog Draft**: Allows authenticated users to create a new blog draft by providing minimal required information such as title, description, thumbnail image, and tags. This operation initializes a blog with 'Draft' state.
+- **Update Blog Content**: Enables users to modify their blog content, including title, description, content body, images, and other metadata. Users can save changes as they work or save and exit to continue later.
+- **Submit for Review**: Allows users to submit their completed blog for the admin review process. This transitions the blog from 'Draft' to 'Under Review' state and assigns it to a reviewer admin.
+- **View Blog Details**: Provides functionality to retrieve and display complete blog information including content, metadata, author information, and engagement metrics.
+- **List Published Blogs**: Enables users to browse and search through published blogs on the platform, with filtering and sorting capabilities.
+
+### 2. Coach Operations
+- **Create New Blog Draft**: Allows coach users to create a new blog draft by providing minimal required information such as title, description, thumbnail image, and tags. This operation initializes a blog with 'Draft' state.
+- **Update Blog Content**: Enables coaches to modify their blog content, including title, description, content body, images, and other metadata. Coaches can save changes as they work or save and exit to continue later.
+- **Submit for Review**: Allows coaches to submit their completed blog for the admin review process. This transitions the blog from 'Draft' to 'Under Review' state and assigns it to a reviewer admin.
+- **View Blog Details**: Provides functionality to retrieve and display complete blog information including content, metadata, author information, and engagement metrics.
+- **List Published Blogs**: Enables coaches to browse and search through published blogs on the platform, with filtering and sorting capabilities.
+
+### 3. Interaction Operations
+- **Blog Liking System**: Allows authenticated users to like or unlike blogs, maintaining a record of user preferences and contributing to blog engagement metrics. The system tracks like/unlike states to prevent duplicate actions.
+- **Commenting System**: Enables authenticated users to add comments to blogs, including the ability to reply to other comments in a threaded discussion format. Supports comment editing and deletion within time limits.
+- **Blog Reporting System**: Provides authenticated users with the ability to report blogs that violate community guidelines, with various reason categories and the ability to provide additional context for admin review.
+- **Comment Reporting System**: Allows users to report individual comments that are inappropriate or violate community standards, with similar categorization and context options.
+
+### 4. Admin Operations
+- **Reviewer Review Process**: Enables reviewer admins to examine submitted blogs, validate content against guidelines, edit fields as needed, and provide feedback comments. Reviewers can save draft comments and return later before finalizing.
+- **Approver Approval Process**: Allows approver admins to conduct the second-stage review, examining both the blog content and the reviewer's comments. Approvers can make minor edits, approve for publication, or reject with reasons.
+- **Reviewer Queue Management**: Provides reviewer admins with a prioritized list of blogs awaiting their review, with filtering and search capabilities to manage their workload efficiently.
+- **Approver Queue Management**: Offers approver admins a list of blogs ready for stage 2 approval, allowing them to track and manage the final approval workflow.
+- **Blog Analytics Dashboard**: Provides admin users with comprehensive analytics for individual blogs, including view counts, like metrics, comment engagement, share statistics, and report history to understand blog performance and user interaction.
+- **Comment Moderation**: Enables admin users to delete inappropriate comments from blogs, with audit trails to track moderation actions. Admins can also add warning comments to educate users about community guidelines.
+- **Report Management Interface**: Presents admin users with a comprehensive list of all reports submitted by users, including blog reports and comment reports, with filtering and prioritization options.
+- **Report Resolution System**: Allows admin users to update the status of reports (resolve, dismiss, escalate) and take appropriate actions based on the nature of each report, with detailed logging of all administrative decisions.
+
+---
+
+## Security & Validation
+
+### 1. Authentication Middleware
+- `authenticatedAdminToken`: Validates admin permissions
+- User session validation for authenticated actions
+
+### 2. Image Management
+- S3 upload with proper security policies
+- Image cleanup when blog content changes
+- Prevents stale data accumulation
+
+### 3. Content Moderation
+- Two-stage review process
+- Report system for user-generated content
+- Admin oversight for all published content
+
+---
+
+## Analytics & Reporting
+
+### 1. Blog Metrics
+- Views, likes, shares, comments
+- Report counts and types
+- Engagement statistics
+
+### 2. Admin Dashboard
+- Published blog analytics
+- Report management interface
+- Review queue management
+- User interaction tracking
+
+This architecture ensures a robust, scalable, and secure blog platform that supports the complex review workflow while maintaining content quality and user engagement.

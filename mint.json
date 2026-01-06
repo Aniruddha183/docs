@@ -207,10 +207,10 @@
           ]
         },
         {
-          "group": "Live Session Module",
+          "group": "Coach Live Session Module",
           "pages": [
-            "backend/modules/coach/overview",
-            "backend/liveSession-db-schema",
+            "backend/architecture/live-session-architecture",
+            "backend/DB-Schema/liveSession-db-schema",
 
             {
               "group": "Website",
@@ -261,8 +261,8 @@
         {
           "group": "Blog Module",
           "pages": [
-            "backend/modules/coach/overview",
-            "backend/blog-db-schema",
+            "backend/architecture/blog-architecture",
+            "backend/DB-Schema/blog-db-schema",
 
             {
               "group": "Admin Panel",

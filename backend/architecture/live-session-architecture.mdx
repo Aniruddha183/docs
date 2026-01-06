@@ -1,0 +1,200 @@
+---
+title: "Coach Live Session Architecture"
+description: "Complete Architecture for Coach Live Session module."
+---
+
+# Coach Live Session Module Architecture
+
+## Overview
+The Coach Live Session module enables onboarded and verified coaches to conduct paid group sessions on the FitnEarn platform. The architecture supports coaches in creating, submitting, and conducting live sessions, with a robust admin review process before sessions go live. The system includes payment processing, booking management, and analytics for both coaches and admin users.
+
+---
+
+## User Types and Roles
+
+### 1. Coach Users
+- Create and manage live sessions
+- Submit sessions for admin review
+- Conduct live sessions
+- Request payment after session completion
+- Subject to cancellation limits (max 3 cancellations)
+
+### 2. Authenticated Users
+- Browse and book live sessions
+- Make payments for sessions
+- Join sessions at scheduled time
+- Cancel bookings within policy
+- Access booking history
+
+### 3. Admin Users
+- Create live session and assign to a verified coach
+- Perform review and approval actions (two-stage process)
+- Set session details (link, price, seats, discounts)
+- Manage session analytics
+- Process coach payments via Razorpay
+- Manage user refunds
+- Monitor coach compliance
+
+---
+
+## Core Architecture Components
+
+### 1. Session Creation Flow
+- **Coach Session Creation**: Coaches create live sessions via the coach app
+- **Review Submission**: Sessions sent for admin review with 48-hour minimum advance notice
+- **Two-Stage Approval**: Reviewer and Approver admin validation process
+- **Mandatory Details**: Approver admin must provide session link, price, seats, and discount percentage(applied on original base price for all users subscriptions)
+
+### 2. Review and Approval Workflow
+
+#### Stage 1: Reviewer Process
+- **Content Validation**: Reviewer validates session details and compliance
+- **Edit Capability**: Reviewers can edit session content fields
+- **Comment System**: Reviewers add feedback comments
+- **Save & Return**: Option to save comments and return later
+- **Transition Control**: Mandatory reviewer comment required for stage advancement
+
+#### Stage 2: Approver Process
+- **Dual Review**: Approver reviews session content and reviewer's comment
+- **Mandatory Details**: Approver must provide session link, price, seats, and discount
+- **Final Decision**: Approve or reject with reason
+- **State Management**: Rejected sessions return to coach with denial reason
+
+### 3. Payment and Pricing System
+- **Base Pricing**: Derived from coach user agreement
+- **Discount Application**: Admin discount applied to base price
+- **Subscription Tiers**: Additional discount for premium users
+- **GST Calculation**: Applied to final price before payment
+- **Razorpay Integration**: Payment facilitation via Razorpay
+
+### 4. Booking and Session Management
+- **Seat Management**: Available seat counter decremented on booking
+- **User Booking Record**: Added to UserBookedSession model
+- **Join Access**: Users can join from bookings tab or workouts page
+- **Cancellation Policy**: Admin-defined policy for refunds
+- **Session History**: Past bookings accessible to users
+
+### 5. Access Control
+- **Guest Users**: No access to live sessions
+- **Authenticated Users**: Full booking and participation capabilities
+- **Admin Authentication**: Token-based validation using admin middleware
+- **Coach Verification**: Only verified coaches can create sessions
+
+---
+
+## Data Models
+
+### 1. PublicSession Model
+- `sessionId`: Unique identifier
+- `coachId`: Reference to coach
+- `title`, `description`, `category`
+- `startTime`, `endTime`: Session timing
+- `sessionLink`: Link for joining the session
+- `price`: Base price for the session
+- `maxSeats`, `availableSeats`: Capacity management
+- `discountPercent`: Admin-applied discount
+- `state`: Draft, Under Review, Under Approval, Denied, Approved, Completed, Cancelled
+- `reviewerId`, `approverId`
+- `createdAt`, `updatedAt`, `publishedAt`
+- `meta`: Additional session metadata
+
+### 2. UserBookedSession Model
+- `bookingId`: Unique identifier
+- `userId`: Reference to user
+- `sessionId`: Reference to session
+- `bookingStatus`: Confirmed, Cancelled, Completed
+- `paymentId`: Reference to payment record
+- `bookingTime`: Timestamp of booking
+- `cancelTime`: Timestamp if cancelled
+- `refundStatus`: Pending, Processed, Declined
+- `createdAt`, `updatedAt`
+
+### 3. UserBooking Model
+- `paymentId`: Unique identifier
+- `userId`: Reference to user
+- `sessionId`: Reference to session
+- `basePrice`, `discountedPrice`, `finalPrice`: Pricing details
+- `gstAmount`: GST applied
+- `totalAmount`: Final payment amount
+- `paymentStatus`: Pending, Success, Failed, Refunded
+- `paymentMethod`: Payment method used
+- `razorpayOrderId`, `razorpayPaymentId`: Razorpay references
+- `createdAt`, `updatedAt`
+
+### 4. AdminLiveSessionReview Model
+- `sessionId`: Reference to session
+- `reviewer`: Stage 1 review data
+- `approver`: Stage 2 review data
+- `stage`: Current workflow stage
+- `lock`: Review/approval finalization status
+- `participants`: array of enrolled users userID
+- `attendedUsers`: array of attended users
+- `likes`, `shares`: Engagement metrics
+- `reports`: Count of reports
+- `feedback`: User feedback data
+- `createdAt`, `updatedAt`
+
+---
+
+## Core Operations
+
+### 1. Coach Operations
+- **Create Live Session**: Allows coaches to create a new live session by providing details such as title, description, category, start/end time, and other session parameters. Session must be scheduled at least 48 hours in advance.
+- **Submit for Review**: Enables coaches to submit their completed session for the admin review process. This transitions the session from 'Draft' to 'Under Review' state and assigns it to a reviewer admin.
+- **Update Session Details**: Allows coaches to modify their session content before approval, including title, description, timing, and other parameters.
+- **Request Coach Payment**: After session completion, coaches can request payment from the admin panel for their conducted sessions.
+- **View Session Analytics**: Provides coaches with access to basic metrics about their sessions, including bookings and user engagement.
+
+### 2. User Operations
+- **Browse Live Sessions**: Enables authenticated users to view available live sessions with filtering and sorting capabilities, including price, category, and timing.
+- **View Session Details**: Provides functionality to retrieve and display complete session information including title, description, coach details, pricing, and available seats.
+- **Book Session**: Allows users to reserve a spot in a live session, process payment via Razorpay, and add the session to their booking record.
+- **Join Session**: Enables users to join the live session at the scheduled time from their bookings tab or workouts page.
+- **Cancel Booking**: Allows users to cancel their session booking within the defined cancellation policy, with potential for refund based on timing.
+
+### 3. Admin Operations
+- **Reviewer Review Process**: Enables reviewer admins to examine submitted sessions, validate content against guidelines, edit fields as needed, and provide feedback comments. Reviewers can save draft comments and return later before finalizing.
+- **Approver Approval Process**: Allows approver admins to conduct the second-stage review, examining both the session content and the reviewer's comments. Approvers must provide mandatory details: session link, price, number of seats, and discount percentage.
+- **Reviewer Queue Management**: Provides reviewer admins with a prioritized list of sessions awaiting their review, with filtering and search capabilities to manage their workload efficiently.
+- **Approver Queue Management**: Offers approver admins a list of sessions ready for stage 2 approval, allowing them to track and manage the final approval workflow.
+- **Session Analytics Dashboard**: Provides admin users with comprehensive analytics for individual sessions, including enrollment counts, attendance, engagement metrics, and revenue data.
+- **Coach Payment Processing**: Enables admin users to process payments to coaches via Razorpay, including verification of coach bank details through Razorpay's contact and fund account APIs.
+- **User Refund Management**: Allows admin users to initiate refunds to users when sessions are cancelled or other refund scenarios occur.
+- **Session Cancellation**: Provides admin users with the ability to cancel sessions when necessary, triggering user notifications and potential refund processes.
+
+---
+
+## Security & Validation
+
+### 1. Authentication Middleware
+- Coach verification for session creation
+- User authentication for booking and joining sessions
+- Admin authentication for review and approval actions
+
+### 2. Business Logic Validation
+- 48-hour advance notice requirement for session creation
+- Coach cancellation limits (max 3 cancellations)
+- Pricing and discount validation
+- Seat availability checks
+
+### 3. Payment Security
+- Razorpay integration for secure payment processing
+- GST calculation and compliance
+- Bank account verification for coach payouts
+
+---
+
+## Analytics & Reporting
+
+### 1. Session Metrics
+- User enrollment and attendance counts
+- Engagement metrics (likes, shares)
+- User feedback and reports
+
+### 2. Admin Dashboard
+- Session performance analytics
+- Payment and refund tracking
+- Coach compliance monitoring
+- User booking patterns
+
+This architecture ensures a robust, scalable, and secure live session platform that supports the complex workflow between coaches, users, and admin users while maintaining proper payment processing and user engagement features.
