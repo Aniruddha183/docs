@@ -185,9 +185,7 @@
 
             {
               "group": "Website",
-              "pages": [
-                "backend/Coach/user-auth-routes(Not Prepared)"                        
-              ]
+              "pages": ["backend/Coach/user-auth-routes(Not Prepared)"]
             },
             {
               "group": "Coach App",
@@ -195,14 +193,11 @@
                 "backend/Coach/api-doc-coach-auth-routes",
                 "backend/Coach/coach-profile-api-doc",
                 "backend/Coach/coach-kyc-api-doc"
-
               ]
             },
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/Coach/admin-auth-routes(Not Prepared)"
-              ]
+              "pages": ["backend/Coach/admin-auth-routes(Not Prepared)"]
             }
           ]
         },
@@ -214,21 +209,15 @@
 
             {
               "group": "Website",
-              "pages": [
-                "backend/User/user-live-session-api-doc"        
-              ]
+              "pages": ["backend/User/user-live-session-api-doc"]
             },
             {
               "group": "Coach App",
-              "pages": [
-                "backend/Coach/coach-live-session-api-doc"        
-              ]
+              "pages": ["backend/Coach/coach-live-session-api-doc"]
             },
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-live-session-management"        
-              ]
+              "pages": ["backend/admin-live-session-management"]
             }
           ]
         },
@@ -240,21 +229,15 @@
 
             {
               "group": "Website",
-              "pages": [
-                "backend/User/user-coach-booking-api-doc"        
-              ]
+              "pages": ["backend/User/user-coach-booking-api-doc"]
             },
             {
               "group": "Coach App",
-              "pages": [
-                "backend/Coach/coach-live-session-api-doc"        
-              ]
+              "pages": ["backend/Coach/coach-live-session-api-doc"]
             },
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-coach-booking-management"        
-              ]
+              "pages": ["backend/admin-coach-booking-management"]
             }
           ]
         },
@@ -266,21 +249,15 @@
 
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-blog-management"        
-              ]
+              "pages": ["backend/admin-blog-management"]
             },
             {
               "group": "Website",
-              "pages": [
-                "backend/User/user-blog-api-doc"        
-              ]
+              "pages": ["backend/User/user-blog-api-doc"]
             },
             {
               "group": "Coach App",
-              "pages": [
-                "backend/Coach/coach-blog-api-routes"        
-              ]
+              "pages": ["backend/Coach/coach-blog-api-routes"]
             }
           ]
         },
@@ -292,21 +269,15 @@
 
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-workoutPlan-management"
-              ]
+              "pages": ["backend/admin-workoutPlan-management"]
             },
             {
               "group": "Website",
-              "pages": [
-                "backend/User/user-workout-plan-api-doc(Not Prepared)1"        
-              ]
+              "pages": ["backend/User/user-workout-plan-api-doc(Not Prepared)1"]
             },
             {
               "group": "Coach App",
-              "pages": [
-                "backend/Coach/coach-workoutPlan-api-doc"        
-              ]
+              "pages": ["backend/Coach/coach-workoutPlan-api-doc"]
             }
           ]
         },
@@ -318,15 +289,11 @@
 
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-post-management"
-              ]
+              "pages": ["backend/admin-post-management"]
             },
             {
               "group": "Coach App",
-              "pages": [
-                "backend/Coach/coach-post-api-doc"        
-              ]
+              "pages": ["backend/Coach/coach-post-api-doc"]
             }
           ]
         },
@@ -464,6 +431,57 @@
                     "backend/modules/studio/website/booking/architecture",
                     "backend/modules/studio/website/booking/api-documentation",
                     "backend/modules/studio/website/booking/business-logic"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Store Module",
+          "pages": [
+            "backend/modules/store/overview",
+            "backend/modules/store/database-schema",
+            {
+              "group": "Website",
+              "pages": [
+                {
+                  "group": "Product",
+                  "pages": [
+                    "backend/modules/store/website/product/architecture",
+                    "backend/modules/store/website/product/business-logic",
+                    "backend/modules/store/website/product/api-documentation"
+                  ]
+                },
+                {
+                  "group":"Order",
+                  "pages": [
+                    "backend/modules/store/website/order/architecture",
+                    "backend/modules/store/website/order/business-logic",
+                    "backend/modules/store/website/order/api-documentation"
+                  ]
+                },
+                "backend/modules/store/website/overview"
+              ]
+            },
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/modules/store/admin-panel/overview",
+                {
+                  "group": "Product Management",
+                  "pages": [
+                    "backend/modules/store/admin-panel/ProductManagement/architecture",
+                    "backend/modules/store/admin-panel/ProductManagement/business-logic",
+                    "backend/modules/store/admin-panel/ProductManagement/api-documentation"
+                  ]
+                },
+                {
+                  "group": "Order Management",
+                  "pages": [
+                    "backend/modules/store/admin-panel/OrderManagement/architecture",
+                    "backend/modules/store/admin-panel/OrderManagement/business-logic",
+                    "backend/modules/store/admin-panel/OrderManagement/api-documentation"
                   ]
                 }
               ]

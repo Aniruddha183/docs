@@ -1,0 +1,69 @@
+---
+title: "Product Business Logic"
+description: "Core business rules, validation logic, and state transitions for the Product module."
+---
+
+## 1. Product Validation Rules
+### Content Constraints
+To ensure catalog consistency and frontend performance, the following limits are enforced at the API level:
+- **Images:**
+  - **Minimum:** 3 images per product/variant (Required for cover, hover, and detail views).
+  - **Maximum:** 4 images per product/variant.
+- **Description:**
+  - **Max Length:** 250 words. This forces concise copy and prevents layout breakage on mobile cards.
+- **Price:**
+  - Must be a positive number.
+  - `taxRate` is mandatory for compliance.
+### Required Fields for Publication
+A product cannot failover to `Publish` state unless these critical fields exist:
+- `productName`, `description`, `category`
+- `basePrice`, `baseStockQuantity`
+- `sellerName`, `sellerId`
+- `size`, `color` (Defining attributes)
+---
+
+## 2. Inventory & Store Capacity Logic
+We enforce a **Capacity-Based** inventory model rather than just simple stock counting.
+### The Capacity Formula
+Every Base Product defines a `storeCapacity`. This represents the physical or allocated shelf space for *all* variants of that product.
+> **Rule:** `Sum(All Variant Stock) + New Variant Stock <= Store Capacity`
+- **Scenario:**
+  - Product `storeCapacity` = 100.
+  - Variant A (Red, S) = 40.
+  - Variant B (Blue, M) = 50.
+  - **Remaining Capacity:** 10.
+  - *Attempt to add Variant C (Green, L) with stock 20 -> **REJECTED**.*
+### Inventory Status Automation
+- **Status:** `InStock` | `OutOfStock`
+- **Logic:**
+  - Explicitly calculated.
+  - If `totalStock > 0`, status is `InStock`.
+  - If `totalStock <= 0`, status is sets to `OutOfStock`.
+- **Trigger:** Recalculated on every Product edit, Variant add/edit, or Order placement.
+---
+
+## 3. Product Lifecycle & Automation
+### Base Variant Automation
+To simplify the browsing experience, every product acts as its own "default variant".
+- **On Publish:**
+  - System automatically creates a **Base Variant** (`isBaseVariant: true`).
+  - This variant copies all metadata (Images, Price, Description) from the Base Product.
+  - **Purpose:** Ensures the product is immediately purchasable without needing manual variant creation.
+- **Syncing:**
+  - Editing the Base Product automatically updates the Base Variant to keep them in sync.
+### Deletion Protection
+- **Rule:** You cannot delete a variant that is flagged as `isBaseVariant`.
+- **Reason:** A product must always have at least one purchasable SKU to remain valid in the catalog. To remove it, you must delete or unpublish the Product itself.
+---
+
+## 4. Analytics Data Aggregation
+Business logic for how "Best Sellers" and "Popular Items" are determined:
+- **"Bought" Count:** Derived from `Order` items with status `Delivered` or `Shipped`. Cancelled/Refunded items are excluded from the "Sold" count to reflect true sales.
+- **"Added to Cart" Count:** Real-time sum of `Cart` collections. This indicates intent and is used for "High Demand" badges.
+---
+
+## 5. Product Duplication Logic
+When using the "Copy Product" feature, the system enforces a "Clean Slate" policy to prevent data contamination.
+- **State Reset:** The new clone is always set to `Draft` state, regardless of the original's status.
+- **Social Proof Wipe:** `Reviews`, `Ratings`, and `Shares` are **not** copied. The new product starts with 0 social proof.
+- **Variant Handling:** The duplication process currently **clones the Base Product metadata only**. It does not deep-copy the customized variants. The new product will need its own variants generated or assigned upon publication.

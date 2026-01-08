@@ -1,0 +1,60 @@
+---
+title: "Product Architecture"
+description: "Technical design for catalog management, variant handling, and search discovery."
+---
+
+# Product & Catalog Architecture
+
+The Product module is the backbone of the e-commerce experience, designed to handle complex SKU variations, high-performance search, and rich media content for thousands of items.
+
+## 1. Catalog & Variant Engine
+
+- **Variant Logic:** Products are structured as `Base Product` ↔ `Variants`. A base product holds shared metadata (name, description, category), while variants hold specific SKUs (Size/Color combinations).
+- **Inventory Strategy:**
+  - **Dual-Level Tracking:** Stock is tracked at the Variant level (`variantStockQuantity`).
+  - **Fallback Logic:** If a specific variant is OOS, the system automatically checks for other available variants or falls back to the `Base Product` stock for simple items.
+- **Price Calculation:** Dynamic pricing engine that calculates final price based on `basePrice`, `variantPrice` overrides, and `discountRate`.
+
+## 2. Search & Discovery Service
+
+This service powers the exploration of the catalog:
+
+- **Advanced Filtering:** Supports multi-dimensional filtering by `price`, `rating`, `color`, `size`, and `category`.
+- **Smart Sorting:** Default ranking algorithm prioritizes `Newest` → `Best Sellers` → `User Likes`.
+- **Similar Products:** Recommendation engine checks `category` and excludes the current item to suggest relevant alternatives.
+
+## 3. Data Schema Highlights
+
+### Product Table (Base)
+
+| Field | Type | Description |
+|------|------|-------------|
+| `productId` | String | Unique Identifier (e.g., `PROD123`) |
+| `variantId` | `Array<String>` | References to `Variant` documents |
+| `basePrice` | Number | Default price if no variant selected |
+| `reviewIds` | `Array<String>` | References to `Review` documents |
+| `tags` | `Array<String>` | SEO and search optimization tags |
+
+### Variant Table (SKU)
+
+| Field | Type | Description |
+|------|------|-------------|
+| `variantId` | String | Unique SKU ID (e.g., `VAR456`) |
+| `color` / `size` | String | Specific attributes for this SKU |
+| `inventoryStatus` | Enum | `InStock`, `OutOfStock` |
+| `variantImages` | `Array<String>` | Variant-specific media (e.g., Red Shirt images) |
+
+### Review & Rating Table
+
+| Field | Type | Description |
+|------|------|-------------|
+| `reviewId` | String | Primary Key |
+| `rating` | Number | 1–5 Star Rating |
+| `mediaUrl` | `Array<String>` | User-uploaded photos/videos of the product |
+| `status` | Enum | `Pending`, `Approved`, `Rejected` |
+
+## 4. Performance & Caching Logic
+
+- **Optimized Lookups:** Variant data is fetched in parallel with products and mapped in memory to reduce N+1 query latency.
+- **Media Delivery:** All product and review images are served via **CloudFront CDN** for low-latency global access.
+- **Aggregated Ratings:** Ratings are calculated asynchronously or cached on the Product document to avoid heavy aggregation queries on listing pages.
