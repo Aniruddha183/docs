@@ -237,7 +237,7 @@
           "pages": [
             "backend/modules/coach/overview",
             "backend/coachBooking-db-schema",
-
+            
             {
               "group": "Website",
               "pages": [
@@ -280,6 +280,21 @@
               "group": "Coach App",
               "pages": [
                 "backend/Coach/coach-blog-api-routes"        
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Razorpay",
+          "pages": [
+             "backend/razorpay-setup",
+            "backend/Razorpay/razorpay-payment-api-doc",
+            "backend/Razorpay/coach-payout-overview",
+            "backend/Razorpay/razorpay-payout-api-doc",
+            {
+              "group": "Admin Panel",
+              "pages": [
+                "backend/admin-live-session-management"        
               ]
             }
           ]

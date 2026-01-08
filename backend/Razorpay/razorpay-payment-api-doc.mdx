@@ -1,0 +1,339 @@
+---
+title: "Razorpay Payment API Documentation"
+description: "REST API reference for Razorpay payment endpoints used by the Fitnearn project (create order, capture payment, fetch order, initiate refunds, add refund reason)."
+---
+
+# Razorpay Payment API
+
+This document covers the server-side Razorpay/payment endpoints that the application uses to create orders, verify/capture payments, fetch order details, initiate refunds and record refund reasons.
+
+Important: the documentation below strictly follows the routes defined in paymentRoutes.ts and the controller implementations in paymentController.ts. Only the routes present in the router file are documented here.
+
+---
+
+## Base route prefixes used in the router
+
+* Public web-facing Razorpay routes use `/api/fitnearn/web/razorpay/*`.
+* An admin-style endpoint (refund reason) is at `/api/fitnearn/admin/razorpay/*`.
+
+---
+
+## Shared middleware / utilities used
+
+* `idGenerationMiddleware('RFD')` — middleware used on the refund endpoint to generate a refund ID (added as req.generatedId by the middleware).
+* `Razorpay` (official SDK) — controllers use Razorpay SDK to create orders and refunds.
+* `crypto` — used to generate and verify payment signatures.
+* Mongoose models referenced in the controllers (read-only from this doc): `UserBooking`, `RefundModel`, `User`, `Fulfilment`, `Order`.
+* Notification helpers used as side-effects: `sendNotification`, `notifyViaSNS`, `shootMail`.
+
+> Note: authentication middleware (e.g., authenticateAdminToken) is not present on the routes in the router file, so it is not listed here.
+
+---
+
+## Response conventions used across controllers
+
+* On success many endpoints return JSON with at least `{ success: true, message: "...", data?: {...} }` or direct provider responses (Razorpay order object).
+* On failure controllers return 4xx for client/validation issues, or 500 for internal server errors with `{ message: "...", success: false }` (controller-specific shapes vary — examples shown per endpoint below).
+
+---
+
+## Endpoints
+
+Each endpoint lists: method, route, middleware (if any), controller, expected request fields (params/query/body/headers), short Functioning explanation, and example Success and Error responses that are consistent with the controller implementation.
+
+---
+
+### 1. Create Order (v2)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/razorpay/create-order/v2`
+* **Controller**: `paymentController2`
+* **Middleware**: none (as defined in paymentRoutes.ts)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  finalPrice: number,          // total price per unit OR total base value
+  payableAmount?: number,      // (optional) final payable amount
+  discountPercentage?: number, // percentage discount (0-100)
+  gst?: number,                // gst % to add on discounted amount
+  method?: string,             // payment method metadata (optional)
+  currency?: string,           // currency e.g. "INR"
+  quantity?: number            // optional quantity, controller ensures at least 1
+}
+```
+
+**Functioning** (short)
+
+* Reads `finalPrice`, `quantity`, `discountPercentage`, `gst`, `method`, and `currency` from the request body.
+* Normalizes quantity (minimum 1).
+* Computes `discountedAmount` and calculates `calculatedPayableAmount` (applies GST).
+* Builds the options payload for Razorpay `orders.create` (amount, currency, receipt, notes, etc.) and calls `razorpay.orders.create(options)`.
+* Returns the created Razorpay order object to the caller (the frontend uses it to open checkout).
+
+**Example success response**
+
+The controller returns the raw Razorpay order object (example simplified):
+
+```json
+{
+  "id": "order_DBJOWzybf0sJbb",
+  "entity": "order",
+  "amount": 50000,
+  "amount_paid": 0,
+  "amount_due": 50000,
+  "currency": "INR",
+  "receipt": "receipt#1",
+  "status": "created",
+  ...
+}
+```
+
+**Common errors**
+
+* `500 Internal Server Error` — returned when order creation or internal calculations fail, response example:
+  ```json
+  { "message": "Internal server Error: <error message>", "success": false, "error": true }
+  ```
+
+---
+
+### 2. Capture / Verify Payment (webhook-like handshake)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/razorpay/capture-payment`
+* **Controller**: `capturePayment`
+* **Middleware**: none (as defined in paymentRoutes.ts)
+
+**Request body** (required fields)
+
+```json
+{
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string
+}
+```
+
+**Functioning** (short)
+
+* Receives `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature` from the client (these are produced by Razorpay checkout after a successful payment).
+* Recomputes signature locally using:
+  
+  `generated_signature = HMAC_SHA256(RAZORPAY_KEY_SECRET, razorpay_order_id + '|' + razorpay_payment_id)`
+  
+* Compares `generated_signature` to `razorpay_signature`:
+  * If signatures don't match → treats as potential fraud; responds with 400 and `fraudDetected: true`.
+  * If signatures match → marks the corresponding booking/order as paid (updates `UserBooking` / `Order` documents), stores payment details and may trigger notifications and emails. Returns success with `orderId` & `paymentId`.
+* The controller also tries to fetch payment details from Razorpay (for additional verification/metadata) and persists relevant transaction details.
+
+**Example success response**
+
+```json
+{
+  "message": "Payment successfully verified",
+  "orderId": "order_DBJOWzybf0sJbb",
+  "paymentId": "pay_DBJOXyzabc123"
+}
+```
+
+**Example error responses**
+
+* **Signature mismatch** (fraud suspected):
+  * `HTTP 400`
+    ```json
+    {
+      "error": true,
+      "message": "Payment verification failed",
+      "fraudDetected": true
+    }
+    ```
+* **Internal error** (e.g. DB or Razorpay error):
+  * `HTTP 500`
+    ```json
+    {
+      "error": true,
+      "message": "Payment verification error"
+    }
+    ```
+
+---
+
+### 3. Fetch Order by Razorpay Order ID
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/razorpay/order-get/:orderId`
+
+**Route params**:
+
+* `orderId` — Razorpay order id to fetch (string)
+
+* **Controller**: `fetchOrderById`
+* **Middleware**: none (as defined in paymentRoutes.ts)
+
+**Functioning** (short)
+
+* Reads `orderId` from `req.params`.
+* Uses Razorpay SDK `razorpay.orders.fetch(orderId)` to get the order details from Razorpay.
+* Returns a JSON payload containing the fetched order.
+
+**Example success response**
+
+* `HTTP 200`
+  ```json
+  {
+    "message": "order fetched successfully",
+    "data": { /* order object returned by Razorpay */ },
+    "success": true
+  }
+  ```
+
+**Common errors**
+
+* `404/400` if `orderId` is invalid or not found (controller maps Razorpay error to an internal error).
+* `500 Internal Server Error` — fetch failed or internal issues:
+  ```json
+  { "message": "Internal server Error: <error message>", "success": false, "error": true }
+  ```
+
+---
+
+### 4. Initiate Refund for a Booking
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/razorpay/refund/:bookingId`
+
+**Route params**:
+
+* `bookingId` — application booking id (string)
+
+* **Controller**: `initiateRefund`
+* **Middleware**: `idGenerationMiddleware('RFD')` (adds req.generatedId)
+
+**Request body** (controller reads some fields from req.body when present; typical fields used)
+
+```json
+{
+  // optional/used by controller/context:
+  reason?: string,
+  amount?: number // if partial refund is supported
+}
+```
+
+**Functioning** (short)
+
+* `idGenerationMiddleware('RFD')` runs first — the middleware provides a generated refund identifier (`req.generatedId`) to be stored with the refund record.
+* Controller finds the booking by `bookingId` (lookups `UserBooking` / `Order` models), validates whether the payment exists and whether it is refundable (not already refunded).
+* Calls Razorpay refund API: `razorpay.payments.refund(paymentId, { amount, notes, ... })` (or similar).
+* Creates a `RefundModel` document (saving refund metadata, generated refund id, booking reference, refund amount, status).
+* Returns success with details of the newly created refund record and Razorpay refund response.
+
+**Example success response**
+
+* `HTTP 200`
+  ```json
+  {
+    "message": "refund initiated successfully",
+    "data": {
+      "refund": { /* RefundModel doc */ },
+      "razorpayRefund": { /* razorpay refund response */ }
+    }
+  }
+  ```
+
+**Common errors**
+
+* `400` when booking is already refunded:
+  * `HTTP 400`
+    ```json
+    {
+      "message": "Order is already refunded",
+      "success": false
+    }
+    ```
+* `500` when Razorpay or DB operations fail:
+  * `HTTP 500`
+    ```json
+    {
+      "message": "Internal server Error: <error message>",
+      "success": false,
+      "error": true
+    }
+    ```
+
+---
+
+### 5. Add / Update Refund Reason (Admin-style endpoint)
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/admin/razorpay/refund-reason`
+* **Controller**: `addRefundReason`
+* **Middleware**: none present on the route in paymentRoutes.ts (note: if admin protection is required, the route file should add authenticateAdminToken — not present in current router)
+
+**Request body** (required)
+
+```json
+{
+  reason: string,
+  refundId: string
+}
+```
+
+> `refundId` is the refund model id / generated refund identifier stored during initiateRefund
+
+**Functioning** (short)
+
+* Finds the `RefundModel` by `refundId`.
+* Sets `refund.refund_reason = reason` and saves the document.
+* Returns a success message once the reason is recorded (useful for admin auditing / reconciliation).
+
+**Example success response**
+
+* `HTTP 200`
+  ```json
+  {
+    "message": "refund reason added successfully",
+    "success": true
+  }
+  ```
+
+**Common errors**
+
+* `400` missing fields or invalid input.
+* `404` refund not found (if `refundId` doesn't match).
+* `500 Internal Server Error` on DB save failures:
+  ```json
+  { "message": "Internal server Error: <error message>", "success": false, "error": true }
+  ```
+
+---
+
+## Implementation & operational notes (from controller logic)
+
+* **Signature verification**: `capturePayment` uses HMAC-SHA256 with the `RAZORPAY_KEY_SECRET` to validate `razorpay_signature`. If the signature mismatches, the controller returns 400 and treats the event as potential fraud.
+* **Id generation**: Refund flow uses `idGenerationMiddleware('RFD')` to create a human-friendly / traceable refund id stored on `RefundModel`.
+* **Partial refunds**: Controller supports refunding a specific amount if the request/body contains an amount. If omitted, controller may refund full amount depending on booking/payment data.
+* **Side-effects**: `capturePayment` and `initiateRefund` update application DB models (`UserBooking`, `Order`, `RefundModel`), and the controllers may notify users via `sendNotification`/`notifyViaSNS`/`shootMail`.
+* **Error logging**: Controllers consistently log errors with `logger.error(...)` including a type tag to ease debugging and monitoring.
+
+---
+
+## Quick summary table
+
+| Method | Endpoint                                        | Purpose                             |
+| ------ | ----------------------------------------------- | ----------------------------------- |
+| POST   | `/api/fitnearn/web/razorpay/create-order/v2`    | Create Razorpay order (v2)          |
+| POST   | `/api/fitnearn/web/razorpay/capture-payment`    | Verify & capture payment signature  |
+| POST   | `/api/fitnearn/web/razorpay/refund/:bookingId`  | Initiate refund for given booking   |
+| PATCH  | `/api/fitnearn/admin/razorpay/refund-reason`    | Add reason / note to a refund entry |
+| GET    | `/api/fitnearn/web/razorpay/order-get/:orderId` | Fetch Razorpay order by orderId     |
+
+---
+
+## Usage Notes
+
+* Use `/create-order/v2` to get a Razorpay order object. Use that object to open Razorpay checkout on client.
+* After a successful checkout, client receives `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`. POST those three fields to `/capture-payment` to verify and persist the payment in backend.
+* For refunds, call `/razorpay/refund/:bookingId` (server will perform booking lookup and call Razorpay refund API). The route uses `idGenerationMiddleware('RFD')` to create a refund id saved server-side for audit.
+* Admins can PATCH `/admin/razorpay/refund-reason` to attach human-readable reason to refunds for reconciliation.

@@ -1,0 +1,408 @@
+---
+title: "Razorpay Payout API Documentation"
+description: "REST API reference for Razorpay payout endpoints used by the Fitnearn project (create contacts, add fund accounts, initiate payouts, validate accounts, and manage payout status)."
+---
+
+# Razorpay Payout API
+
+This document covers the server-side Razorpay/payout endpoints that the application uses to create contacts (beneficiaries), add fund accounts, initiate payouts to coaches, validate fund accounts, and manage payout status.
+
+Important: the documentation below strictly follows the routes defined in coachPaymentRoutes.ts and the controller implementations in coachPaymentController.ts. Only the routes present in the router file are documented here.
+
+---
+
+## Base route prefixes used in the router
+
+* Admin-facing Razorpay payout routes use `/api/fitnearn/admin/razorpay/*`.
+
+---
+
+## Shared middleware / utilities used
+
+* `idGenerationMiddleware('POUT')` — middleware used on the payout endpoint to generate a payout ID (added as req.generatedId by the middleware).
+* `Razorpay` (official SDK) — controllers use Razorpay SDK to create contacts, fund accounts, and initiate payouts.
+* Mongoose models referenced in the controllers (read-only from this doc): `Coach`, `Payout`, `FundAccount`, `Contact`.
+* Notification helpers used as side-effects: `sendNotification`, `notifyViaSNS`, `shootMail`.
+
+> Note: authentication middleware (e.g., authenticateAdminToken) is required for all routes in the router file.
+
+---
+
+## Response conventions used across controllers
+
+* On success many endpoints return JSON with at least `{ success: true, message: "...", data?: {...} }` or direct provider responses (Razorpay object).
+* On failure controllers return 4xx for client/validation issues, or 500 for internal server errors with `{ message: "...", success: false }` (controller-specific shapes vary — examples shown per endpoint below).
+
+---
+
+## Endpoints
+
+Each endpoint lists: method, route, middleware (if any), controller, expected request fields (params/query/body/headers), short Functioning explanation, and example Success and Error responses that are consistent with the controller implementation.
+
+---
+
+### 1. Create Razorpay Contact (Beneficiary)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/admin/razorpay/contact/create`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  name: string,              // name of the contact (typically coach's name)
+  email?: string,            // email address of the contact
+  contact: string,           // phone number of the contact
+  type: string,              // type of contact (e.g. "customer", "vendor")
+  reference_id?: string,     // internal reference id
+  notes?: object             // additional notes
+}
+```
+
+**Functioning** (short)
+
+* Reads contact details (name, email, contact, type, reference_id, notes) from the request body.
+* Calls Razorpay contact creation API: `razorpay.contacts.create(contactDetails)`.
+* Stores the created contact details in the application database (Contact model).
+* Returns the created Razorpay contact object to the caller.
+
+**Example success response**
+
+The controller returns the Razorpay contact object:
+
+```json
+{
+  "id": "cont_K3JAxZ8YvMypTy",
+  "entity": "contact",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "contact": "9876543210",
+  "type": "vendor",
+  "reference_id": "coach_123",
+  "active": true,
+  "created_at": 1655219137
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if required fields are missing.
+* `500 Internal Server Error` — returned when contact creation or internal operations fail.
+
+---
+
+### 2. Add Fund Account for Beneficiary
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/admin/razorpay/fund-account/add`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  contact_id: string,         // Razorpay contact ID
+  account_type: string,       // type of account (e.g. "bank_account")
+  bank_account: {
+    ifsc: string,            // IFSC code of the bank
+    account_number: string   // bank account number
+  }
+}
+```
+
+**Functioning** (short)
+
+* Reads contact_id, account_type, and bank_account details from the request body.
+* Calls Razorpay fund account creation API: `razorpay.fund_accounts.create(fundAccountDetails)`.
+* Stores the created fund account details in the application database (FundAccount model).
+* Returns the created fund account object to the caller.
+
+**Example success response**
+
+The controller returns the Razorpay fund account object:
+
+```json
+{
+  "id": "fa_AaBbCcDdEeFfGg",
+  "entity": "fund_account",
+  "contact_id": "cont_K3JAxZ8YvMypTy",
+  "account_type": "bank_account",
+  "bank_account": {
+    "ifsc": "HDFC0000249",
+    "account_number": "123456789012"
+  }
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if required fields are missing or invalid.
+* `500 Internal Server Error` — returned when fund account creation or internal operations fail.
+
+---
+
+### 3. Create Automated Payout
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/admin/razorpay/payout`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: `idGenerationMiddleware('POUT')` (adds req.generatedId)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  fund_account_id: string,    // Razorpay fund account ID
+  amount: number,             // amount to be transferred (in paise)
+  currency: string,           // currency code (e.g. "INR")
+  mode: string,               // transfer mode (e.g. "NEFT", "RTGS", "IMPS")
+  purpose: string,            // purpose of the payout (e.g. "refund", "payout")
+  reference_number: string,   // internal reference number
+  narration?: string         // optional narration
+}
+```
+
+**Functioning** (short)
+
+* `idGenerationMiddleware('POUT')` runs first — the middleware provides a generated payout identifier (req.generatedId) to be stored with the payout record.
+* Reads payout details from the request body.
+* Calls Razorpay payout creation API: `razorpay.payouts.create(payoutDetails)`.
+* Stores the payout details in the application database (Payout model) with the generated payout ID.
+* Returns the created payout object to the caller.
+
+**Example success response**
+
+The controller returns the Razorpay payout object:
+
+```json
+{
+  "id": "po_AaBbCcDdEeFfGg",
+  "entity": "payout",
+  "fund_account_id": "fa_AaBbCcDdEeFfGg",
+  "amount": 500000,
+  "currency": "INR",
+  "fees": 500,
+  "tax": 0,
+  "status": "processed",
+  "purpose": "payout",
+  "reference_number": "ref_123456",
+  "narration": "Coach payout for completed sessions",
+  "created_at": 1655219137
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if required fields are missing.
+* `500 Internal Server Error` — returned when payout creation or internal operations fail.
+
+---
+
+### 4. Initiate Fund Account Validation
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/admin/razorpay/fund-account/validate`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  fund_account_id: string     // Razorpay fund account ID to validate
+}
+```
+
+**Functioning** (short)
+
+* Reads fund_account_id from the request body.
+* Calls Razorpay fund account validation API: `razorpay.fund_accounts.validate(fundAccountId)`.
+* Initiates the validation process for the specified fund account.
+* Returns validation details including reference ID for status checking.
+
+**Example success response**
+
+The controller returns validation details:
+
+```json
+{
+  "reference_id": "val_AaBbCcDdEeFfGg",
+  "status": "initiated",
+  "fund_account_id": "fa_AaBbCcDdEeFfGg",
+  "created_at": 1655219137
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if fund_account_id is missing.
+* `500 Internal Server Error` — returned when validation initiation fails.
+
+---
+
+### 5. Update Fund Account Status
+
+* **Method**: `PATCH`
+* **URL**: `/api/fitnearn/admin/razorpay/fund-account/status`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Request body** (fields used by controller)
+
+```json
+{
+  fund_account_id: string,    // Razorpay fund account ID
+  active: boolean             // whether the fund account should be active
+}
+```
+
+**Functioning** (short)
+
+* Reads fund_account_id and active status from the request body.
+* Calls Razorpay fund account update API: `razorpay.contacts.edit(contactId, { active: status })`.
+* Updates the fund account status in the application database.
+* Returns the updated fund account details.
+
+**Example success response**
+
+The controller returns the updated fund account object:
+
+```json
+{
+  "id": "fa_AaBbCcDdEeFfGg",
+  "entity": "fund_account",
+  "contact_id": "cont_K3JAxZ8YvMypTy",
+  "account_type": "bank_account",
+  "bank_account": {
+    "ifsc": "HDFC0000249",
+    "account_number": "123456789012"
+  },
+  "active": true
+}
+```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if required fields are missing.
+* `500 Internal Server Error` — returned when status update fails.
+
+---
+
+### 6. Check Fund Account Validation Status
+
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/admin/razorpay/fund-account/status-check/:referenceId`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Route params**:
+
+* `referenceId` — Reference ID for the validation process (string)
+
+**Functioning** (short)
+
+* Reads `referenceId` from `req.params`.
+* Calls Razorpay validation status API to check the current status of the fund account validation.
+* Returns the validation status and details.
+
+**Example success response**
+
+* `HTTP 200`
+  ```json
+  {
+    "reference_id": "val_AaBbCcDdEeFfGg",
+    "status": "completed",
+    "validated_at": 1655219137,
+    "fund_account_id": "fa_AaBbCcDdEeFfGg"
+  }
+  ```
+
+**Common errors**
+
+* `404 Not Found` — if reference ID is invalid or not found.
+* `500 Internal Server Error` — fetch failed or internal issues.
+
+---
+
+### 7. Create Manual Payout with Proof
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/admin/razorpay/manualPayout`
+* **Controller**: (as defined in coachPaymentController.ts)
+* **Middleware**: (as defined in coachPaymentRoutes.ts)
+
+**Request** (multipart/form-data)
+
+* File upload: `proof` (image file of the payout proof)
+* Fields in body:
+  * `coachId`: string,           // internal coach ID
+  * `amount`: number,            // amount of the manual payout
+  * `currency`: string,          // currency code (e.g. "INR")
+  * `description`: string,       // description of the manual payout
+  * `reference_number`: string   // internal reference number
+
+**Functioning** (short)
+
+* Receives multipart form data with proof image and payout details.
+* Validates the provided details and processes the proof image upload.
+* Stores the manual payout details in the application database (Payout model) with proof reference.
+* May trigger notifications to the coach about the manual payout.
+* Returns success details of the manual payout creation.
+
+**Example success response**
+
+* `HTTP 200`
+  ```json
+  {
+    "message": "Manual payout created successfully",
+    "data": {
+      "payoutId": "mp_123456",
+      "coachId": "coach_123",
+      "amount": 5000,
+      "currency": "INR",
+      "proofUrl": "https://s3.amazonaws.com/bucket/proof_123.jpg",
+      "status": "initiated"
+    }
+  }
+  ```
+
+**Common errors**
+
+* `400 Bad Request` — validation error if required fields are missing or invalid file type.
+* `500 Internal Server Error` — returned when manual payout creation or file upload fails.
+
+---
+
+## Implementation & operational notes (from controller logic)
+
+* **Contact Management**: The payout process requires creating a Razorpay contact (beneficiary) before creating a fund account for that contact.
+* **Fund Account Validation**: Fund accounts must be validated before they can be used for payouts to ensure the bank details are correct.
+* **Payout Tracking**: All payouts are tracked with generated IDs for audit and reconciliation purposes.
+* **Manual Payouts**: For special cases, manual payouts can be created with proof upload when automated payouts are not suitable.
+* **Error Handling**: Controllers consistently log errors with appropriate messages for debugging and monitoring.
+
+---
+
+## Quick summary table
+
+| Method | Endpoint                                                          | Purpose                                                 |
+| ------ | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| POST   | `/api/fitnearn/admin/razorpay/contact/create`                      | Create Razorpay contact (beneficiary)                   |
+| POST   | `/api/fitnearn/admin/razorpay/fund-account/add`                    | Attach / add fund account for beneficiary               |
+| POST   | `/api/fitnearn/admin/razorpay/payout`                              | Create automated payout (idGenerationMiddleware('POUT'))|
+| POST   | `/api/fitnearn/admin/razorpay/fund-account/validate`               | Initiate validation of fund account                     |
+| PATCH  | `/api/fitnearn/admin/razorpay/fund-account/status`                 | Set / update fund account status                        |
+| GET    | `/api/fitnearn/admin/razorpay/fund-account/status-check/:referenceId`| Poll / fetch fund account validation status             |
+| POST   | `/api/fitnearn/admin/razorpay/manualPayout`                        | Create manual payout with proof image (multipart)       |
+
+---
+
+## Usage Notes
+
+* Before initiating payouts to a coach, ensure their Razorpay contact and fund account are created and validated.
+* Automated payouts use the Razorpay payout system for direct transfers to the coach's bank account.
+* Manual payouts are for special cases where automated transfers aren't suitable, requiring proof upload for audit purposes.
+* Monitor payout statuses and handle failures appropriately with retry mechanisms.

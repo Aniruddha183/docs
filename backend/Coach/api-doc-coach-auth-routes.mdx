@@ -1,295 +1,360 @@
 ---
-title: "Coach App Authentication Api Documentation"
-description: "REST API reference for Coach App Authentication"
+title: "Coach Authentication API Documentation"
+description: "REST API reference for coach authentication (Google sign-in, OTP flows, logout) used by the Coach app."
 ---
 
-# Coach App Authentication API
+# Coach Authentication
 
-This document outlines the API endpoints available to **Coaches** for authenticating in Coach App.
+This document describes the coach-facing authentication endpoints used by the Coach app: Google registration/login, mobile OTP registration/login/resend/verify, and logout. Each endpoint lists middleware, expected headers, request params/body/query, a short Functioning explanation (what it does and how), example success responses (from controller), and common error responses.
+
+Important: AWS Cognito is integrated and configured for Coach App authentication and user management. Controllers call Cognito helper functions to create/confirm users, authenticate, generate tokens, and revoke tokens when needed.
 
 ---
 
 ## Base URL
 
-```
-/api/fitnearn/web/coach
-```
+`/api/fitnearn/web/coach`
+
 ---
 
-## Middleware
+## Required headers (typical)
 
-### `idGenerationMiddleware('COH')`
+| Header | Type | Description |
+|--------|------|-------------|
+| `Content-Type` | string | `application/json` (or `multipart/form-data` when sending files) |
+| `Authorization` | string | Bearer token (not required for initial auth routes like OTP/register/login) |
 
-- **Purpose**: Generates a unique Coach ID (`COHxxxxx`) for new coach registrations.
-- **Usage**: Required in Coach registration endpoints.
+---
+
+## Middleware & utilities (used by controller functions)
+
+* **AWS Cognito integration**: The coach authentication controllers integrate with AWS Cognito for identity/user management. Cognito is used to create and confirm users, issue and revoke tokens. The helpers below are wrappers around Cognito flows and associated session handling.
+* **idGenerationMiddleware(prefix)** — generates unique IDs (route uses `idGenerationMiddleware('COH')` for coach registration).
+* **generateUniqueSequence(prefix)** — used to generate numeric sequences for `coach_id` when creating a new coach.
+* **addPhoneNumberToCognito(phone, attributes)** — (Cognito helper) creates or updates a Cognito user with the phone number; used when a new coach verifies OTP or when completing registration. Ensures the phone number is attached as a Cognito username/attribute and triggers Cognito user creation if not present. Returns Cognito user metadata (username / sub).
+* **authenticateCognitoUser(usernameOrPhone)** — (Cognito helper) checks/initiates authentication for a Cognito user; called during OTP verification and Google login flows to validate the Cognito-side record and ensure the user exists. May return Cognito challenge state (if any) or a success indicator.
+* **generateCoachTokenAndSetSession(coachProfile, cognitoTokens?)** — (session helper) builds the genToken payload (app-specific JWT metadata), stores session info in CoachSession collection (accessToken/refreshToken/access metadata), and returns token structure used by the client. This function is called after successful Cognito authentication (Google or OTP flows) to persist server-side session and return tokens.
+* **revokeCognitoTokens(refreshToken)** — (Cognito helper) revokes a Cognito refresh token (invalidates the refresh token and associated access tokens), used during logout flows to ensure tokens cannot be reused.
+* **sendSMS(mobileNumber, otp, action)** — utility to send OTP SMS.
+* **generateRandomNumber(min, max)** — used to generate OTPs.
+* **CoachOTP, CoachSession, ProfileModel, etc.** — MongoDB models used in controllers.
+* **logger** — system logger used to capture errors and audit events.
 
 ---
 
 ## Endpoints
 
+Each endpoint includes: method, path, middleware, controller, request shape (params/body/query/headers), a short Functioning section (what it does and how), example success JSON response, and common error cases.
+
+---
+
 ### 1. Google Registration (Signup)
 
-Registers a new coach using Google OAuth.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/google/register`
+* **Middleware**: `idGenerationMiddleware('COH')`
+* **Controller**: `coachGoogleRegistrationSignup`
 
-- **Method**: `POST`
-- **URL**: `/google/register`
-- **Middleware**: `idGenerationMiddleware('COH')`
-- **Controller**: `coachGoogleRegistrationSignup`
-- **Request Body**:
-  - `email` (string): Coach's email (required)
-  - `awsUserName` (string): AWS username (required)
-  - `accessToken`, `authToken`, `refreshToken` (string, optional): Google OAuth tokens
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Coach registered successfully",
-    "user": { ...coachObject },
-    "genToken": { ...tokenObject }
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Missing or duplicate email
-  - `500 Internal Server Error`: Registration failure
+**Request Body** (JSON)
 
----
+```json
+{
+  "email": "coach@example.com",
+  "awsUserName": "awsUsernameOptional",
+  "accessToken": "googleAccessToken (optional)",
+  "authToken": "googleAuthToken (optional)",
+  "refreshToken": "googleRefreshToken (optional)"
+}
+```
 
-### 2. Google Login
+**Functioning**
 
-Logs in a coach using Google OAuth.
+* Validates required email.
+* Checks if a coach with the email already exists in `ProfileModel`.
+* If new:
+  * Creates a coach profile with `coach_id` generated via `idGenerationMiddleware('COH')` / `generateUniqueSequence`.
+  * Calls `addPhoneNumberToCognito(...)` if a phone is available in payload or retrieved from Google profile to ensure a Cognito user exists for the coach (Cognito user creation/attribute sync).
+  * Stores any provided Google tokens into a `CoachSession` record if present.
+  * Calls `generateCoachTokenAndSetSession(coachProfile, cognitoTokens?)` to produce genToken returned to the client and to persist server-side session metadata.
+  * Returns created user object and token data.
 
-- **Method**: `POST`
-- **URL**: `/google/login`
-- **Controller**: `coachGoogleRegistrationSignin`
-- **Request Body**:
-  - `email` (string): Coach's email
-  - `accessToken`, `authToken`, `refreshToken` (string): Google OAuth tokens
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "User signed in successfully",
-    "genToken": { ...tokenObject },
-    "coachData": { ...coachObject }
-  }
-  ```
-- **Error Responses**:
-  - `404 Not Found`: Coach not found
-  - `500 Internal Server Error`
+**Example Success Response**
+
+```json
+{
+  "success": true,
+  "message": "Coach registered successfully",
+  "user": { /* coach object */ },
+  "genToken": { /* token object (app metadata + tokens) */ }
+}
+```
+
+**Common Errors**
+
+* `400 Bad Request` — missing email.
+* `400 Bad Request` — user already exists.
+* `500 Internal Server Error` — DB, Cognito or other failure.
 
 ---
 
-### 3. OTP Registration
+### 2. Google Login (Signin)
 
-Generates an OTP for a new coach registration using mobile number.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/google/login`
+* **Controller**: `coachGoogleRegistrationSignin`
 
-- **Method**: `POST`
-- **URL**: `/otp/register`
-- **Controller**: `coachRegisterUsingOTP`
-- **Request Body**:
-  - `mobileNumber` (string): Coach's mobile number
-  - `countryCode` (string): Country code
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "OTP generated successfully"
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Mobile number already registered
-  - `500 Internal Server Error`
+**Request Body** (JSON)
+
+```json
+{
+  "email": "coach@example.com",
+  "accessToken": "googleAccessToken (optional)",
+  "authToken": "googleAuthToken (optional)",
+  "refreshToken": "googleRefreshToken (optional)"
+}
+```
+
+**Functioning**
+
+* Looks up coach by email. If not found, the controller may create a record depending on business rules or return 404.
+* Ensures a corresponding Cognito user exists by calling `authenticateCognitoUser(email)` or `addPhoneNumberToCognito` as needed.
+* Updates or creates a `CoachSession` with provided tokens.
+* Calls `generateCoachTokenAndSetSession(coachProfile, cognitoTokens?)` to generate genToken payload and persist session info.
+* Returns the coach object and tokens to the client.
+
+**Example Success Response**
+
+```json
+{
+  "success": true,
+  "message": "User signed in successfully",
+  "genToken": { /* token object */ },
+  "user": { /* coach object */ }
+}
+```
+
+**Common Errors**
+
+* `404 Not Found` — coach not found (if creation-on-signin is not permitted).
+* `500 Internal Server Error` — token/Cognito/DB failures.
 
 ---
 
-### 4. OTP Login
+### 3. OTP Registration (Generate OTP for Registration)
 
-Generates an OTP for login using mobile number.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/otp/register`
+* **Controller**: `coachRegisterUsingOTP`
 
-- **Method**: `POST`
-- **URL**: `/otp/login`
-- **Controller**: `coachLoginUsingOtp`
-- **Request Body**:
-  - `mobileNumber` (string): Coach's mobile number
-  - `countryCode` (string): Country code
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "OTP generated successfully"
-  }
-  ```
-- **Error Responses**:
-  - `400 Bad Request`: Mobile number not found
-  - `500 Internal Server Error`
+**Request Body** (JSON)
+
+```json
+{
+  "mobileNumber": "9876543210",
+  "countryCode": "+91"
+}
+```
+
+**Functioning**
+
+* Builds the full phone string from `countryCode + mobileNumber`.
+* Generates a 4-digit OTP and stores it in `CoachOTP` with an expiry timestamp.
+* Sends OTP via `sendSMS()`.
+* Returns success. (The actual Cognito user creation is performed during OTP verification—if the verification creates a new user, `addPhoneNumberToCognito` will be called in the verify flow.)
+
+**Example Success Response**
+
+```json
+{
+  "success": true,
+  "message": "OTP generated successfully"
+}
+```
+
+**Common Errors**
+
+* `500 Internal Server Error` — SMS/DB/Cognito issues.
+
+---
+
+### 4. OTP Login (Generate OTP for Login)
+
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/otp/login`
+* **Controller**: `coachLoginUsingOtp`
+
+**Request Body** (JSON)
+
+```json
+{
+  "mobileNumber": "9876543210",
+  "countryCode": "+91"
+}
+```
+
+**Functioning**
+
+* Similar to otp/register: generates an OTP, stores it in `CoachOTP`, sends it via `sendSMS`. On successful verification (via /otp/verify) the flow authenticates the Cognito user and returns tokens via `generateCoachTokenAndSetSession`.
+
+**Example Success Response**
+
+```json
+{
+  "success": true,
+  "message": "OTP generated successfully"
+}
+```
+
+**Common Errors**
+
+* `500 Internal Server Error` — DB/SMS/Cognito errors.
 
 ---
 
 ### 5. Resend OTP
 
-Resend an OTP for registration or login.
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/otp/resend`
+* **Controller**: `resendOTP`
 
-- **Method**: `POST`
-- **URL**: `/otp/resend`
-- **Controller**: `resendOTP`
-- **Request Body**:
-  - `mobileNumber` (string): Coach's mobile number
-  - `countryCode` (string): Country code
-  - `action` (string): Action type (e.g., 'register', 'login')
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "OTP generated successfully"
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+**Request Body** (JSON)
 
----
+```json
+{
+  "mobileNumber": "9876543210",
+  "countryCode": "+91",
+  "action": "register"  // or "login"
+}
+```
 
-### 6. Logout
+**Functioning**
 
-Logs out the currently authenticated coach.
+* Generates a fresh OTP, updates `CoachOTP` with new expiry.
+* Sends the new OTP via `sendSMS`.
+* Returns the same success response as initial OTP generation.
 
-- **Method**: `POST`
-- **URL**: `/logout`
-- **Controller**: `coachLogout`
-- **Request Body**:
-  - `coach_id` (string): Coach's unique ID
-- **Success Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Logout successful"
-  }
-  ```
-- **Error Responses**:
-  - `500 Internal Server Error`
+**Example Success Response**
+
+```json
+{
+  "success": true,
+  "message": "OTP generated successfully"
+}
+```
+
+**Common Errors**
+
+* `500 Internal Server Error` — SMS/DB issues.
 
 ---
 
-### 7. Verify OTP
+### 6. Verify OTP
 
-Verifies an OTP for registration or login.
+* **Method**: `GET`
+* **URL**: `/api/fitnearn/web/coach/otp/verify`
+* **Controller**: `verifyOTP`
 
-- **Method**: `GET`
-- **URL**: `/otp/verify`
-- **Controller**: `verifyOTP`
-- **Query Params**:
-  - `mobileNumber` (string): Coach's mobile number
-  - `countryCode` (string): Country code
-  - `otp` (string): OTP code
-  - `reset` (boolean, optional): For password reset flow
-- **Success Response**:
+**Query Parameters**
+
+* `mobileNumber=<number>` — required: number without country code
+* `countryCode=<+91>` — required
+* `otp=<1234>` — required
+* `reset=<boolean>` — optional, used when resetting password or similar flows
+* `tag=<string>` — optional metadata tag
+* `email=<string>` — optional (used in some flows)
+
+**Functioning**
+
+* Joins `countryCode + mobileNumber` to look up the `CoachOTP` record and validate OTP + expiry.
+* If OTP invalid/expired → returns 400.
+* On valid OTP:
+  * If the coach does not yet exist in `ProfileModel`, the controller calls `addPhoneNumberToCognito(...)` to create the Cognito user and then creates the coach profile in the database with `coach_id` from `generateUniqueSequence('COH')`.
+  * If the coach exists, the controller ensures the Cognito user is present and calls `authenticateCognitoUser()` to validate the Cognito account.
+  * After successful Cognito presence/authentication, `generateCoachTokenAndSetSession(coachProfile, cognitoTokens?)` is called to:
+    * Create the genToken payload (app-level tokens/metadata)
+    * Save a `CoachSession` record including accessToken / refreshToken and device metadata
+    * Return the tokens and session info to the client
+  * Deletes the `CoachOTP` record (one-time use).
+  * Returns tokens and `coach_id` when authentication is completed.
+
+**Example Success Responses**
+
+* Basic verified:
+  ```json
+  { "success": true, "message": "OTP verified successfully" }
+  ```
+* Verified + tokens returned (login flow):
   ```json
   {
     "success": true,
     "message": "OTP verified successfully",
-    "genToken": { ...tokenObject },
+    "genToken": { /* token metadata */ },
     "access_token": "...",
     "id_token": "...",
     "refresh_token": "...",
-    "coach_id": "COHxxxxx"
+    "coach_id": "COH00012"
   }
   ```
-- **Error Responses**:
-  - `400 Bad Request`: Invalid or expired OTP
-  - `500 Internal Server Error`
+
+**Common Errors**
+
+* `400 Bad Request` — number not found or OTP expired.
+* `400 Bad Request` — invalid OTP.
+* `404 Not Found` — coach profile not found in specific branches (if expected).
+* `500 Internal Server Error` — Cognito/DB/token generation errors.
 
 ---
 
-## 📦 Models
+### 7. Logout
 
-### `IProfileModel` (Coach Profile)
-- **Description**: Stores coach profile and authentication information.
-- **Key Fields**:
-  - `coach_id` (string): Unique coach identifier (e.g., `COH00001`)
-  - `name` (string): Coach's name
-  - `awsUserName` (string): AWS username
-  - `email` (string): Coach's email address
-  - `age` (number): Age
-  - `gender` (string): Gender
-  - `licenseStatus` (string): License status
-  - `mobileNumber` (string): Mobile number
-  - `countryCode` (string): Country code
-  - `clientCount` (number): Number of clients coached
-  - `category` (string): Coaching category
-  - `categoryLevel` (string): Category level
-  - `peopleCoached` (number): Number of people coached
-  - `experience` (string): Experience description
-  - `bio` (string): Coach's biography
-  - `images` (string[]): Array of image URLs
-  - `profileImage` (string): Profile image URL
-  - `coverImage` (string): Cover image URL
-  - `appType` (string): App type
-  - `status` (string): Profile/account status
-  - `isVerified` (boolean): Whether the coach is verified
-  - `onBoardingComplete` (boolean): Onboarding completion status
-  - `lastLogin` (Date, optional): Last login timestamp
-  - `stage` (enum): `"VERIFIED" | "UNVERIFIED" | "UNDER REVIEW" | "SUSPENDED" | "STUDIO" | "DRAFT"`
-  - `connectedDevice` (string[]): Connected device IDs
-  - `liveSessionPrice` (number): Price for live sessions
-  - `bookingPrice` (number): Price for bookings
-  - `kycVerified` (boolean): KYC verification status
-  - `firstLiveSessionCreated` (boolean): Whether the first live session is created
-  - `firstWorkoutPlanCreated` (boolean): Whether the first workout plan is created
-  - `authType` (string): Authentication type
+* **Method**: `POST`
+* **URL**: `/api/fitnearn/web/coach/logout`
+* **Controller**: `coachLogout`
+
+**Request Body** (JSON)
+
+```json
+{ "coach_id": "COH00012" }
+```
+
+**Functioning**
+
+* Finds the `CoachSession` record(s) for the given `coach_id` (session may store a refreshToken).
+* If a refreshToken exists, calls `revokeCognitoTokens(refreshToken)` to revoke tokens at Cognito so client tokens can no longer be renewed.
+* Deletes or invalidates the `CoachSession` record(s) from the DB.
+* Returns success confirming logout.
+
+**Example Success Response**
+
+```json
+{ "success": true, "message": "Logout successful :: <details>" }
+```
+
+**Common Errors**
+
+* `500 Internal Server Error` — errors while revoking tokens or DB cleanup.
 
 ---
 
-### `ICoachSession`
-- **Description**: Stores active session and authentication tokens for coaches.
-- **Key Fields**:
-  - `coachId` (string): Reference to the coach (`IProfileModel["coach_id"]`)
-  - `phone` (number, optional): Coach's phone number
-  - `userAgent` (string, optional): User agent string
-  - `authToken` (string): Auth token
-  - `accessToken` (string): Access token
-  - `refreshToken` (string): Refresh token
-  - `JWT_Token` (string): JWT token
-  - `createdAt` (Date): Session creation date
-  - `fcmToken` (string, optional): FCM token for push notifications
+## Implementation notes & security considerations
+
+* **Cognito-backed identity**: AWS Cognito is the authoritative identity provider. Controllers rely on Cognito helper functions (`addPhoneNumberToCognito`, `authenticateCognitoUser`, `revokeCognitoTokens`) for secure user lifecycle management.
+* **Session persistence**: `generateCoachTokenAndSetSession` persists server-side session state (in `CoachSession`) so the server can invalidate sessions, track active devices, and revoke refresh tokens when needed.
+* **OTP lifecycle**: OTPs are stored temporarily in `CoachOTP` and removed after successful verification. Use HTTPS. Enforce OTP rate limits in front of these endpoints in production.
+* **Token handling**: Tokens returned to the client include Cognito tokens and the platform genToken. Treat `refresh_token` as sensitive; revoke via `revokeCognitoTokens` on logout or suspicious activity.
+* **Logging & observability**: Controllers use `logger` for structured error logs. Monitor Cognito errors (user creation/validation) separately from DB errors.
+* **Edge cases**: If Cognito is misconfigured, expect 5xx errors. Ensure environment variables for Cognito are set and valid.
 
 ---
 
-### `ICoachOTP`
-- **Description**: Stores OTP codes for coach authentication.
-- **Key Fields**:
-  - `mobileNumber` (number): Coach's mobile number
-  - `otp` (number): OTP code
-  - `createdAt` (Date): OTP creation timestamp
-  - `expiresAt` (Date): OTP expiration timestamp
+## Summary table
 
----
-
-### `ICoachTokenVerification`
-- **Description**: Stores verification tokens for coach authentication.
-- **Key Fields**:
-  - `coachId` (string): Coach identifier
-  - `token` (number): Verification token
-  - `createdAt` (Date): Token creation timestamp
-
----
-
-## Notes
-
-- All endpoints are designed for coach authentication and registration flows.
-- Google OAuth endpoints require valid Google tokens.
-- OTP endpoints require valid phone/email and OTP codes.
-- The `idGenerationMiddleware('COH')` ensures unique coach IDs for new registrations.
-
----
-## Summary Table
-
-| Method | Endpoint             | Description                |
-|--------|----------------------|----------------------------|
-| POST   | `/google/register`   | Google registration        |
-| POST   | `/google/login`      | Google login               |
-| POST   | `/otp/register`      | OTP registration           |
-| POST   | `/otp/login`         | OTP login                  |
-| POST   | `/otp/resend`        | Resend OTP                 |
-| POST   | `/logout`            | Logout                     |
-| GET    | `/otp/verify`        | Verify OTP                 |
-
----
+| Method | Endpoint           | Purpose                                    |
+| ------ | ------------------ | ------------------------------------------ |
+| POST   | `/google/register` | Register a coach via Google (signup)       |
+| POST   | `/google/login`    | Login a coach via Google                   |
+| POST   | `/otp/register`    | Generate OTP for new coach registration    |
+| POST   | `/otp/login`       | Generate OTP for login                     |
+| POST   | `/otp/resend`      | Resend OTP (register/login flows)          |
+| GET    | `/otp/verify`      | Verify OTP and complete login/registration |
+| POST   | `/logout`          | Logout coach (revoke session/token)        |
