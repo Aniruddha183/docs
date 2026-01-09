@@ -1,0 +1,433 @@
+---
+
+title: "Razorpay Payments & Payouts — DB Schema"
+description: "MongoDB schema documentation + TypeScript interfaces for models used in Razorpay payments and payouts flows. Includes IProfile, UserBookings, RazorpayPayouts, CoachAgreement, RefundModel."
+---
+
+# DB Schema
+
+This document describes MongoDB model schemas used by the payments & payouts flows. Each model section contains:
+
+* Full field list with types and short descriptions
+* Important fields called out (highlighted)
+* Suggested indexes
+* A compact Mongoose-style snippet (for reference)
+* A TypeScript `interface` representing the model shape
+
+
+---
+
+# 1. `IProfile` (Coach / User profile)
+
+**Purpose:** central profile for coaches/users. This doc highlights the KYC & Razorpay payout related fields used in payout flows.
+
+**Key fields to highlight:**
+
+* **`kycVerified`** — `boolean` — whether KYC is completed and validated for payouts.
+* **`razorpayContactId`** — `string | null` — stored Razorpay Contact id for the profile (required for payouts via Razorpay).
+* **`razorpayContactType`** — `"individual" | "business" | "Coach" | "Studio" | null` — contact type used while creating Razorpay Contact.
+* **`razorpayFundId`** — `string | null` — stored Razorpay Fund Account id (bank/UPI) attached to the contact.
+* **`razorpayFundType`** — `"bank_account" | "vpa" | null` — type of fund account (bank or VPA/UPI).
+
+**Full fields list**
+
+| Field                   |                                                             Type |     Required    | Description                                                          |                                                      |
+| ----------------------- | ---------------------------------------------------------------: | :-------------: | -------------------------------------------------------------------- | ---------------------------------------------------- |
+| `_id`                   |                                                       `ObjectId` |       yes       | Mongo primary key                                                    |                                                      |
+| `coach_id`              |                                                         `string` |   conditional   | internal coach identifier (if profile is coach)                      |                                                      
+                                       |                                                      
+| `name`                  |                                                         `string` |       yes       | full name                                                            |                                                      |
+| `email`                 |                                                         `string` |   conditional   | email address                                                        |                                                      |
+| `mobileNumber`          |                                                         `string` |   conditional   | phone number                                                         |                                                      |
+| `profileImage`          |                                                         `string` |     optional    | s3 url / public url                                                  |                                                      |
+| `bio`                   |                                                         `string` |     optional    | short bio                                                            |                                                      |
+| `category`              |                                                       `string[]` |     optional    | coach categories / tags                                              |                                                      |
+| `experience`            |                                                         `number` |     optional    | years of experience                                                  |                                                      |
+| `kycVerified`           |                                                        `boolean` | default `false` | whether KYC details are verified via razorpay fund accont validation                              |                                                      |
+                                     |                                                      |
+| `razorpayContactId`     |                                                          `string |      null`      | optional                                                             | 
+| `razorpayContactType`   |                                                          `string |      null`      | optional                                                             | 
+| `razorpayFundId`        |                                                          `string |      null`      | optional                                                             | 
+| `razorpayFundType`      |                                                          `string |      null`      | optional                                                             | 
+|                               |                                                      |
+| `createdAt`             |                                                           `Date` |       yes       | created timestamp                                                    |                                                      |
+| `updatedAt`             |                                                           `Date` |       yes       | last updated timestamp                                               |                                                      |
+
+**Suggested indexes**
+
+* `{ coach_id: 1 }` (sparse)
+* `{ mobileNumber: 1 }` (sparse)
+* `{ email: 1 }` (sparse)
+
+**Mongoose-style snippet (concise)**
+
+```js
+const ProfileSchema = new Schema({
+  coach_id: { type: String, index: true },
+  userId: { type: String, index: true },
+  name: String,
+  email: { type: String, index: true, sparse: true },
+  mobileNumber: { type: String, index: true, sparse: true },
+  profileImage: String,
+  bio: String,
+  category: [String],
+  experience: Number,
+  kycVerified: { type: Boolean, default: false },
+  kycDocuments: [{ key: String, type: String, uploadedAt: Date }],
+  razorpayContactId: { type: String, sparse: true },
+  razorpayContactType: { type: String, enum: ['individual','business', "Coach", "Studio" ], default: null },
+  razorpayFundId: { type: String, sparse: true },
+  razorpayFundType: { type: String, enum: ['bank_account','vpa'], default: null },
+  razorpayFundStatus: { type: String },
+  coachAgreementId: String,
+}, { timestamps: true });
+```
+
+**TypeScript interface**
+
+```ts
+export interface IProfile {
+  _id?: string;
+  coach_id?: string;
+  userId?: string;
+  name: string;
+  email?: string;
+  mobileNumber?: string;
+  profileImage?: string;
+  bio?: string;
+  category?: string[];
+  experience?: number;
+  /** KYC & Razorpay fields highlighted below */
+  kycVerified?: boolean;
+  kycDocuments?: Array<{ key: string; type: string; uploadedAt: Date }>;
+  razorpayContactId?: string | null;
+  razorpayContactType?: 'individual' | 'business' | "Coach" | "Studio" | null;
+  razorpayFundId?: string | null;
+  razorpayFundType?: 'bank_account' | 'vpa' | null;
+  payoutAccountVerified?: boolean;
+  coachAgreementId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+# 2. `UserBookings`
+
+**Purpose:** records of bookings (both public live sessions and private coach bookings). Each booking may reference a session or private appointment, payment records, seat counts, user metadata and refund state.
+
+**Full fields list**
+
+| Field              |       Type |     Required    | Description                                                                     |              |          |           |            |
+| ------------------ | ---------: | :-------------: | ------------------------------------------------------------------------------- | ------------ | -------- | --------- | ---------- |
+| `_id`              | `ObjectId` |       yes       | Mongo primary key                                                               |              |          |           |            |
+| `bookingId`        |   `string` |       yes       | internal booking id (e.g. `BK:00001`)                                           |              |          |           |            |
+| `userId`           |   `string` |       yes       | who booked                                                                      |              |          |           |            |
+                                                  |              |          |           |            |
+| `sessionId`        |   `string` |     optional    | `PublicSession` or `LiveSession` id                                             |              |          |           |            |
+| `sessionType`      |  `"public" |    "private"`   | yes                                                                             | booking type |          |           |            |
+| `date`             |   `string` |     optional    | booking date (YYYY-MM-DD)                                                       |              |          |           |            |                                                                |              |          |           |            |
+| `seats`            |   `number` |   default `1`   | number of seats booked                                                          |              |          |           |            |
+| `actualAmount`            |   `number` |       yes       | Price before discount                                             |              |          |           |            |
+| `grandTotal`     |   `number` |       yes       | final price paid by the user  |              |          |           |            |
+        |
+| `currency`         |   `string` |  default `INR`  | currency code                                                                   |              |          |           |            |
+| `paymentStatus`    |   `string` |       yes       | `pending                                                                        | success      | failed   | refunded` |            |
+| `paymentId`        |   `string` |     optional    |                                                    |              |          |           |            |
+| `orderId`          |   `string` |     optional    | internal order id (if used)                                                     |              |          |           |            |
+| `transactionId`    |   `string` |     optional    | gateway txn id                                                                  |              |          |           |            |
+| `status`           |   `string` |       yes       | `confirmed                                                                      | 
+| `isRefunded`       |  `boolean` | default `false` | whether refunded                                                                |              |          |           |            |
+                                                     |              |          |           |            |
+| `createdAt`        |     `Date` |       yes       |                                                                                 |              |          |           |            |
+| `updatedAt`        |     `Date` |       yes       |                                                                                 |              |          |           |            |
+
+**Suggested indexes**
+
+* `{ bookingId: 1 }` unique
+* `{ userId: 1 }`
+
+**Mongoose-style snippet**
+
+```js
+const UserBookingSchema = new Schema({
+  bookingId: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  coachId: { type: String, index: true },
+  sessionId: { type: String, index: true },
+  sessionType: { type: String, enum: ['public','private'], required: true },
+  date: String,
+  startTime: String,
+  endTime: String,
+  seats: { type: Number, default: 1 },
+  actualAmount: { type: Number, required: true },
+  discountAmount: number;
+  discountPercent: number;
+  gst: number;
+  grandTotal: { type: Number, required: true },
+  currency: { type: String, default: 'INR' },
+  paymentStatus: { type: String, default: 'pending' },
+  paymentId: String,
+  transactionId: String,
+  status: { type: String, default: 'confirmed' },
+  isRefunded: { type: Boolean, default: false },
+}, { timestamps: true });
+```
+
+**TypeScript interface**
+
+```ts
+export interface IUserBooking {
+  _id?: string;
+  bookingId: string;
+  userId: string;
+  coachId?: string;
+  sessionId?: string;
+  sessionType: 'public' | 'private';
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  seats?: number;
+  actualAmount: { type: Number, required: true },
+  discountAmount: number;
+  discountPercent: number;
+  gst: number;
+  grandTotal: { type: Number, required: true },
+  currency?: string;
+  paymentStatus?: 'pending' | 'success' | 'failed' | 'refunded';
+  paymentId?: string;
+  orderId?: string;
+  transactionId?: string;
+  status?: string;
+  isRefunded?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+# 3. `RazorpayPayouts` 
+
+**Purpose:** stores payout transactions initiated by admin (Razorpay payouts or manual payouts). Tracks contact/fundAccount and final status.
+
+**Full fields list**
+
+| Field                |                  Type |    Required   | Description                                       |            |               |        |           |
+| -------------------- | --------------------: | :-----------: | ------------------------------------------------- | ---------- | ------------- | ------ | --------- |
+| `_id`                |            `ObjectId` |      yes      |                                                   |            |               |        |           |
+| `payoutId`           |              `string` |      yes      | internal payout id                                |            |               |        |           |
+| `coachId`            |              `string` |      yes      | coach reference                                   |            |               |        |           |
+                    |            |               |        |           |
+| `amount`             |              `number` |      yes      | amount in smallest unit                           |            |               |        |           |
+| `currency`           |              `string` | default `INR` |                                                   |            |               |        |           |
+| `method`             |              `string` |      yes      | `razorpay_payout                                  | manual     | bank_transfer | upi`   |           |
+| `status`             |              `string` |      yes      | `initiated                                        | processing | success       | failed | reversed` |
+| `razorpayPayoutId`   |              `string` |    optional   | Razorpay payout id                                |            |               |        |           |
+|                                                   |            |               |        |           |
+| `contactId`          |              `string` |    optional   | Razorpay contact id (store for traceability)      |            |               |        |           |
+| `fundAccountId`      |              `string` |    optional   | Razorpay fund-account id (store for traceability) |            |               |        |           |
+| `initiatedBy`        |              `string` |    optional   | admin user id                                     |            |               |        |           |
+|  |                                                   |            |               |        |           |
+| `proofImage`           |              `string` |    optional   | s3 url for proof image if manual                  |            |               |        |           |
+| `notes`              | `Record<string, any>` |    optional   |                                                   |            |               |        |           |
+|                            |            |               |        |           |
+| `createdAt`          |                `Date` |      yes      |                                                   |            |               |        |           |
+| `updatedAt`          |                `Date` |      yes      |                                                   |            |               |        |           |
+
+**Important pointers:**
+
+* `contactId` and `fundAccountId` are often populated from the **IProfile** document (see highlighted fields in IProfile).
+* `status` should be updated from webhook / payout API responses; 
+
+**Suggested indexes**
+
+* `{ payoutId: 1 }` unique
+
+**Mongoose-style snippet**
+
+```js
+const PayoutSchema = new Schema({
+  payoutId: { type: String, required: true, unique: true },
+  coachId: { type: String, required: true, index: true },
+  requestId: String,
+  amount: { type: Number, required: true },
+  currency: { type: String, default: 'INR' },
+  method: { type: String, required: true },
+  status: { type: String, required: true },
+  razorpayPayoutId: { type: String, sparse: true },
+  contactId: String,
+  fundAccountId: String,
+  initiatedBy: String,
+  proofImage: String,
+}, { timestamps: true });
+```
+
+**TypeScript interface**
+
+```ts
+export interface IRazorpayPayout {
+  _id?: string;
+  payoutId: string;
+  coachId: string;
+  requestId?: string;
+  amount: number;
+  currency?: string;
+  method: 'razorpay_payout' | 'manual' | 'bank_transfer' | 'upi' | string;
+  status: 'initiated' | 'processing' | 'success' | 'failed' | 'reversed' | string;
+  razorpayPayoutId?: string;
+  razorpayTransferId?: string;
+  razorpayBatchId?: string;
+  contactId?: string;
+  fundAccountId?: string;
+  initiatedBy?: string;
+  prrofImage?: string; // s3 url
+  prrofImageKey?: string; // s3 key
+  notes?: Record<string, any>;
+  rawResponse?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+# 4. `CoachAgreement`
+
+**Purpose:** stores the standard agreement/compensation terms for a coach — crucial fields include the fees the platform and coach have agreed upon.
+
+**Fields to highlight:**
+
+* **`bookingPrice`** — `number` — standard fee for coach **per coach booking** (in smallest currency unit). This is the per-booking amount the coach will receive or that is charged — used to compute payouts and revenue splits.
+* **`liveSessionPrice`** — `number` — standard fee for **public live session** enrollments (per seat or per-session depending on app logic).
+
+**Full fields list**
+
+| Field                |       Type |    Required   | Description                                                                  |
+| -------------------- | ---------: | :-----------: | ---------------------------------------------------------------------------- |
+| `_id`                | `ObjectId` |      yes      |                                                                              |
+                                                                |
+| `coachId`            |   `string` |      yes      | coach reference                                                              |
+| `bookingPrice`       |   `number` |      yes      | **highlight** coach fee per private booking (smallest unit)                  |
+| `liveSessionPrice`   |   `number` |      yes      | **highlight** standard price/fee for live sessions (per-seat or per-session) |
+|                                            |
+| `currency`           |   `string` | default `INR` |                                                                              |
+|                                                                             |
+| `status`             |   `string` |    optional   | active/inactive                                                              |
+| `createdAt`          |     `Date` |      yes      |                                                                              |
+| `updatedAt`          |     `Date` |      yes      |                                                                              |
+
+**Indexes**
+
+* `{ coachId: 1 }`
+
+**Mongoose snippet**
+
+```js
+const CoachAgreementSchema = new Schema({
+  coachId: { type: String, required: true, index: true },
+  bookingPrice: { type: Number, required: true },
+  liveSessionPrice: { type: Number, required: true },
+  currency: { type: String, default: 'INR' },
+  status: { type: String, default: 'active' },
+  agreementUrl: { type: String, required: false },
+  agreementKey: { type: String, required: false },
+
+}, { timestamps: true });
+```
+
+**TypeScript interface**
+
+```ts
+export interface ICoachAgreement {
+  _id?: string;
+  agreementId: string;
+  coachId: string;
+  bookingPrice: number;
+  liveSessionPrice: number;
+  currency?: string;
+  status?: 'active' | 'inactive' | string;
+  agreementUrl: string;
+  agreementKey: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+# 5. `RefundModel`
+
+**Purpose:** records refund attempts and their life-cycle (initiated by admin/user or via automated bulk refunds). Useful for auditing and linking refunds to bookings and payments.
+
+**Full fields list**
+
+| Field              |                  Type |    Required   | Description                   |           |        |          |
+| ------------------ | --------------------: | :-----------: | ----------------------------- | --------- | ------ | -------- |
+| `_id`              |            `ObjectId` |      yes      |                               |           |        |          |
+| `refundId`         |              `string` |      yes      | internal refund id            |           |        |          |
+|   |           |        |          |
+| `bookingId`        |              `string` |    optional   | linked booking id             |           |        |          |
+| `amount`           |              `number` |      yes      | refund amount (smallest unit) |           |        |          |
+| `currency`         |              `string` | default `INR` |                               |           |        |          |
+| `status`           |              `string` |      yes      | `created                      | processed | failed | pending` |
+| `reason`           |              `string` |    optional   |                               |           |        |          |
+| `initiatedBy`      |              `string` |    optional   | admin or system user          |           |        |          |
+|  |                               |           |        |          |
+| `razorpayRefundId` |              `string` |    optional   |                               |           |        |          |
+|          |           |        |          |
+| `notes`            | `Record<string, any>` |    optional   |                               |           |        |          |
+| `createdAt`        |                `Date` |      yes      |                               |           |        |          |
+| `updatedAt`        |                `Date` |      yes      |                               |           |        |          |
+
+**Suggested indexes**
+
+* `{ refundId: 1 }` unique
+* `{ razorpayRefundId: 1 }` sparse
+
+**Mongoose snippet**
+
+```js
+const RefundSchema = new Schema({
+  refundId: { type: String, required: true, unique: true },
+  bookingId: String,
+  amount: { type: Number, required: true },
+  currency: { type: String, default: 'INR' },
+  status: { type: String, required: true },
+  reason: String,
+  initiatedBy: String,
+  razorpayRefundId: String,
+}, { timestamps: true });
+```
+
+**TypeScript interface**
+
+```ts
+export interface IRefundModel {
+  _id?: string;
+  refundId: string;
+  bookingId?: string;
+  amount: number;
+  currency?: string;
+  status: 'created' | 'processed' | 'failed' | 'pending' | string;
+  reason?: string;
+  initiatedBy?: string;
+  razorpayRefundId?: string;
+  notes?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+---
+
+# Cross-model notes & best practices
+
+1. **Do not store sensitive bank details in plaintext.** Store only masked values (last 4 digits) if needed for UI. Use encrypted S3 or encrypted DB fields for any full sensitive data.
+2. **Razorpay ids as canonical keys:** store `razorpayContactId`, `razorpayFundId`, `razorpayPayoutId` and never store card PANs or raw account numbers. Use these ids to reconcile with Razorpay webhooks.
+3. **Timestamps & audit:** include `createdAt` and `updatedAt` for every model. For payouts and refunds include `initiatedAt` / `processedAt` explicitly.
+4. **Linking:** `UserBookings` links to `RefundModel` via `refundId` and to payments via `paymentId`. `RazorpayPayouts` links to `IProfile` via `coachId` and uses `contactId`/`fundAccountId` values from the `IProfile` document.
+5. **Indexes:** index IDs used frequently by webhooks and reconciliation (`razorpay*` fields, booking/payment ids). This speeds up webhook processing.
+
+---

@@ -288,6 +288,7 @@
           "group": "Razorpay",
           "pages": [
              "backend/razorpay-setup",
+            "backend/Razorpay/payments-db-schema",
             "backend/Razorpay/razorpay-payment-api-doc",
             "backend/Razorpay/coach-payout-overview",
             "backend/Razorpay/razorpay-payout-api-doc",
