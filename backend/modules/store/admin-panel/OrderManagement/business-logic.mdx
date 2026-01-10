@@ -1,0 +1,98 @@
+# Order & Payment Business Logic
+
+## Overview
+
+This document outlines the decision tables and calculation logic for the Order Management module. It details core business rules for order aggregation, status transitions, and financial calculations.
+
+---
+
+## 1. Master Order State Logic
+
+The `Order` document's state is a **Computed Property** derived from the status of all its child Fulfilments.
+
+| Child Fulfilment States | Master Order State | Logic |
+| :--- | :--- | :--- |
+| All `New` | `Order Received` | Initial state. |
+| Any `Processing` / `Shipping` | `Order In Process` | Activity has started on at least one item. |
+| Any `Payment Pending` | `Payment Pending` | Waiting for payment confirmation. |
+| All `Closed` | `Completed` | All items delivered or terminal. |
+| Any `Refund` + `Rejected`/`Cancelled` | `Order Refund` | Return flow active. |
+
+**Rule**: The "lowest common denominator" of activity drives the status. If even one item is pending, the whole order is considered "In Process".
+
+---
+
+## 2. Task & State Transitions
+
+Transactions move through a strict flow enforced by the `createTask` controller.
+
+**Uniqueness**: A fulfilment cannot have two open tasks of the same type.
+
+**Closure**: When a Task is `Closed`, it implies that specific operational step is done. Example: Closing a `Processing` task usually precedes opening a `Shipping` task.
+
+**Terminal States**:
+
+- If `isDelivered: "No"` and State is `Cancelled`, the order is dead.
+- If `isDelivered: "Yes"`, the lifecycle ends successfully.
+
+---
+
+## 3. Seller Payment Formula
+
+Payouts are calculated dynamically to ensure transparency.
+
+**Formula**:
+
+```
+Final Payout = Product Price - (Commission % of Price) - Penalty
+```
+
+**Components**:
+
+- **Product Price**: The user-paid amount for the item.
+- **Commission Rate**: A configured % (e.g., 10%) agreed upon with the seller.
+- **Penalty**: Manual deduction by Admin for lost items, late shipping, or wrong items.
+
+**Constraint**: `Final Payout` cannot be negative (floored at 0).
+
+---
+
+## 4. Refund Rules
+
+- **Source**: Refunds are processed via Razorpay.
+- **Amount Cap**: `Refund Amount <= Amount Paid by User`. You cannot refund more than the transaction value.
+- **Double-Refund Prevention**: The system checks Razorpay status (`refunded`) before attempting a new refund call to prevent duplicate payouts.
+- **States**:
+  - `Initiated`: Request sent to Gateway.
+  - `Processed`: Money left the platform account.
+
+---
+
+## 5. Invoice Generation
+
+- **Trigger**: Invoices are generated only when the order is marked `Delivered` or upon explicit request.
+- **Storage**: Generated PDF is uploaded to S3 Public Bucket.
+- **Immutable URL**: The S3 URL is saved to the document (`invoiceUrl`). Subsequent requests return this URL instead of regenerating the PDF.
+
+---
+
+## 6. Payment Rejection Protocol
+
+Admins can reject a logged seller payment if the transaction is invalid or bank details are incorrect.
+
+**Status Reset**: The status is forced to `NOT_APPLICABLE` (distinct from `Failed`).
+
+**Financial Reset**:
+
+- `Commission` → Reset to 0.
+- `Penalty` → Reset to 0.
+- `Amount Paid` → Cleared.
+
+**Reason**: A `rejectReason` is mandatory for audit trails.
+
+---
+
+## 7. Staff Assignment Logic
+
+- **Override**: Manual assignment (`assignTo`) takes precedence over any automated routing.
+- **Visibility**: Assigning an order to a specific Staff ID filters it into their "My Tasks" view (if applicable).

@@ -1,0 +1,75 @@
+---
+title: Order Architecture
+description: Technical design for order processing, fulfilment splitting, and invoice generation.
+---
+
+# Order & Fulfilment Architecture
+
+The Order module is the transactional heart of the platform, designed to ensure data consistency while handling multi-seller cart checkout, real-time stock deductions, and post-purchase document generation.
+
+## 1. The "Split-Order" Core
+
+A single user checkout is converted into a hierarchical structure to support a **multi-vendor marketplace** model.
+
+-   **Wrapper Order**: The parent `Order` document captures the user-facing transaction (Grand Total, Payment ID, Shipping Address).
+-   **Fulfilment Units**: The system automatically splits the parent order into granular `Fulfilment` documents.
+    -   **Split Logic**: 1 Fulfilment = 1 Line Item (or 1 Seller group).
+    -   **Independence**: Each fulfilment has its own `Status` (e.g., one item Shipped, another Pending), `Invoice`, and `Tracking Number`.
+    -   **Seller Payouts**: Commission calculations (`fitcartCommissionRate`) happen at this granular level.
+
+## 2. Order Lifecycle & State Machine
+
+The order process follows a strict state transition flow:
+
+### Transactional Creation (ACID)
+1.  **Stock Lock**: Decrement `Product/Variant` stock. (Rollback if insufficient).
+2.  **Order Write**: Create parent `Order` record.
+3.  **Fulfilment Write**: Generate `FULFILxxxx` records for each item.
+4.  **Cart Purge**: Clear the user's `Cart`.
+5.  **Commit**: Finalize transaction.
+
+### Status Flow
+`Order Received` → `Payment Confirmed` → `Processing` → `Shipped` → `Delivered` OR `Cancelled`
+
+## 3. Invoice Generation Service
+
+Invoices are generated dynamically and stored as immutable records.
+
+-   **Trigger**: On-demand or post-delivery.
+-   **Engine**: `PDFKit` renders a standardized template.
+-   **Storage**: 
+    -   PDFs are uploaded to **AWS S3** (`invoices/` bucket).
+    -   Public URL is stored in the `Fulfilment` document.
+-   **Assets**: Auto-fetches fonts and logos during generation to ensure brand consistency.
+
+## 4. Data Schema Highlights
+
+### Order Table (Aggregator)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `orderId` | String | Unique User Ref (e.g., `ORDER123`) |
+| `grandTotal` | Number | Total User Payment |
+| `paymentStatus` | Enum | `Paid`, `Pending`, `Failed` |
+| `orders` | Array | Array of summary line items |
+
+### Fulfilment Table (Execution Unit)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `fulfilmentId` | String | Unique Tracking Ref (e.g., `FULFIL456`) |
+| `sellerId` | String | Vendor responsible for this item |
+| `stage` | Enum | `New`, `Packed`, `Shipped`, `Completed` |
+| `invoiceUrl` | String | S3 URL to the PDF invoice |
+
+## 5. Cart Engine
+
+-   **Logic**: "Merge & Sum". If a user adds an item already in the cart (matched by `productId` + `variantId`), the quantity increments rather than creating a duplicate entry.
+-   **Validation**: Real-time price and stock checks occur **on every fetch** (`getCartItems`) to reflect current catalog changes instantly.
+
+## 6. Notification Integration
+
+-   **Event-Driven**: Successful order commit triggers generic events.
+-   **Channels**:
+    -   **FCM**: Push notifications for "Order Placed" and "Shipped".
+    -   **Email**: Order confirmation summary.

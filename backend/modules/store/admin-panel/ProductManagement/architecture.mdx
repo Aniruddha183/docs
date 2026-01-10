@@ -1,0 +1,62 @@
+---
+title: "Product Architecture"
+description: "The Admin Product module handles the complete lifecycle of inventory, designed to manage complex SKU variations, enforce store capacity limits, and provide deep insights into product performance."
+---
+
+## 1. Product Lifecycle & State Engine
+The system employs a strict state machine to manage product visibility and readiness.
+- **Draft vs. Publish:**
+  - **Draft:** Products can be saved partially. A "Base Variant" is attempted but only created if all required fields are present. `state: 'Draft'`, `status: 'Inactive'`.
+  - **Publish:** Requires strict validation (min 3 images, max words). Automatically generates a **Base Variant** that mirrors the product's main attributes to ensure at least one purchasable SKU exists. `state: 'Publish'`, `status: 'Active'`.
+- **Base Variant Logic:** Every published product possesses an `isBaseVariant: true` SKU. This ensures that even "simple" products are treated architecturally as having at least one variant, simplifying the frontend checkout logic.
+## 2. Inventory & Capacity Management
+Inventory logic on the admin side allows for strict control over stock distribution.
+- **Store Capacity Protocol:**
+  - The `Base Product` defines a `storeCapacity` (total shelf space allocated).
+  - **Validation:** When adding or editing a `Variant`, the system sums the stock of all existing variants + the new quantity. If this exceeds `storeCapacity`, the operation is blocked to prevent overstocking.
+- **Stock Synchronization:**
+  - The `Base Product` maintains an aggregate `baseStockQuantity` and `inventoryStatus` (`InStock` / `OutOfStock`).
+  - Updates to any variant trigger a recalculation of the parent product's global inventory status.
+## 3. Analytics & Insights Service
+This service aggregates cross-module data to provide a 360-degree view of product performance:
+- **Engagement Metrics:**
+  - **Likes:** Real-time count from `UserLike` collection.
+  - **Cart Adds:** Aggregates `Cart` items to show potential intent.
+  - **Shares:** Tracks social sharing activity stored on the Product document.
+- **Sales Conversion:**
+  - **Bought Count:** Deep aggregation of the `Order` collection, unwinding order items to sum up specific SKU sales.
+- **Rating Distribution:** Calculates weighted averages and detailed star-breakdowns (1-5 stars) dynamically from the `Review` module.
+## 4. Data Schema Highlights
+### Product Table (Admin Extensions)
+| Field | Type | Description |
+|------|------|-------------|
+| `storeCapacity` | Number | Maximum allowed stock across all variants |
+| `sellerId` | String | Link to the Seller profile (for multi-vendor support) |
+| `taxRate` | Number | GST/Tax percentage applicable |
+| `hsnCode` | String | Harmonized System Nomenclature code for invoicing |
+| `state` | Enum | `Draft`, `Publish` |
+### Variant Table (Inventory Control)
+| Field | Type | Description |
+|------|------|-------------|
+| `variantId` | String | Unique SKU ID (e.g., `VAR99001`) |
+| `isBaseVariant` | Boolean | Flags the default variant created at publication |
+| `variantStockQuantity`| Number | Actual physical stock for this specific SKU |
+| `orderLimit` | Number | Max quantity a single user can buy per order |
+### Analytics Response Object
+```json
+{
+  "productId": "PROD123",
+  "likes": 150,
+  "addedToCart": 45,
+  "bought": 12,
+  "ratingDetails": {
+    "fiveStar": 10,
+    "fourStar": 2,
+    ...
+  }
+}
+```
+
+## 5. Performance Strategy
+- **Batch Aggregation**: Analytics endpoints use MongoDB Aggregation Pipelines to compute Total Bought and Total Cart Adds on the fly, avoiding the need to store stale counters on the product document.
+- **Variant Lock-Checking**: A "Rollback" mechanism is implemented during Variant creation. If storeCapacity is exceeded during the race condition of a save, the new variant is immediately deleted to maintain data integrity.
