@@ -91,14 +91,20 @@
           "pages": ["frontend/frontend-code-guidelines", "frontend/demo"]
         },
         {
-          "group": "Fitnearn Components",
+          "group": "Fitnearn Components · Website",
           "pages": [
-            "frontend/sidebar",
             "frontend/adminheader",
             "frontend/text-effect",
             "frontend/select-avatar",
+            "frontend/downloadButton"
+          ]
+        },
+
+        {
+          "group": "Fitnearn Components · Admin",
+          "pages": [
+            "frontend/sidebar",
             "frontend/shadcnButton",
-            "frontend/downloadButton",
             "frontend/toast-docs",
             "frontend/Popup",
             "frontend/combo-box",
@@ -226,7 +232,7 @@
           "pages": [
             "backend/modules/coach/overview",
             "backend/coachBooking-db-schema",
-            
+
             {
               "group": "Website",
               "pages": ["backend/User/user-coach-booking-api-doc"]
@@ -264,16 +270,14 @@
         {
           "group": "Razorpay",
           "pages": [
-             "backend/razorpay-setup",
+            "backend/razorpay-setup",
             "backend/Razorpay/payments-db-schema",
             "backend/Razorpay/razorpay-payment-api-doc",
             "backend/Razorpay/coach-payout-overview",
             "backend/Razorpay/razorpay-payout-api-doc",
             {
               "group": "Admin Panel",
-              "pages": [
-                "backend/admin-live-session-management"        
-              ]
+              "pages": ["backend/admin-live-session-management"]
             }
           ]
         },
@@ -470,7 +474,7 @@
                   ]
                 },
                 {
-                  "group":"Order",
+                  "group": "Order",
                   "pages": [
                     "backend/modules/store/website/order/architecture",
                     "backend/modules/store/website/order/business-logic",
