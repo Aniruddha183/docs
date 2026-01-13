@@ -96,7 +96,12 @@
             "frontend/adminheader",
             "frontend/text-effect",
             "frontend/select-avatar",
-            "frontend/downloadButton"
+            "frontend/downloadButton",
+            "frontend/blog-card",
+            "frontend/contact-us",
+            "frontend/editorjs-renderer",
+            "frontend/user-navbar",
+            "frontend/usernavbar-footer"
           ]
         },
 
