@@ -1,0 +1,327 @@
+---
+title: "Product Management API"
+description: "This section outlines the API endpoints for managing Products, Variants, and Analytics in the FitnEarn platform."
+---
+### 1. Add & Publish Product
+Creates a new product and immediately publishes it. Automatically generates a **Base Variant**.
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addPublishProduct`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_PRODUCT`
+- **Middleware**: `idGenerationMiddleware('PROD')`
+- **Request Body**:
+```json
+{
+  "productName": "Yoga Mat",
+  "description": "High quality yoga mat...",
+  "productCategory": "Equipment",
+  "basePrice": 1999,
+  "baseStockQuantity": 100,
+  "storeCapacity": 500,
+  "baseImages": ["url1", "url2", "url3"],
+  "size": "Standard",
+  "color": "Blue",
+  "sellerName": "FitnEarn Direct",
+  "sellerId": "SELLER123",
+  "taxRate": 18,
+  "orderLimit": 5,
+  "highlights": ["Non-slip", "Eco-friendly"]
+}
+Response:
+{
+  "success": true,
+  "message": "Product Added and Published",
+  "data": {
+    "product": {
+      "productId": "PROD8274",
+      "state": "Publish",
+      "status": "Active",
+      ...
+    }
+  }
+}
+Error Responses:
+400 Bad Request – Missing required fields or Image count < 3
+500 Internal Server Error
+2. Add Draft Product
+Saves a product as a draft. Creates a Base Variant only if all required fields are present.
+
+Method: POST
+
+Endpoint: /api/fitnearn/web/admin/store/addDraftProduct
+
+Authentication: authenticateAdminToken
+
+Authorization: CREATE_PRODUCT
+
+Middleware: idGenerationMiddleware('PROD')
+
+Request Body: Same as Add Publish Product, but fields can be partial.
+
+Response:
+
+{
+  "success": true,
+  "message": "Product Added and Published",
+  "data": { "product": { ... } }
+}
+3. Publish Draft Product
+Transition a Draft product to Published state.
+
+Method: PUT
+
+Endpoint: /api/fitnearn/web/admin/store/publishProduct/:productId
+
+Authentication: authenticateAdminToken
+
+Authorization: PUBLISH_PRODUCT
+
+Path Parameters:
+
+productId: (string)
+Response:
+
+{
+  "success": true,
+  "message": "Product published successfully and base variant created",
+  "data": { ... }
+}
+4. Edit Product
+Updates product details and synchronizes changes to the Base Variant.
+
+Method: PATCH
+
+Endpoint: /api/fitnearn/web/admin/store/editProduct/:productId
+
+Authentication: authenticateAdminToken
+
+Authorization: EDIT_PRODUCT
+
+Request Body:
+
+Supports partial updates of product fields.
+Response:
+
+{
+  "success": true,
+  "message": "Product and Base Variant updated successfully",
+  "data": { ... }
+}
+5. Get Product List
+Method: GET
+
+Endpoint: /api/fitnearn/web/admin/store/getProductList
+
+Authentication: authenticateAdminToken
+
+Authorization: VIEW_PRODUCTS
+
+Query Parameters (optional):
+
+search: (string) Search by name, ID, category
+category: (string)
+price: (number)
+status: Active | Inactive
+state: Draft | Publish
+inventoryStatus: InStock | OutOfStock
+sortBy: A-Z | Z-A
+hasVariant: Yes | No
+Response:
+
+{
+  "success": true,
+  "data": [
+    {
+       "productId": "PROD123",
+       "productName": "Yoga Mat",
+       "baseStockQuantity": 20,
+       "inventoryStatus": "InStock",
+       "variantCount": "2 Variants",
+       ...
+    }
+  ]
+}
+6. Get Product By ID
+Method: GET
+
+Endpoint: /api/fitnearn/web/admin/store/getProduct/:productId
+
+Authentication: authenticateAdminToken
+
+Authorization: READ_PRODUCT
+
+Response:
+
+{
+  "success": true,
+  "data": { ... }
+}
+7. Add Variant
+Adds a new SKU variant to an existing product.
+
+Method: POST
+
+Endpoint: /api/fitnearn/web/admin/store/addProductVariant
+
+Authentication: authenticateAdminToken
+
+Authorization: CREATE_PRODUCT_VARIANT
+
+Middleware: idGenerationMiddleware('VAR')
+
+Request Body:
+
+{
+  "productId": "PROD123",
+  "variantName": "Yoga Mat - Red",
+  "variantStockQuantity": 50,
+  "size": "L",
+  "color": "Red",
+  "variantImages": [...],
+  "variantPrice": 2100
+}
+Error Responses:
+400 Bad Request – Store Capacity Exceeded
+8. Edit Variant
+Method: PATCH
+
+Endpoint: /api/fitnearn/web/admin/store/editProductVariant
+
+Authentication: authenticateAdminToken
+
+Authorization: EDIT_PRODUCT_VARIANT
+
+Request Body:
+
+variantId: (required)
+Fields to update
+Response:
+
+{
+  "success": true,
+  "message": "Variant ID VAR999 updated successfully"
+}
+9. Delete Variants
+Method: DELETE
+
+Endpoint: /api/fitnearn/web/admin/store/deleteManyVariants
+
+Authentication: authenticateAdminToken
+
+Authorization: DELETE_PRODUCT
+
+Request Body:
+
+{
+  "variantIds": ["VAR001", "VAR002"]
+}
+Error Responses:
+400 Bad Request – Cannot delete Base Variant
+10. Get Product Analytics
+Method: GET
+
+Endpoint: /api/fitnearn/web/admin/store/getProductAnalytics/:productId
+
+Authentication: authenticateAdminToken
+
+Authorization: READ_PRODUCT
+
+Response:
+
+{
+  "success": true,
+  "data": {
+    "productId": "PROD123",
+    "likes": 150,
+    "addedToCart": 45,
+    "bought": 12,
+    "shares": 5
+  }
+}
+11. Get Product Reviews
+Method: GET
+
+Endpoint: /api/fitnearn/web/admin/store/allReviews/:productId
+
+Authentication: authenticateAdminToken
+
+Authorization: READ_PRODUCT
+
+Response:
+
+{
+  "success": true,
+  "message": "Reviews retrieved successfully",
+  "data": {
+    "totalReviews": 10,
+    "finalReviews": [ ... ],
+    "totalRatings": 4.5,
+    "ratingDetails": { "fiveStar": 5, ... }
+  }
+}
+### 12. Delete Many Products
+- **Method**: `DELETE`
+- **Endpoint**: `/api/fitnearn/web/admin/store/deleteManyProduct`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `DELETE_PRODUCT`
+- **Request Body**:
+```json
+{
+  "productIds": ["PROD1", "PROD2"]
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Products deleted successfully"
+}
+```
+### 13. Copy Product
+Duplicates an existing product including its basic details.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/copyProduct/:productId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `COPY_PRODUCT`
+- **Middleware**: `idGenerationMiddleware('PROD')`
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Product copied successfully",
+  "data": { "productId": "PROD_NEW_123", ... }
+}
+```
+
+### 14. Size Guide Management
+#### Upload Size Guide
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/uploadSizeGuide`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `UPLOAD_SIZE_GUIDE`
+- **Middleware**: `idGenerationMiddleware('SIZEID'), upload.single('image')`
+
+#### Get Size Guide
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getSizeGuide`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_SIZE_GUIDE`
+### 15. Get Rating Details
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/ratingDetails/:productId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_PRODUCT`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "averageRating": 4.5,
+    "totalRatings": 100,
+    "distribution": { "1": 2, "2": 1, "3": 10, "4": 20, "5": 67 }
+  }
+}
+```

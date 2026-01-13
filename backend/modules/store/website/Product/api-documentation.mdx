@@ -1,0 +1,342 @@
+---
+title: "Product API Documentation"
+---
+
+## Product Module
+
+### Module Overview
+
+The Product module powers the e-commerce storefront, allowing users to browse, search, and interact with the catalog. Users can **filter products** by various attributes (price, size, color), view detailed information, **manage wishlists**, and **post reviews**.
+
+### Key Capabilities
+
+- **Catalog Discovery:** Advanced search and multi-dimensional filtering
+- **Product Details:** Rich product information including variants and size guides
+- **User Interaction:** Like/Unlike products and post verified reviews
+- **Recommendations:** Smart "Similar Products" suggestions
+
+---
+
+### Product APIs
+
+Below are the APIs related to **Product Management** within this module.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/users/store/product
+```
+
+---
+
+## Endpoints
+
+### 1. Get All Products
+
+Retrieves a paginated and filtered list of products.
+
+- **Method**: `GET`
+- **URL**: `/all-products/:userId`
+- **Controller**: `getAllProducts`
+- **URL Parameters**:
+    - `userId` (string): User identifier for "Like" status check (required)
+- **Query Parameters**:
+    - `search` (string): Search term for product name (optional)
+    - `category` (string): Filter by category (comma-separated, optional)
+    - `price` (number): Max price filter (optional)
+    - `rating` (number): Filter by exact rating (optional)
+    - `color` (string): Filter by variant color (comma-separated, optional)
+    - `size` (string): Filter by variant size (comma-separated, optional)
+    - `bestSeller` (boolean): Filter for best sellers (optional)
+    - `isFreeDelivery` (boolean): Filter for free delivery items (optional)
+    - `stock` (boolean): Filter for in-stock items (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "productId": "PROD123",
+        "name": "Yoga Mat",
+        "price": 1200,
+        "priceOff": 1500,
+        "discountRate": 20,
+        "rating": 4.5,
+        "thumbnail": "https://...",
+        "inStock": true,
+        "isLiked": true,
+        "bestSeller": true
+      }
+    ]
+  }
+  ```
+- **Error Responses**:
+    - `500 Internal Server Error`
+
+---
+
+### 2. Get Product Details
+
+Retrieves full details for a specific product, including variants and reviews.
+
+- **Method**: `GET`
+- **URL**: `/get-product/:productId`
+- **Controller**: `getProductById`
+- **URL Parameters**:
+    - `productId` (string): Product identifier (required)
+- **Query Parameters**:
+    - `userId` (string): User identifier for personalization (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "productId": "PROD123",
+      "name": "Yoga Mat",
+      "description": "Premium non-slip mat",
+      "price": 1200,
+      "images": ["https://..."],
+      "colors": ["Red", "Blue"],
+      "size": ["Standard"],
+      "variant": [
+        { "variantId": "VAR001", "color": "Red", "stock": 10 }
+      ],
+      "reviews": [],
+      "sizeGuide": "https://..."
+    }
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Invalid Product ID
+    - `404 Not Found`: Product not found
+    - `500 Internal Server Error`
+
+---
+
+### 3. Like / Dislike Product
+
+Toggles the "Like" status of a product for a user.
+
+- **Method**: `POST`
+- **URL**: `/like-product/:userId/:productId`
+- **Controller**: `likeProduct`
+- **URL Parameters**:
+    - `userId` (string): User identifier (required)
+    - `productId` (string): Product identifier (required)
+- **Query Parameters**:
+    - `action` (string): `like` or `dislike` (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Product Liked"
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Missing parameters or Invalid action
+    - `404 Not Found`: Product not found
+    - `200 OK (False)`: Product is already liked/disliked
+
+---
+
+### 4. Share Product
+
+Increments the share count for a product.
+
+- **Method**: `POST`
+- **URL**: `/share/:productId`
+- **Controller**: `updateProductShare`
+- **URL Parameters**:
+    - `productId` (string): Product identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Product share count updated successfully",
+    "data": {
+      "productId": "PROD123",
+      "totalShares": 15
+    }
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Product ID required
+    - `404 Not Found`: Product not found
+    - `500 Internal Server Error`
+
+### 5. Get Liked Products
+
+Retrieves a list of all products liked by the user.
+
+- **Method**: `GET`
+- **URL**: `/liked-products/:userId`
+- **Controller**: `getLikedProducts`
+- **URL Parameters**:
+    - `userId` (string): User identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      { "productId": "PROD123", "productName": "Yoga Mat" }
+    ]
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: User ID required
+    - `404 Not Found`: User likes not found
+
+---
+
+### 5. Get Similar Products
+
+Retrieves recommended products based on the current product's category.
+
+- **Method**: `GET`
+- **URL**: `/similar-products/:productId`
+- **Controller**: `getSimilarProducts`
+- **URL Parameters**:
+    - `productId` (string): Reference Product ID (required)
+- **Query Parameters**:
+    - `userId` (string): User identifier (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "productId": "PROD456",
+        "name": "Foam Roller",
+        "category": "Equipment",
+        "price": 800
+      }
+    ]
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Product ID missing
+    - `404 Not Found`: Reference product not found
+
+---
+
+### 6. Validate Products (Stock Check)
+
+Checks availability and stock validation for a list of products (used before Cart/Checkout).
+
+- **Method**: `POST`
+- **URL**: `/validate-products`
+- **Controller**: `validateProducts`
+- **Request Body**:
+  ```json
+  {
+    "products": [
+      { "productId": "PROD123", "variantId": "VAR001", "quantity": 1 }
+    ]
+  }
+  ```
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "All products are available and have sufficient stock"
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Insufficient stock or invalid input
+    - `404 Not Found`: Product/Variant not found
+
+---
+
+### 7. Post Review
+
+Allows a verified buyer to post a review for a product.
+
+- **Method**: `POST`
+- **URL**: `/review/add/:productId`
+- **Controller**: `postReview`
+- **Middleware**: `upload.single('reviewImage')`
+- **URL Parameters**:
+    - `productId` (string): Product identifier (required)
+- **Request Body** (multipart/form-data):
+    - `userId` (string): User identifier (required)
+    - `rating` (number): 1-5 Star rating (required)
+    - `review` (string): Review text content (optional)
+    - `type` (string): `Product` (required)
+    - `reviewImage` (file): Optional image attachment
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Review is Posted"
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: Already reviewed or invalid type
+    - `401 Unauthorized`: Missing authentication headers (for upload)
+    - `403 Forbidden`: User has not purchased/received the product
+    - `404 Not Found`: User not found
+
+---
+
+### 8. Get Product Reviews
+
+Retrieves reviews for a specific product.
+
+- **Method**: `GET`
+- **URL**: `/reviews/:moduleId`
+- **Controller**: `getReviews`
+- **URL Parameters**:
+    - `moduleId` (string): Product ID (required)
+- **Query Parameters**:
+    - `type` (string): `Product` (required)
+    - `search` (string): Search keyword (optional)
+    - `sortby` (string): `latest`, `oldest`, `mostrated` (default)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalReviews": 10,
+      "finalReviews": [
+        {
+          "username": "John Doe",
+          "rating": 5,
+          "content": "Great product!",
+          "reviewFileUrl": "https://..."
+        }
+      ]
+    }
+  }
+  ```
+
+---
+
+### 9. Get Review Stats
+
+Retrieves aggregated rating statistics.
+
+- **Method**: `GET`
+- **URL**: `/review/rating-details/:moduleId`
+- **Controller**: `getRatingDetails`
+- **URL Parameters**:
+    - `moduleId` (string): Product ID (required)
+- **Query Parameters**:
+    - `type` (string): `Product` (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalRatings": 4.5,
+      "ratingDetails": {
+        "oneStar": 1,
+        "twoStar": 0,
+        "threeStar": 2,
+        "fourStar": 5,
+        "fiveStar": 10
+      }
+    }
+  }
+  ```

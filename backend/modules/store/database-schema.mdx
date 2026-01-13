@@ -1,0 +1,401 @@
+# Store Module - Database Schema Documentation
+
+## Overview
+
+This document describes the MongoDB collections used in the Store module. The schema supports e-commerce functionality including product management, order processing, fulfilment, seller payments, reviews, and shopping cart operations.
+
+**Database**: MongoDB  
+**Total Collections**: 12  
+**Last Updated**: January 2026
+
+---
+
+## Collections Summary
+
+| Collection | Purpose | Primary Key | Related Collections |
+| :--- | :--- | :--- | :--- |
+| `Product` | Main product catalog information | `productId` | Variant, Review, SizeGuide, User |
+| `Variant` | Product variations (size/color/etc.) | `variantId` | Product |
+| `Cart` | User shopping basket | `userId` | User, Product, Variant |
+| `ShippingAddress` | User delivery addresses | `userId` | User |
+| `Order` | Customer order records | `orderId` | User |
+| `Fulfilment` | Order processing and shipping tracking | Auto-generated `_id` | Order, SellerPayment, Task, Timeline |
+| `Task` | Operations/tasks related to fulfilment | `taskId` | Fulfilment (Order ref), UserCrossPlatform |
+| `Refund` | Refund processing for orders and bookings | `refundId` | UserBooking, Order |
+| `Review` | Product ratings and feedback | `reviewId` | User, Product, Studio, Coach, Workout |
+| `CouponCode` | Discount coupons | `couponCode` | - |
+| `SellerPayment` | Payout records for sellers | Auto-generated `_id` | Fulfilment |
+| `SizeGuide` | Size charts for products | `sizeGuideId` | Product |
+
+---
+
+## 1. Product Collection
+
+**Purpose**: Stores core product details, categorization, and general settings. Serves as the parent for variants.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `productId` | String | Yes | - | Unique product identifier |
+| `productName` | String | Yes | - | Name of the product |
+| `description` | String | No | - | Product description |
+| `productCategory` | String | No | - | Category classification |
+| `basePrice` | Number | No | - | Base price before variations |
+| `baseStockQuantity` | Number | No | - | Stock count for base product |
+| `storeCapacity` | Number | No | - | Maximum store capacity |
+| `warranty` | String | No | - | Warranty information |
+| `productHsnCode` | String | No | - | HSN code for tax |
+| `bestSeller` | Boolean | No | `false` | Best seller flag |
+| `inventoryStatus` | String (enum) | Yes | - | Stock status (see below) |
+| `isCoupon` | Boolean | Yes | `false` | Coupon eligibility |
+| `discountRate` | Number | No | - | Discount percentage |
+| `couponCode` | String | No | - | Applicable coupon code |
+| `baseImages` | Array[String] | No | - | Product images (max 4) |
+| `thumbnailMediaId` | Array[String] | No | - | Media IDs for thumbnails |
+| `color` | String | No | - | Base color |
+| `size` | String | No | - | Base size |
+| `highlights` | String | No | - | Key product highlights |
+| `reviewIds` | Array[String] | No | `[]` | References to Review collection |
+| `freeDelivery` | Boolean | No | `false` | Free shipping flag |
+| `status` | String (enum) | No | `"Inactive"` | Operational status (see below) |
+| `state` | String (enum) | No | `"Draft"` | Lifecycle state (see below) |
+| `variantId` | Array[String] | No | `[]` | References to Variant collection |
+| `sizeGuide` | String | No | - | Reference to SizeGuide |
+| `lastReminderSent` | Date | No | `null` | Last reminder timestamp |
+| `shares` | Number | No | `0` | Share count |
+| `estimatedDeliveryTime` | String | No | - | Estimated delivery duration |
+| `shippingChargeRate` | Number | No | `0` | Shipping charge rate |
+| `createdBy` | String | Yes | - | Creator user ID |
+| `sellerName` | String | No | - | Name of the seller |
+| `taxRate` | Number | No | `0` | Tax percentage |
+| `sellerId` | String | No | - | Seller ID |
+| `orderLimit` | Number | No | - | Purchase limit per order |
+
+### Enum Values
+
+**status**: `"Active"` \| `"Inactive"`
+
+**state**: `"Draft"` \| `"Publish"`
+
+**inventoryStatus**: `"InStock"` \| `"OutOfStock"`
+
+### Constraints & Indexes
+
+**Unique Constraints**:
+
+- `productId` (Implicitly unique as primary identifier)
+
+**Links**:
+
+- `reviewIds` → [Review](#9-review-collection)
+- `variantId` → [Variant](#2-variant-collection)
+- `sizeGuide` → [SizeGuide](#12-sizeguide-collection)
+
+---
+
+## 2. Variant Collection
+
+**Purpose**: Stores specific variations of a product (e.g., Small/Red, Large/Blue).
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `productId` | String | Yes | - | Reference to parent Product |
+| `variantId` | String | Yes | - | Unique variant identifier |
+| `variantName` | String | Yes | - | Name of the variant |
+| `variantStockQuantity` | Number | Yes | - | Stock available for this variant |
+| `inventoryStatus` | String (enum) | Yes | `"InStock"` | Stock status (see below) |
+| `variantImages` | Array[String] | Yes | - | Variant specific images |
+| `thumbnailMediaId` | Array[String] | No | - | Thumbnail IDs |
+| `color` | String | Yes | - | Variant color |
+| `size` | String | Yes | - | Variant size |
+| `basePrice` | Number | Yes | - | Base price for variant |
+| `variantPrice` | Number | Yes | - | Final selling price |
+| `taxRate` | Number | No | - | Tax rate |
+| `discountRate` | Number | No | - | Discount rate |
+| `description` | String | No | - | Variant description |
+| `highlights` | String | No | - | Variant highlights |
+| `status` | String (enum) | No | `"Inactive"` | Operational status (see below) |
+| `state` | String (enum) | No | `"Draft"` | Lifecycle state (see below) |
+| `bestSeller` | Boolean | No | `false` | Best seller flag |
+| `isBaseVariant` | Boolean | No | `false` | Is this the default variant? |
+| `orderLimit` | Number | No | - | Order limit specific to variant |
+
+### Enum Values
+
+**status**: `"Active"` \| `"Inactive"`
+
+**state**: `"Draft"` \| `"Publish"`
+
+**inventoryStatus**: `"InStock"` \| `"OutOfStock"`
+
+---
+
+## 3. Cart Collection
+
+**Purpose**: Stores items currently in a user's shopping cart.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `userId` | String | Yes | - | Reference to User |
+| `lastReminderSent` | Date | No | `null` | Cart abandonment reminder |
+| `items` | Array[Object] | No | `[]` | List of cart items |
+
+### Item Sub-Schema
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `productId` | String | Yes | - | Product reference |
+| `size` | String | No | - | Selected size |
+| `color` | String | No | - | Selected color |
+| `variantId` | String | No | - | Variant reference |
+| `price` | Number | No | - | Price at time of add |
+| `quantity` | Number | Yes | - | Quantity selected |
+| `addedAt` | Date | No | `Date.now()` | Timestamp added |
+
+---
+
+## 4. ShippingAddress Collection
+
+**Purpose**: Manages multiple delivery addresses for a user.
+
+### Schema Definition
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `userId` | String | Yes | Reference to User |
+| `addresses` | Array[AddressSchema] | No | List of addresses |
+
+### Address Sub-Schema
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `addressId` | String | Yes | Unique address ID |
+| `email` | String | Yes | Contact email |
+| `phoneNumber` | Number | Yes | Contact number |
+| `name` | String | Yes | Recipient name |
+| `address` | String | Yes | Street address |
+| `landmark` | String | No | Nearby landmark |
+| `city` | String | Yes | City |
+| `country` | String | No | Default: "India" |
+| `state` | String | Yes | State |
+| `pincode` | Number | Yes | 6-digit postal code |
+| `deliverHere` | Boolean | No | Default: false |
+
+---
+
+## 5. Order Collection
+
+**Purpose**: Records customer orders, including payment status and snapshot of product details.
+
+### Schema Definition
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `userId` | String | Yes | Reference to User |
+| `orders` | Array[OrderItemSchema] | No | List of orders |
+
+### OrderItem Sub-Schema
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `orderId` | String | Yes | - | Unique order ID |
+| `shippingAddress` | Object | Yes | - | Address snapshot |
+| `shippingCharge` | Number | No | `0` | Shipping cost |
+| `totalAmountPaidtoSeller` | Number | No | - | Amount for seller |
+| `orderAmount` | Number | Yes | - | Subtotal |
+| `discountAmount` | Number | No | `0` | Discount applied |
+| `couponCode` | String | No | - | Coupon used |
+| `taxAmount` | Number | No | `0` | Tax applied |
+| `invoiceUrl` | String | No | - | Invoice file URL |
+| `key` | String | No | - | Invoice S3 key |
+| `grandTotal` | Number | Yes | - | Final total amount |
+| `paymentStatus` | String (enum) | No | `"Pending"` | Payment status (see below) |
+| `paymentMode` | String | Yes | - | Payment method |
+| `transactionId` | String | No | - | Payment transaction ID |
+| `orderState` | String | No | `"Order Received"` | Display state |
+| `orderStatus` | Boolean | No | `true` | Active status |
+| `orderPlacedAt` | Date | No | `Date.now()` | Placement timestamp |
+| `rozarpay_order_id` | String | No | - | Razorpay ID |
+| `products` | Array[Object] | No | - | Snapshot of products bought |
+
+### Enum Values
+
+**paymentStatus**: `"Pending"` \| `"Success"` \| `"Failed"` \| `"Not Applicable"`
+
+---
+
+## 6. Fulfilment Collection
+
+**Purpose**: Tracks the lifecycle of ordered items from processing to delivery.
+
+### Schema Definition
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `orderId` | String | Yes | Reference to Order |
+| `Fulfilments` | Array[FulfilmentSchema] | No | List of fulfilment items |
+
+### FulfilmentItem Sub-Schema
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `fulfilmentId` | String | Yes | - | Unique fulfilment ID |
+| `productId` | String | Yes | - | Product reference |
+| `variantId` | String | Yes | - | Variant reference |
+| `sellerId` | String | No | - | Seller reference |
+| `assignedTo` | String | No | - | Staff assigned |
+| `stage` | String (enum) | No | `"Order Received"` | Workflow stage (see below) |
+| `state` | String (enum) | No | `"New"` | Processing state (see below) |
+| `sales/financials` | Various | - | - | Price, tax, discount snapshots |
+| `shippingMethod` | String (enum) | No | `"Standard"` | Shipping method (see below) |
+| `shippingPartnerDetails` | Object | No | - | Tracking info |
+| `timelines` | Array[ObjectId] | No | `[]` | Ref to Timeline |
+| `order_tasks` | Array[String] | No | `[]` | Ref to Task |
+| `sellerPayment` | ObjectId | No | - | Ref to SellerPayment |
+| `refund` | String | No | - | Ref to Refund |
+
+### Enum Values
+
+**stage**: `"Order Received"` \| `"Order Processing"` \| `"In Shipping"` \| `"Order Delivery"` \| `"Order Refund"` \| `"Closed"` \| `"Payment"`
+
+**state**: `"New"` \| `"Order Rejected"` \| `"Order In Process"` \| `"Order Cancelled"` \| `"Pending"` \| `"Completed"`
+
+**shippingMethod**: `"Standard"` \| `"Express"`
+
+---
+
+## 7. Task Collection
+
+**Purpose**: Operational tasks linked to order fulfilment, ensuring workflow steps are completed.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `taskId` | String | Yes | - | Unique task identifier |
+| `fulfilmentId` | String | Yes | - | Reference to Order/Fulfilment |
+| `taskDetail` | String | Yes | - | Description of task |
+| `isActive` | Boolean | No | `true` | Active flag |
+| `status` | String (enum) | Yes | `"Open"` | Task status (see below) |
+| `assignedTo` | String | Yes | - | Assigned admin user |
+| `taskType` | String (enum) | No | - | Matches Fulfilment stage |
+| `timelines` | Array[ObjectId] | No | - | History trails |
+
+### Enum Values
+
+**status**: `"Open"` \| `"Closed"`
+
+---
+
+## 8. Refund Collection
+
+**Purpose**: Manages refunds for cancelled or returned orders, as well as session bookings.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `refundId` | String | Yes | - | Unique refund identifier |
+| `razorpay_refund_id` | String | No | - | Razorpay specific refund ID |
+| `bookingId` | String | Yes | - | Reference to UserBooking |
+| `orderId` | String | No | - | Reference to Order (if product) |
+| `userId` | String | Yes | - | User receiving refund |
+| `sessionId` | String | No | - | Session ID (if booking) |
+| `refund_amount` | Number | Yes | - | Amount refunded |
+| `refund_reason` | String | No | - | Reason for refund |
+| `refund_status` | String | No | - | Status of refund processing |
+| `payment_mode` | String | No | - | Payment method used |
+| `status` | String | No | - | General status |
+| `refundedBy` | String | No | - | Admin/System who processed |
+| `bookingType` | String (enum) | No | - | Source type (see below) |
+
+### Enum Values
+
+**bookingType**: `"Product Order"`
+
+---
+
+## 9. Review Collection
+
+**Purpose**: Stores user reviews and ratings for products and other modules (Studio, Coach, Workout).
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `reviewId` | String | Yes | - | Unique review ID |
+| `moduleId` | String | Yes | - | Reference to Product/Studio/Coach/Workout ID |
+| `userId` | String | Yes | - | User who reviewed |
+| `userName` | String | Yes | - | Name of the reviewer |
+| `rating` | Number | Yes | - | Numeric rating |
+| `moduleType` | String (enum) | Yes | - | Type of item reviewed (see below) |
+| `status` | String (enum) | Yes | `"Active"` | Review status (see below) |
+| `content` | String | No | - | Review text |
+| `mediaUrl` | String | No | - | Attached media URL |
+| `mediaKey` | String | No | - | S3 key for media |
+| `createdAt` | Date | No | `Date.now()` | Timestamp |
+
+### Enum Values
+
+**moduleType**: `"Studio"` \| `"Product"` \| `"Coach"` \| `"Workout"`
+
+**status**: `"Active"` \| `"Inactive"`
+
+---
+
+## 10. CouponCode Collection
+
+**Purpose**: Manages global or specific discount coupons associated with expirations.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `couponCode` | String | Yes | - | The unique code |
+| `validForDays` | Number | Yes | - | Validity duration in days |
+| `discountRate` | Number | Yes | - | Percentage discount |
+| `isUsed` | Boolean | No | `false` | Usage flag |
+| `expiresAt` | Date | Yes | - | TTL expiration date |
+
+---
+
+## 11. SellerPayment Collection
+
+**Purpose**: Tracks payouts and commissions for third-party sellers.
+
+### Schema Definition
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `fulfilmentId` | String | Yes | - | Reference to Fulfilment |
+| `sellerName` | String | Yes | - | Name of seller |
+| `sellerPaymentStatus` | String (enum) | No | `"Pending"` | Payment status (see below) |
+| `amountPaidToSeller` | Number | No | - | Net amount to seller |
+| `fitcartCommissionRate` | Number | No | `0` | Platform commission % |
+| `commissionAmount` | Number | No | - | Platform revenue |
+| `penalty` | Number | No | - | Deductions |
+| `rejectReason` | String | No | - | Rejection reason |
+
+### Enum Values
+
+**sellerPaymentStatus**: `"Pending"` \| `"Paid"` \| `"Rejected"`
+
+---
+
+## 12. SizeGuide Collection
+
+**Purpose**: Stores reference images for product sizing charts.
+
+### Schema Definition
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `sizeGuideId` | String | Yes | Unique ID |
+| `productType` | String | Yes | Category (e.g., "T-Shirt") |
+| `image` | String | Yes | URL to chart image |
+| `key` | String | No | S3 key |

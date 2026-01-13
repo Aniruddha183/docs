@@ -1,0 +1,55 @@
+---
+title: "Architecture"
+description: "Technical design for order fulfilment, task-based state transitions, and financial reconciliation."
+---
+# Admin Order & Fulfilment Architecture
+The Order Management module is built around a **Distributed Fulfilment Model**. Unlike simple cart systems, a single user order is split into multiple independent units (Fulfilments) to handle multi-vendor logistics seamlessly.
+## 1. Fulfilment-Centric Model
+- **Order Splitting:** A single User Order (`Ord123`) containing products from multiple sellers is instantly split into distinct **Fulfilment** documents (`Fulfilment A` for Seller X, `Fulfilment B` for Seller Y).
+- **Independence:** Each fulfilment has its own lifecycle. One item can be "Delivered" while another is still "Processing" or "Cancelled".
+- **Master Order State:** The parent `Order` document provides a rolled-up status (e.g., if *any* fulfilment is processing, the Order is ` In Process`).
+## 2. Task-Based State Machine
+Order tracking is not just a status field; it is driven by a linear sequence of **Tasks**.
+- **Task Flow:** `New` → `Processing` → `InShipping` → `Delivery`
+- **Logic:**
+  - Every status update is recorded as a generic `Task` document.
+  - **Notifications:** Creating a task (e.g., `InShipping`) automatically triggers the corresponding push notification and email to the user.
+  - **Audit Trail:** The history of tasks provides an immutable timeline of the order's journey.
+## 3. Financial Reconciliation Engine
+This module handles the complex flows of money between Admin, Seller, and User.
+- **Seller Payments:**
+  - **Commission Model:** `(Product Price - Commission - Penalty) = Seller Payout`.
+  - **Payment Modes:** Supports both Manual (Bank Transfer) and Automated (UPI/Razorpay Route) payouts.
+  - **Penalties:** Admins can levy penalties for SLA breaches, which are deducted from the final payout.
+- **Refunds:**
+  - Direct integration with **Razorpay**.
+  - Refunds are linked to specific Fulfilments, ensuring granular financial tracking even in multi-item orders.
+- **Invoicing:**
+  - PDF Invoices are generated on-the-fly using `pdfkit` and stored on S3.
+  - Invoices represent the contract between the Seller/Platform and the Buyer.
+## 4. Data Schema Highlights
+### Order Table (Aggregator)
+| Field | Type | Description |
+|------|------|-------------|
+| `orderId` | String | Public Order ID (e.g., `ORD-2024-001`) |
+| `userId` | String | Buyer Reference |
+| `paymentStatus` | String | `Paid`, `Pending`, `Failed` |
+| `orderState` | String | Aggregated status (`Order Received`, `Completed`) |
+### Fulfilment Table (Operational Unit)
+| Field | Type | Description |
+|------|------|-------------|
+| `fulfilmentId` | String | Operational ID (e.g., `FUL-001`) |
+| `sellerId` | String | Vendor responsible for this item |
+| `stage` | Enum | Current active Task (`Processing`, `Delivery`) |
+| `state` | Enum | High-level state (`Pending`, `Completed`, `Cancelled`) |
+| `refund` | String | Reference to Refund document if applicable |
+### Task Table (State Transition)
+| Field | Type | Description |
+|------|------|-------------|
+| `taskId` | String | Unique Event ID |
+| `fulfilmentId` | String | Parent Fulfilment |
+| `taskType` | Enum | The status being applied (`INSHIPPING`, `DELIVERY`) |
+| `assignedTo` | String | Admin/Staff responsible for this step |
+## 5. Middleware Strategy
+- **Role-Based Access Control (RBAC):** Granular permissions (`VIEW_ORDERS`, `EDIT_ORDER`, `INITIATE_REFUND`) ensure staff only access data relevant to their role.
+- **Notification Decoupling:** The `sendInAppNotification` utility abstracts the complexity of FCM, allowing controllers to simply fire-and-forget status updates.

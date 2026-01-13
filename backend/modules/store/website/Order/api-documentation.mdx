@@ -1,0 +1,295 @@
+---
+title: "Order API Documentation"
+---
+
+## Order & Checkout Module
+
+### Module Overview
+
+The Order module manages the transactional flow of the application. It handles **cart management**, **checkout processing** (including address and coupon validation), **order creation**, and post-purchase **order tracking** and **invoicing**.
+
+### Key Capabilities
+
+- **Shopping Cart:** Add/Remove items, update quantities, and view cart totals
+- **Checkout:** Manage shipping addresses and validate discount coupons
+- **Order Processing:** Secure order creation with atomic stock validation
+- **Tracking:** detailed views for Orders and individual Seller Fulfilments
+- **Invoicing:** On-demand PDF invoice generation
+
+---
+
+### Order APIs
+
+Below are the APIs related to **Order, Cart, and Checkout Management**.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/web/users/store
+```
+
+---
+
+## Endpoints
+
+### 1. Add to Cart
+
+Adds an item to the user's shopping cart or updates quantity if it already exists.
+
+- **Method**: `POST`
+- **URL**: `/addToCart/:userId`
+- **Controller**: `addToCart`
+- **URL Parameters**:
+    - `userId` (string): User identifier (required)
+- **Request Body**:
+    - `productId` (string): Product identifier (required)
+    - `variantId` (string): Specific variant ID (optional)
+    - `size` (string): Size attribute (optional)
+    - `color` (string): Color attribute (optional)
+    - `quantity` (number): Quantity to add (required)
+    - `price` (number): Price of the item (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Products are added"
+  }
+  ```
+- **Error Responses**:
+    - `400 Bad Request`: User not found
+    - `500 Internal Server Error`
+
+---
+
+### 2. Get Cart Items
+
+Retrieves the current user's shopping cart with calculated totals.
+
+- **Method**: `GET`
+- **URL**: `/cartItems/:userId`
+- **Controller**: `getCartItems`
+- **URL Parameters**:
+    - `userId` (string): User identifier (required)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "totalAmount": 2500,
+      "cartProducts": [
+        {
+          "productId": "PROD123",
+          "name": "Yoga Mat",
+          "price": 1200,
+          "quantity": 2,
+          "thumbnail": "https://..."
+        }
+      ]
+    }
+  }
+  ```
+
+---
+
+### 3. Update Cart Item Quantity
+
+Updates the quantity of a specific item in the cart.
+
+- **Method**: `PATCH`
+- **URL**: `/toggleQuantity/:userId`
+- **Controller**: `toggleQuantityOfItems`
+- **URL Parameters**:
+    - `userId` (string): User identifier (required)
+- **Request Body**:
+    - `productId` (string): The `_id` of the cart item (not just product ID)
+    - `quantity` (number): New quantity value
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Quantity is updated"
+  }
+  ```
+
+---
+
+### 4. Delete Cart Item
+
+Removes an item from the cart.
+
+- **Method**: `DELETE`
+- **URL**: `/:productId/deleteItem/:userId`
+- **Controller**: `deleteCartItem`
+- **URL Parameters**:
+    - `userId` (string): User identifier
+    - `productId` (string): Product identifier to remove
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Item Deleted"
+  }
+  ```
+
+---
+
+### 5. Add Shipping Address
+
+Adds a new shipping address for the user.
+
+- **Method**: `POST`
+- **URL**: `/addAddress/:userId`
+- **Middleware**: `idGenerationMiddleware('ADRS')`
+- **Controller**: `addShippingAddress`
+- **Request Body**:
+    - `name` (string): Recipient name
+    - `address` (string): Street address
+    - `city` (string): City
+    - `state` (string): State
+    - `pincode` (string): Postal code
+    - `phoneNumber` (string): Contact number
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Address Added Successfully",
+    "addressId": "ADRS001"
+  }
+  ```
+
+---
+
+### 6. Create Order
+
+Finalizes the checkout and creates a new order.
+
+- **Method**: `POST`
+- **URL**: `/createOrder/:userId`
+- **Middleware**: `idGenerationMiddleware('ORDER')`
+- **Controller**: `createOrder`
+- **URL Parameters**:
+    - `userId` (string): User identifier
+- **Request Body**:
+    - `products` (array): List of items to order
+    - `shippingAddressId` (string): Selected address ID
+    - `grandTotal` (number): Final amount paid
+    - `paymentMode` (string): e.g., 'Prepaid'
+    - `transactionId` (string): Payment gateway ref
+    - `couponCode` (string): Applied coupon (optional)
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Order created successfully",
+    "orderId": "ORDER12345"
+  }
+  ```
+
+---
+
+### 7. Get Order List
+
+Retrieves a list of orders for the user.
+
+- **Method**: `GET`
+- **URL**: `/orderslist/:userId`
+- **Controller**: `ordersList`
+- **Query Parameters**:
+    - `pastOrders` (boolean): `true` for completed/past orders, `false` for active
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "totalOrders": 5,
+    "data": [
+      {
+        "orderId": "ORDER123",
+        "state": "Processing",
+        "totalAmount": 1500,
+        "datePlaced": "2025-01-01"
+      }
+    ]
+  }
+  ```
+
+---
+
+### 8. Get Order Details
+
+Retrieves details for a specific parent order.
+
+- **Method**: `GET`
+- **URL**: `/order/:userId/:orderId`
+- **Controller**: `getOrderDetails`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "orderId": "ORDER123",
+      "grandTotal": 1500,
+      "fulfilments": []
+    }
+  }
+  ```
+
+---
+
+### 9. Get Fulfilment Details
+
+Retrieves details for a specific seller fulfilment within an order.
+
+- **Method**: `GET`
+- **URL**: `/fulfilment/:fulfilmentId`
+- **Controller**: `getFulfilmentDetails`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "fulfilmentId": "FULFIL001",
+      "status": "Shipped",
+      "trackingNumber": "TRK123"
+    }
+  }
+  ```
+
+---
+
+### 10. Generate Invoice
+
+Generates or retrieves the PDF invoice for a specific fulfilment.
+
+- **Method**: `GET`
+- **URL**: `/order/:userId/invoice/:fulfilmentId`
+- **Controller**: `generateInvoice`
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "data": "https://s3.amazonaws.com/invoices/INV123.pdf"
+  }
+  ```
+
+---
+
+### 11. Raise Query
+
+Submit a query or complaint regarding an order or product.
+
+- **Method**: `POST`
+- **URL**: `/users/raiseQuery`
+- **Middleware**: `authenticateCognitoUser`, `idGenerationMiddleware('QRY')`
+- **Controller**: `createQuery`
+- **Request Body**:
+    - `message` (string): Query details
+    - `referenceId` (string): Related Order/Product ID
+- **Success Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Query submitted successfully"
+  }
+  ```

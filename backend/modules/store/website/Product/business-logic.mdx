@@ -1,0 +1,93 @@
+---
+title: Product Business Logic
+description: Deep dive into the business rules driving product display, pricing, and stock management.
+---
+
+# Product Business Logic
+
+This document outlines the core business rules and logic implemented in the Product Service.
+
+## 1. Smart Product Resolution Engine
+
+When a user views a product list (listing page) or a specific product details page, the system does not simply return raw database records. It dynamically resolves the "best" version of the product to display based on inventory and variation rules.
+
+### Variant Selection Algorithm
+The system follows a specific priority order to determine which variant to show as the "Main" product card:
+
+1.  **Primary Match**: Check for the **Base Variant** (marked `isBaseVariant: true`).
+2.  **Stock Availability Check**:
+    -   If the Base Variant is `InStock`, it is selected.
+    -   If the Base Variant is `OutOfStock`, the system searches for **ANY other variant** that is `InStock`.
+3.  **Fallback**:
+    -   If **NO** variants are in stock, it reverts to showing the **Base Variant** (even if OOS) so the product still appears in the catalog.
+    -   If no Base Variant exists at all, it picks the first available variant found.
+
+**Business Impact**: This ensures users always see a "buyable" version of the product first, reducing friction and avoiding "Out of Stock" badges on the main listing unless absolutely necessary.
+
+## 2. Dynamic Pricing & Discount Strategy
+
+Prices are calculated dynamically on every read operation to ensure accuracy between the Product level and Variant level.
+
+### Calculation Logic
+$$
+\text{Final Price} = \text{Reference Price} - (\text{Reference Price} \times \frac{\text{Discount Rate}}{100})
+$$
+
+- **Reference Price**:
+    -   If a **Variant** is selected: Uses `variant.variantPrice`.
+    -   If **No Variant** (or Base Product): Uses `product.basePrice`.
+- **Discount Rate**: Inherited from the specific variant or the base product settings.
+
+**Visual Display Keys**:
+- `price`: The final calculated amount the user pays (e.g., $85).
+- `priceOff`: The original struck-through price (e.g., $100).
+- `discountRate`: The percentage displayed (e.g., "15% OFF").
+
+## 3. Search & Filtering Logic
+
+The strict filtering engine applies "AND" logic across different dimensions but allows flexible matching within specific fields.
+
+| Filter | Logic Type | Behavior |
+| :--- | :--- | :--- |
+| **Search** | Partial Match | Case-insensitive substring match on `productName`. |
+| **Category** | Exact Match | Checks `productCategory`. Supports filtering by multiple categories. |
+| **Price** | Range/Max | Filters products where `basePrice` $\le$ User Input. |
+| **Rating** | Exact Match | Matches rounded average rating (e.g., 4.2 rounds to 4). |
+| **Color/Size** | **Nested Lookup** | Checks if **ANY** associated variant matches the requested color/size. |
+
+**Performance Note**: Variant filtering (`color`/`size`) requires resolving variant IDs to their full documents first (`Variant.find({ variantId: ... })`), then creating a Map for O(1) lookups during the filter process.
+
+## 4. Recommendation Engine (Similar Products)
+
+The "Similar Products" section on the PDP uses a content-based filtering approach:
+
+- **Criteria**:
+    1.  **Same Category**: Must match the current product's `productCategory`.
+    2.  **Exclusion**: Must **NOT** be the current product ID.
+- **Ranking Strategy**:
+    1.  **Newest First**: Sorted by creation date (descending).
+    2.  **Best Sellers**: Prioritized if marked as a best seller.
+    3.  **User Likes**: Tie-breaker based on "Like" status.
+
+## 5. Review Eligibility & Verification
+
+To maintain trust, the system enforces strict rules on who can leave a review.
+
+**Rule: Verified Purchase Only**
+A user can ONLY review a product if:
+1.  They have an **Order** containing that specific `productId`.
+2.  The Order Status indicates the item has been **Delivered/Completed**.
+    - _Technically checks for_ `FulfilmentStateEnum.COMPLETED`.
+
+**Single Review Policy**: Users are limited to **one review per product** to prevent spamming.
+
+## 6. Stock Validation (Pre-Checkout)
+
+Before any order creation, a strict validation runs (`validateProducts`):
+
+1.  **User Check**: Validates user existence.
+2.  **Batch Availability**: Queries all requested products in a single DB call.
+3.  **Quantity Check**:
+    -   Compares requested quantity vs. `baseStockQuantity` (for simple products).
+    -   Compares requested quantity vs. `variantStockQuantity` (for variant products).
+4.  **Error Handling**: If ANY item in the cart has insufficient stock, the **entire validation fails**, preventing the checkout flow from proceeding.

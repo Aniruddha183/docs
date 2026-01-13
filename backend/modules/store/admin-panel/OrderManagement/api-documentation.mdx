@@ -1,0 +1,420 @@
+---
+title: "Order Management API"
+description: "This section outlines the API endpoints for managing Orders, Fulfilments, payments, and Invoices."
+---
+# Order Management
+This section outlines the API endpoints for managing **Orders, Fulfilments, and Financial Reconciliation** in the FitnEarn platform.
+---
+### 1. Get Order List
+Retrieves the master list of User Orders.
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getOrderList`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_ORDERS`
+- **Query Parameters (optional)**:
+  - `orderId`: (string) Filter by specific ID
+  - `startDate`, `endDate`: `YYYY-MM-DD`
+  - `state`: (string) e.g., 'Order In Process'
+  - `minAmount`, `maxAmount`: (number) Filter by order value
+  - `sortBy`: `A-Z` | `Z-A` | `Date`
+- **Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "orderId": "ORD-2024-001",
+      "date": "2024-01-01T10:00:00Z",
+      "orderAmount": 5999,
+      "state": "Order In Process",
+       ...
+    }
+  ]
+}
+```
+
+### 2. Get Fulfilments by Order ID
+Retrieves the split fulfilment items for a specific order.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/orders/:orderId/fulfilments`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_ORDERS`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "fulfilmentId": "FUL-001",
+      "sellerName": "FitnEarn Direct",
+      "stage": "InShipping",
+      "state": "Pending",
+      ...
+    }
+  ]
+}
+```
+### 3. Get Fulfilment Details
+Retrieves deep details for a single fulfilment unit, including timelines and tasks.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/details`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "fulfilmentId": "FUL-001",
+    "shippingInformation": { ... },
+    "timelines": [ ... ],
+    "tasks": [ ... ],
+    "productDetail": { ... }
+  }
+}
+```
+### 4. Create / Edit Task
+Creates a new status task (e.g., Update status to "Shipped") or edits an existing one. Triggers user notifications.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addEditTask`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_TASK`
+- **Request Body**:
+```json
+{
+  "fulfilmentId": "FUL-001",
+  "taskType": "INSHIPPING",
+  "taskDetail": "Packet handed over to courier",
+  "assignedTo": "ADMIN_ID",
+  "isActive": true
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "INSHIPPING is created successfully",
+  "taskId": "TASK1092"
+}
+```
+### 5. Close Task
+Marks a task as completed.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/closeTask/:taskId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CLOSE_TASK`
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Task TASK1092 is closed successfully"
+}
+```
+### 6. Update Fulfilment Details
+Updates operational details like Shipping Partner, Tracking ID, or Assigned Staff.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/update`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `EDIT_ORDER`
+- **Request Body**:
+```json
+{
+  "shippingPartner": "BlueDart",
+  "trackingId": "BD123456789",
+  "shippingDate": "2024-01-02",
+  "assignedTo": "ADMIN_ID"
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Fulfilment details updated successfully"
+}
+```
+### 7. Initiate Refund
+Refunds an order via Razorpay and records the transaction.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/razorpay/orderRefund/:fulfilmentId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `INITIATE_REFUND`
+- **Request Body**:
+```json
+{
+  "refundAmount": 500,
+  "reason": "Product Damaged"
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Refund initiated successfully",
+  "data": { "refund": { ... } }
+}
+```
+### 8. Get Seller Payment Detail
+Calculates and retrieves the commission, penalty, and final payout for a seller.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/seller-payment`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "productPurchaseAmount": 1000,
+    "fitcartCommissionRate": 10,
+    "calculatedCommissionAmount": 100,
+    "penalty": 0,
+    "finalAmountToSeller": 900
+  }
+}
+```
+### 9. Make Seller Payment
+Records a payment made to the seller (Manual or UPI).
+
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/makeSellerPayment`
+- **Authentication**: Public / Internal use
+- **Request Body**:
+```json
+{
+  "fulfilmentId": "FUL-001",
+  "amountPaidToSeller": 900,
+  "paymentMode": "Manual",
+  "transactionId": "BANK123456"
+}
+```
+### 10. Generate Fulfilment Invoice
+Generates a PDF invoice for the individual fulfilment item.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/invoice`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": "https://s3.aws.com/bucket/invoices/INV123.pdf"
+}
+```
+### 11. Assign Order (Fulfilment)
+Assigns a specific fulfilment to an admin or staff member for processing.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/fitnearn/web/admin/store/assignTo/:fulfilmentId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `ASSIGN_ORDER_REVIEWER`
+- **Request Body**:
+```json
+{
+  "assignedTo": "ADMIN_USER_ID"
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "assignedTo updated successfully",
+  "fulfilmentId": "FUL-001",
+  "assignedTo": "ADMIN_USER_ID"
+}
+```
+### 12. Task Management
+
+#### Get Single Task
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getTask/:taskId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_TASK`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "task": {
+      "taskId": "TASK123",
+      "taskDetail": "Details...",
+      "status": "Open",
+      "assignedToUser": { "name": "Admin Name", "USR_ID": "ADM001" }
+    },
+    "timelineDetails": [ ... ]
+  }
+}
+```
+
+#### Get Tasks by Fulfilment
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/tasks`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_TASK`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+      {
+        "taskId": "TASK123",
+        "taskDetail": "Item packed",
+        "status": "Open",
+        "assignedToUser": { "name": "Admin Name" }
+      }
+  ]
+}
+```
+### 13. Order Summary & Details
+#### Get Fulfilment Summary
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/fulfilments/:fulfilmentId/summary`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "orderPaymentStatus": "Paid",
+    "transactionId": "TX123",
+    "modeOfPayment": "UPI",
+    "totalAmountPaidByUser": 2050,
+    "subtotal": 2000,
+    "shippingCharges": 50,
+    "gst": 18
+  }
+}
+```
+
+#### Get Order Query Details
+Retrieves details of a user query/ticket related to an order.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/queryDetails/:referenceId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Query details fetched successfully",
+  "queries": [ ... ]
+}
+```
+### 14. Timeline Management
+#### Add Timeline Entry
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/addTimeline`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `CREATE_TIMELINE`
+- **Request Body**:
+```json
+{
+  "fulfilmentId": "FUL-001",
+  "comment": "Called customer, no answer.",
+  "adminId": "ADM001",
+  "targetType": "fulfilment"
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Comment added successfully"
+}
+```
+
+#### Get Timelines
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getTimelines/:fulfilmentId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_TIMELINE`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "comment": "Called customer",
+      "admin": { "name": "Support Agent" },
+      "createdAt": "2024-01-01T12:00:00Z"
+    }
+  ]
+}
+```
+### 15. Financial Extras
+#### Reject Seller Payment
+- **Method**: `POST`
+- **Endpoint**: `/api/fitnearn/web/admin/store/rejectSellerPayment/:fulfilmentId`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `REJECT_SELLER_PAYMENT`
+- **Request Body**:
+```json
+{
+  "rejectReason": "Bank details incorrect"
+}
+```
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Seller payment rejected successfully (user refunded)",
+  "data": {
+    "fulfilmentId": "FUL123",
+    "sellerPaymentStatus": "Not Applicable"
+  }
+}
+```
+
+#### Get Order Invoice
+Generates a consolidated invoice for the entire order (all fulfilments).
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/orders/:orderId/invoice`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `READ_ORDER`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": "https://s3.aws.com/bucket/invoices/ORDER_INV_123.pdf"
+}
+```
+### 16. Get Admins List
+Retrieves a list of admins suitable for assignment dropdowns.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/fitnearn/web/admin/store/getAdmins`
+- **Authentication**: `authenticateAdminToken`
+- **Authorization**: `VIEW_ADMINS`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    { "name": "Admin One", "USR_ID": "ADM001", "role": "SUBADMIN2" },
+    { "name": "Admin Two", "USR_ID": "ADM002", "role": "SUBADMIN2" }
+  ]
+}
+```

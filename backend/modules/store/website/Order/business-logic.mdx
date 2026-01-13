@@ -1,0 +1,80 @@
+---
+title: Order Business Logic
+description: Deep dive into the financial, inventory, and state management rules of the Order system.
+---
+
+# Order Business Logic
+
+This document outlines the critical business rules governing the Order Processing, Payment, and Fulfilment lifecycles.
+
+## 1. The Multi-Vendor "Split Order" Rule
+
+A fundamental rule of our marketplace architecture is that **Users place one order, but Sellers receive individual orders.**
+
+### The Logic
+When a user checks out with a mixed cart (e.g., Item A from Seller X, Item B from Seller Y):
+1.  **Aggregation**: The system calculates a single `Grand Total` for the user to pay via Razorpay.
+2.  **Atomicity**: Upon successful payment, the system creates **ONE** parent `Order` document.
+3.  **Segregation**: The system immediately iterates through the cart items and generates separate `Fulfilment` documents for each line item (or grouped by seller).
+
+**Business Justification**:
+-   **Independent Shipping**: Seller X can ship their item while Seller Y is still packing.
+-   **Granular Payouts**: Commission and taxes are calculated per fulfilment, simplifying seller settlements.
+
+## 2. Financial Calculation Engine
+
+The system performs complex financial math to ensure every rupee is accounted for between the User, the Platform, and the Seller.
+
+### Per-Item Breakdown
+For *each* item in the cart, the following values are computed *before* saving:
+
+1.  **Base Subtotal**: `Unit Price × Quantity`
+2.  **Discount Amount**: `Subtotal × (Discount Rate / 100)`
+3.  **Taxable Amount**: `Subtotal - Discount`
+4.  **Tax Amount**: `Taxable Amount × (Tax Rate / 100)`
+5.  **Shipping**: Fixed rate per item (e.g., `shippingChargeRate`).
+6.  **User Paid Amount**:
+    $$
+    \text{Paid} = (\text{Subtotal} - \text{Discount} - \text{Coupon}) + \text{Tax} + \text{Shipping}
+    $$
+
+### Seller Payout & Commission
+The platform takes its cut *at the source* before recording the seller's due amount.
+
+1.  **Commission Fee**: `User Paid Amount × (Commission Rate / 100)` (Default: 10%)
+2.  **Seller Payout**: `User Paid Amount - Commission Fee`
+
+## 3. Inventory & Stock Locking
+
+To prevent "overselling" (two users buying the last item simultaneously), the system enforces **Optimistic Concurrency Control** via MongoDB Transactions (`session`).
+
+### Transaction Flow
+1.  **Start Transaction**: Begin a MongoDB session.
+2.  **Fetch & Check**: Retrieve current stock for *all* items.
+    -   *Rule*: If `requestedQty > currentStock` for ANY item, **ABORT** entire transaction.
+3.  **Deduct**:
+    -   `Product.baseStockQuantity -= quantity`
+    -   `Variant.variantStockQuantity -= quantity`
+4.  **Status Update**: If stock hits 0, auto-set `inventoryStatus = 'OutOfStock'`.
+5.  **Commit**: Save Order and Stock changes simultaneously.
+
+**Failure Handling**: If the transaction fails (e.g., stock changed mid-process), the user is returned to the cart with an error, and no order is created.
+
+## 4. Coupon Application Logic
+
+Coupons are applied to the **Grand Total**, but for accounting purposes, the discount is distributed proportionally.
+
+-   **Logic**: If a flat ₹100 coupon is applied to an order of 2 items (Item A: ₹600, Item B: ₹400), the discount is split weighted by value.
+-   **Constraint**: Coupons are validated against:
+    -   `Expiry Date`
+    -   `Status: Active`
+    -   `Minimum Order Value` (implicit in some logic).
+
+## 5. Invoice Generation Rules
+
+Invoices are **Immutable Records** generated on demand.
+
+-   **Trigger**: Can be generated immediately after order placement.
+-   **Content**: Contains the *frozen* snapshot of the product details at the time of purchase (Name, Price, Tax).
+    -   *Why?* If a product price changes later, the invoice must still show the price the user actually paid.
+-   **Storage**: Generated once as a PDF, stored in S3, and the URL is cached. Subsequent requests return the cached S3 URL.
