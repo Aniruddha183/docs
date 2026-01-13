@@ -1,0 +1,166 @@
+---
+
+title: "Authentication Module Overview"
+description: "High-level architecture and workflow for authentication across Website, Coach App and Admin Panel using AWS Cognito, Google OAuth and mobile OTP (Fast2SMS)."
+---
+# Authentication Module — Overview
+
+This document explains how authentication works across the three surfaces of the platform:
+
+* **Website (public-facing)** — primarily user sign-in via Google (OAuth).
+* **Coach App (mobile)** — Google sign-in *+* mobile OTP verification (required for KYC/payment flows).
+* **Admin Panel** — restricted access using Cognito-managed email/password accounts and mandatory 2‑factor auth. Admin accounts are created by other admins (no self sign-up).
+
+The identity backbone for all three surfaces is **AWS Cognito** (different user pools). Google is configured as an external identity provider for OAuth flows and Fast2SMS is used to deliver OTPs to coaches.
+
+---
+
+## Goals & Rationale
+
+* Use a single, managed identity solution (AWS Cognito) to reduce operational overhead and unify token handling.
+* Allow frictionless sign-in via Google where appropriate (Website & Coach App) to reduce spam / garbage accounts.
+* Enforce mobile OTP verification for Coach users to ensure verified phone ownership (required for KYC and payouts).
+* Keep admin access restricted and controlled — no public registration; accounts created in admin panel and protected by 2MFA.
+
+---
+
+## High-level components
+
+* **AWS Cognito User Pools** — central user store and token issuer (ID, access, refresh tokens).
+* **Google OAuth** — external IdP plugged into Cognito for Google-based sign-in.
+* **Fast2SMS** — SMS provider used to send OTPs for coach mobile verification.
+* **Frontend clients** (Website, Coach App, Admin Panel) — initiate flows and store tokens in cookies/local session.
+* **Backend APIs** — use `genToken` (derived token) plus Cognito tokens for fine-grained authorization.
+* **S3 / AWS Services** — accessed using temporary credentials derived from Cognito tokens or via server-side signed URLs.
+
+---
+
+## Authentication flows (summary)
+
+### 1) Website (public users)
+
+1. User chooses **Sign in with Google** on website.
+2. Website redirects user to Google OAuth. Google authenticates the user and redirects back with an identity token.
+3. Cognito accepts the Google token (configured as an IdP) and issues Cognito tokens: **id_token**, **access_token**, **refresh_token**, and returns the `cognito-username`.
+4. The frontend stores tokens (typically in secure cookies) and also receives a derived **`genToken`** used by the website for API authorization.
+5. Authenticated API calls use `genToken` and/or Cognito access token for server-side authorization checks.
+
+**Notes:**
+
+* Guest users (not authenticated) can view and share content but cannot perform actions like like/comment/report/post.
+* Google acts as the identity authority: email addresses from Google are treated as verified.
+
+---
+
+### 2) Coach App (mobile) — Google + OTP verification
+
+1. Coach can sign-in using Google or via phone number + OTP.
+2. If Google is used, Cognito issues the same set of Cognito tokens as the Website flow.
+3. **Mobile OTP verification is mandatory** for all coach accounts (even those created via Google) because:
+
+   * Coaches must be phone verified to pass KYC and to receive payouts.
+   * OTPs are delivered via Fast2SMS using verified templates.
+4. On successful OTP validation the coach account is marked `mobileVerified` and any temporary verification flow completes.
+5. Tokens (id/access/refresh and `cognito-username`) are stored in secure storage (cookies/session storage depending on platform). A `genToken` is generated and returned for API usage.
+
+**Notes:**
+
+* Backend flows rely on `helperFunctionVerifyUserGenTempCre` and related utilities to generate temporary credentials and validate coach verification state.
+* Mobile app may use the refresh token to keep sessions alive and obtain new id/access tokens via Cognito.
+
+---
+
+### 3) Admin Panel (restricted)
+
+1. Admin accounts are **not** self-registered. Admin users are created by other admin users from the admin panel.
+2. Authentication uses Cognito with *email + password* (no Google sign-in, no OTP).
+3. Admin sign-in requires **2-factor authentication (2MFA)**.
+4. On successful login Cognito issues id/access/refresh tokens + cognito-username, and a `genToken` is produced for API calls.
+
+**Notes:**
+
+* Admin flows include permission checks in APIs (for example `authorize(...)` middleware) which verify the admin's roles/permissions.
+* Admin token lifecycles are treated more strictly (shorter session, stricter cookie flags, enforced 2MFA).
+
+---
+
+## Tokens & Session Management
+
+**Tokens issued by Cognito on every successful authentication:**
+
+* `id_token` — JWT that contains user identity claims (user id, email, and groups/roles).
+* `access_token` — used to authorize requests against protected resources (short lived).
+* `refresh_token` — used to obtain new id/access tokens without re-authentication (longer lived).
+* `cognito-username` — canonical username assigned by Cognito.
+
+**Derived token — `genToken`**
+
+* The backend creates a `genToken` derived from Cognito tokens (or generated using a secure server-side method) and returns it alongside the Cognito tokens.
+* `genToken` is used by the platform for API-level authorization. It is the primary bearer token used by frontend apps to call internal APIs, while Cognito tokens are kept for integrations and AWS service access.
+
+**Storage**
+
+* Tokens are stored in **secure cookies** (recommended): flags `HttpOnly`, `Secure`, `SameSite=Strict` (or `Lax` where needed).
+* Mobile clients may use platform secure storage (Keychain / Keystore).
+
+**Token Refresh**
+
+* Frontend uses `refresh_token` to request a new `access_token`/`id_token` from Cognito when the access token expires.
+* The backend should validate refresh requests and rotate refresh tokens where appropriate.
+
+---
+
+## Integration points that use Cognito tokens
+
+* **S3 access / AWS SDK usage** — temporary credentials for S3 actions can be minted using Cognito tokens (or the server can generate pre-signed URLs with S3 for direct client upload).
+* **Presigned URLs** — the app/server issues presigned upload URLs (e.g., for blog images) and may check `genToken` or Cognito tokens to authorize the request.
+* **KYC / Payout flows** — coach must be phone verified and have KYC before being added as a payout beneficiary; these flows rely on verified identity and the coach profile data linked to Cognito user.
+
+---
+
+## Important API-side helper functions (conceptual)
+
+* `addPhoneNumberToCognito` — associates/updates a phone number on the Cognito profile and triggers OTP verification.
+* `authenticateCognitoUser` — server-side helper that validates Cognito's id/access tokens and extracts claims.
+* `generateCoachTokenAndSetSession` — creates the `genToken` for coach clients and sets session cookies.
+* `revokeCognitoTokens` — revokes/invalidates issued Cognito refresh/access tokens on logout or security events.
+
+These helpers are used across controllers to keep authentication flows consistent.
+
+---
+
+## Security considerations & best practices (already implemented / recommended)
+
+* **Use managed identity provider (Cognito)** to offload token issuance and rotation.
+* **Use Google as external IdP** so the email is pre-verified and reduces spam accounts.
+* **Enforce mobile OTP for coaches** (critical for payouts and KYC).
+* **Admin accounts** are restricted — created only via admin panel and protected by 2MFA.
+* **Cookies**: use `HttpOnly`, `Secure`, `SameSite` and appropriate expiry.
+* **Token validation**: backend should always validate `id_token`/`access_token` signature and expiry before trusting claims.
+* **Least privilege**: `genToken` scopes should be narrow and mapped to API permission checks.
+* **Audit & logging**: record login attempts, token revocations, and suspicious activities.
+
+---
+
+## Short sequence example (Coach Google + OTP)
+
+```text
+1. Coach clicks "Sign in with Google" -> Google OAuth -> returns id token -> Cognito accepts it
+2. Cognito issues id/access/refresh + cognito-username
+3. App receives tokens -> store tokens in secure cookie
+4. App asks the user to verify phone -> requests OTP via Fast2SMS
+5. Coach enters OTP -> server verifies -> marks coach mobileVerified = true in profile
+6. Server issues genToken (and persists session)
+7. App uses genToken to call protected coach APIs
+```
+
+---
+
+## Appendix: Things to watch during maintenance
+
+* Rotation and expiry windows for `refresh_token` (avoid excessively long lifetimes).
+* Make sure SMS templates used with Fast2SMS remain verified in the provider dashboard.
+* Monitor admin account creation — keep an audit log and limit who can create other admins.
+* Keep Cognito IdP configuration in sync (Google client id/secret) and validate callback URLs.
+
+---

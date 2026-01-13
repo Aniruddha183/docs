@@ -191,7 +191,7 @@
         {
           "group": "Authentication Module",
           "pages": [
-            "backend/modules/coach/overview",
+            "backend/coach/authentication-overview",
             "backend/modules/coach/db-schema",
 
             {
