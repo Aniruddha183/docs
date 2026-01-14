@@ -1,0 +1,337 @@
+---
+title: "Coach Steps & Calorie Tracker API Documentation"
+description: "REST API reference and DB schema for the Coach App Steps & Calorie Tracker module."
+---
+
+# Coach Steps & Calorie Tracker
+
+This document describes the **coach-facing** endpoints used to submit daily steps & calorie segments, fetch raw tracker data and request filtered/aggregated reports (day/week/month) for a coach. It also contains the DB schema and TypeScript interfaces used by the module.
+
+---
+
+## Base URL
+
+```
+/api/fitnearn/coach/activity
+```
+
+
+## Utilities & models used 
+
+* `CoachStepsTracker` — Mongoose model that stores per-coach activity history (see DB Schema section below).
+* `IActivityData` (interface) — shape for daily tracker entries and their internal segments.
+* `parseDate` / date helpers — controller normalizes string `date` payloads into `Date` objects internally.
+* `logger` — for error logging when an internal operation fails.
+
+---
+
+## Endpoints
+
+> Each endpoint below lists: method, path, parameters (params/query/body), short functioning explanation (what it does and how), example success response, and common error cases (exact response shapes are taken from controller code).
+
+---
+
+### 1) Add / Update Steps & Calorie Data 
+
+* **Method:** `POST`
+* **URL:** `/api/fitnearn/coach/activity/add`
+* **Request headers (recommended):**
+  * `Content-Type: application/json`
+* **Request Body (required fields):**
+
+```json
+{
+  "coachId": "COACH123",
+  "date": "2025-10-21",        // date string (controller converts to Date object)
+  "timeRange": "06:00-06:30", // or "6AM-6:30AM" — controller treats timeRange as client-provided label
+  "steps": 250,
+  "calories": 12
+}
+```
+
+**Functioning (short)**
+
+1. Validates presence of `coachId`, `date`, `steps`, `calories`. If any missing, returns 400 (see errors).
+2. Finds the coach/profile record (controller checks `ProfileModel` presence). If the coach is not found, returns 404.
+3. Normalizes `date` into a UTC Date object `dateObj` (the controller stores entries grouped by day).
+4. If a `CoachStepsTracker` doc does not exist for `coachId`, it creates one with a `trackerData` array containing a single day entry that includes:
+   * `date` (Date),
+   * `totalStepCount` and `totalCalorieCount` (set to the incoming `steps` and `calories`),
+   * `data` array containing the incoming *segment* (`{ steps, calories, timeRange }`).
+5. If a `CoachStepsTracker` exists for the coach and there is an existing tracker day for `dateObj`, the controller computes the delta between submitted totals and previously stored totals, and **pushes only the delta as a new segment** into that day's `data` array. This prevents double-counting when clients send incremental updates for the same date.
+6. If the `dateObj` is new for that coach, the controller appends a new day entry to `trackerData` with totals and segment array.
+7. Returns the updated `CoachStepsTracker` document on success.
+
+**Success response (HTTP 200)** (exact shape returned by controller):
+
+```json
+{
+  "data": { /* full CoachStepsTracker document (updated) */ },
+  "success": true
+}
+```
+
+**Error cases (exact controller responses):**
+
+* Missing required fields (HTTP 400):
+
+```json
+{
+  "message": "Please provide coachId, date, steps and calories",
+  "success": false
+}
+```
+
+* Coach/profile not found (HTTP 404):
+
+```json
+{ "message": "Coach not found", "success": false }
+```
+
+* Internal server error (HTTP 500):
+
+```json
+{
+  "error": "Internal Server error: <error.message>",
+  "success": false,
+  "type": "addStepsTrackerDataError"
+}
+```
+
+---
+
+### 2) Get Raw Tracker Data (all stored entries for a coach)
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/coach/activity/get-data/:coachId`
+* **URL Params:**
+
+| Param     | Type   | Description                        |
+| --------- | ------ | ---------------------------------- |
+| `coachId` | string | The coach's identifier (required)  |
+
+* **Query params:** none required for this route.
+
+**Functioning**
+
+* Fetches the CoachStepsTracker document for `coachId` and returns it (contains `trackerData` array of day-objects with totals and segment-level `data` arrays). If no document exists, controller returns an empty result with success true and `data: null` (or the DB result if present).
+
+**Success response (HTTP 200)** (exact shape returned by controller):
+
+```json
+{ "data": /* CoachStepsTracker document or null */, "success": true }
+```
+
+**Error cases (HTTP 500):**
+
+```json
+{
+  "error": "Internal Server error: <error.message>",
+  "success": false,
+  "type": "getStepsTrackerByCoachError"
+}
+```
+
+---
+
+### 3) Filter / Aggregate Tracker Data (day / week / month reports)
+
+* **Method:** `GET`
+* **URL:** `/api/fitnearn/coach/activity/filter-steps-data/:coachId`
+* **URL Params:**
+
+| Param     | Type   | Description                       |
+| --------- | ------ | ---------------------------------- |
+| `coachId` | string | Coach identifier (required)        |
+
+* **Query parameters (supported):**
+
+  * `month` — if set to `'true'`, returns per-month aggregated totals (for months present in data).
+  * `week` — if set to `'true'`, returns per-week breakdown for the month/time-range in query (controller supports weekly grouping).
+  * `pastWeek` — if set to `'true'`, returns the last 7 days summary (special past-week aggregation).
+  * `date` — if provided (ISO date string), returns data grouped by hour/timeRange for that specific date.
+  * Optionally you can supply `fromDate` and `toDate` (controller recognizes common date-range inputs in various places) — check controller usage if you need strict formats (ISO `YYYY-MM-DD` is safe).
+
+> The controller uses a switch-logic to choose which aggregation to run depending on which query flags are provided; if none are provided it falls back to returning the raw `trackerData` for the coach (similar to the `get-data` endpoint).
+
+**Functioning**
+
+* Fetches `CoachStepsTracker` for the `coachId`. If no data, returns empty results (success true).
+* If `month === 'true'`:
+  * Groups day entries into months (by `date.getMonth()` and `date.getFullYear()`), sums `totalStepCount` and `totalCalorieCount` per month and returns an ordered list of months with totals and an aggregated chart-friendly structure.
+* If `week === 'true'` (weekly breakdown):
+  * Produces sequential week ranges for the requested timeframe (e.g., weekly buckets inside a month) and sums day totals into their respective week container; returns weeks with `stepCount` and `calorieCount` plus per-day subtotals for that week (controller computes week start/end ranges and fills missing days with zeroes if needed).
+* If `pastWeek === 'true'`:
+  * Returns rolling last-7-days totals with a small array of days and totals (useful for sparkline / quick dashboard view).
+* If `date` is provided:
+  * Returns the day's `data` segments (the `data` array for that day) and optionally enriches segments by parsing `timeRange` strings (e.g. `06:00-06:30`) to compute timeline buckets and aggregates.
+* For all aggregations the controller returns `filteredData` as the top-level payload which is usually an object with keys like `monthWise`, `weekWise`, or `dateWise` arrays depending on the request.
+
+**Success response (HTTP 200)** (exact shape returned by controller):
+
+```json
+{ "data": filteredData, "success": true }
+```
+
+`filteredData` is an aggregation object; examples depend on the query mode:
+
+* `month` mode example (shape):
+
+```json
+{
+  "monthWise": [
+    { "month": "Jan", "year": 2025, "totalSteps": 12345, "totalCalories": 540 },
+    { "month": "Feb", "year": 2025, "totalSteps": 15200, "totalCalories": 620 },
+    ...
+  ],
+  "summary": { "totalSteps": 27545, "totalCalories": 1160 }
+}
+```
+
+* `pastWeek` example (shape):
+
+```json
+{
+  "pastWeek": [
+    { "date": "2025-10-15", "steps": 4000, "calories": 200 },
+    { "date": "2025-10-16", "steps": 5200, "calories": 240 },
+    ...
+  ],
+  "summary": { "totalSteps": 30000, "totalCalories": 1500 }
+}
+```
+
+* `date` example (shape):
+
+```json
+{
+  "date": "2025-10-21",
+  "segments": [
+    { "timeRange": "06:00-06:30", "steps": 250, "calories": 12 },
+    { "timeRange": "18:00-18:30", "steps": 1500, "calories": 90 }
+  ],
+  "totalSteps": 1750,
+  "totalCalories": 102
+}
+```
+
+**Error cases (controller exact HTTP 500 response):**
+
+```json
+{
+  "error": "Internal Server error: <error.message>",
+  "success": false,
+  "type": "filterCoachCaloriesDataError"
+}
+```
+
+---
+
+## DB Schema & TypeScript interfaces
+
+> The runtime code stores coach activity grouped by day. The following interfaces reflect the fields used by controllers and correspond to the `CoachStepsTracker` Mongoose model shape inferred from controller operations.
+
+### CoachStepsTracker (MongoDB document)
+
+* `coachId: string` — reference to coach (unique per coach)
+* `trackerData: Array<ActivityDay>` — list of day-level activity entries
+* `createdAt: Date` (optional)
+* `updatedAt: Date` (optional)
+
+### ActivityDay (each item inside `trackerData`)
+
+* `date: Date` — day (stored as a Date with zeroed time or normalized)
+* `totalStepCount: number` — running total of steps for that day
+* `totalCalorieCount: number` — running total of calories for that day
+* `data: Array<ActivitySegment>` — ordered list of incremental segments added during the day
+
+### ActivitySegment (one reported segment, stored inside the day's `data` array)
+
+* `timeRange: string` — label sent by client, e.g. `06:00-06:30` or `6AM-6:30AM`
+* `steps: number` — steps for this segment (controller stores deltas if repeated uploads occur)
+* `calories: number` — calories for this segment (delta)
+* `createdAt?: Date` — optional timestamp when the segment was stored
+
+---
+
+## TypeScript interface definitions (copyable)
+
+```ts
+// models/coachStepsTracker.d.ts
+
+export interface ActivitySegment {
+  timeRange: string;
+  steps: number;
+  calories: number;
+  createdAt?: Date;
+}
+
+export interface ActivityDay {
+  date: Date;
+  totalStepCount: number;
+  totalCalorieCount: number;
+  data: ActivitySegment[];
+}
+
+export interface ICoachStepsTracker {
+  _id?: string;
+  coachId: string;
+  trackerData: ActivityDay[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+> Use the types above when implementing service or frontend type checks. Controller code treats `trackerData` as an array of `ActivityDay` items and pushes `ActivitySegment` entries into `day.data` arrays.
+
+---
+
+## Implementation notes & best practices (from controller behaviour)
+
+* **Idempotent segment uploads:** The controller stores incremental differences when the client updates daily totals multiple times. Clients can choose to send `total` fields (e.g. device aggregated totals) or only segment-level values — the controller computes and persists only the delta segment required to keep totals accurate.
+* **Client timeRange format:** Controller expects a `timeRange` string (human-friendly). If you need fine-grained time alignment, pass well-formed ranges like `HH:mm-HH:mm` (ISO-like) to enable easier server-side parsing for timeline charts.
+* **Aggregation modes:** Prefer `pastWeek` or `month` queries for dashboard widgets. `date` queries return fine-grained segments for timeline charts.
+* **Missing data handling:** Aggregations fill empty days/weeks with zeroes where applicable (controller builds week/day arrays accordingly).
+* **Error reporting:** Controller returns structured errors with `type` strings for server-side log correlation (e.g., `addStepsTrackerDataError`, `filterCoachCaloriesDataError`). Log these server-side error `type` values for easier debugging.
+
+---
+
+## Quick summary table
+
+| Method | Endpoint                                 | Purpose                                  |
+| ------ | ---------------------------------------- | ---------------------------------------- |
+| POST   | `/add`                                   | Add / update steps & calorie segment     |
+| GET    | `/get-data/:coachId`                     | Get raw tracker doc for coach            |
+| GET    | `/filter-steps-data/:coachId?query...`   | Filter/aggregate tracker data (day/week/month) |
+
+---
+
+## Example cURL requests
+
+**Add segment**
+
+```bash
+curl -X POST "https://your-host/api/fitnearn/coach/activity/add" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "coachId":"COACH123",
+    "date":"2025-10-21",
+    "timeRange":"06:00-06:30",
+    "steps":250,
+    "calories":12
+  }'
+```
+
+**Get coach raw data**
+
+```bash
+curl "https://your-host/api/fitnearn/coach/activity/get-data/COACH123"
+```
+
+**Get month aggregates**
+
+```bash
+curl "https://your-host/api/fitnearn/coach/activity/filter-steps-data/COACH123?month=true"
+```
+
+---

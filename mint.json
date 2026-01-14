@@ -198,7 +198,8 @@
               "pages": [
                 "backend/Coach/api-doc-coach-auth-routes",
                 "backend/Coach/coach-profile-api-doc",
-                "backend/Coach/coach-kyc-api-doc"
+                "backend/Coach/coach-kyc-api-doc",
+                "backend/Coach/coach-activity"
               ]
             },
             {
