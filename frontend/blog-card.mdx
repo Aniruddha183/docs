@@ -1,0 +1,182 @@
+---
+title: BlogCard
+description: Inline blog card UI pattern used to display blog summary information inside blog listing pages.
+---
+
+## Component Overview
+
+**Category:** UI Rendering / Card Pattern  
+**Primary Use:** Display a summary view of a blog entry including thumbnail, title, short description, status, and action buttons.
+
+This blog card is **not a standalone reusable component**. It is an **inline UI pattern** implemented directly within a page using JSX and `flowbite-react`’s `Card` as the base container.
+
+The documentation exists so that:
+
+- Developers can **replicate the same card UI elsewhere**
+- Developers can **extract it later into a component if needed**
+- The behavior and structure are clearly understood
+
+---
+
+## Responsibility Contract
+
+### What this UI pattern does
+
+- Displays blog thumbnail image
+- Displays blog state badge (Draft / Published / Denied / Under Review)
+- Displays truncated blog title
+- Displays truncated blog heading/description
+- Displays action buttons based on blog state
+- Provides navigation to blog view page
+
+### What this UI pattern does NOT do
+
+- Does not fetch blog data
+- Does not manage blog state transitions
+- Does not perform API calls
+- Does not own delete / edit logic
+- Does not manage permissions
+
+> This is a **pure UI rendering pattern** embedded in a page.  
+> All data preparation, permissions, and side effects are handled outside.
+
+---
+
+## Data Contract (Blog Object Shape)
+
+The UI assumes the following blog shape:
+
+```ts
+interface Blog {
+  _id: string;
+  blogId: string;
+  title: string;
+  thumbnail: string;
+  category: string;
+  status: string;
+  author: string;
+  blogHeading: string;
+  createdAt: string;
+  content?: any[];
+  state: string;
+}
+```
+
+---
+
+## Visual Structure
+
+### Layout Order
+
+1. Thumbnail image (top)
+2. Blog state badge (overlay on image)
+3. Blog title (single-line, truncated)
+4. Blog heading / description (multi-line, truncated)
+5. Action buttons (bottom)
+
+---
+
+## Inline JSX Pattern (Reference)
+
+```tsx
+<Card
+  key={blog._id}
+  className="cardComponent rounded-[16px] object-cover p-0 max-w-sm border border-neutral-700 h-[490px] bg-neutral-900"
+  renderImage={() => (
+    <div className="relative w-full h-[450px]">
+      <Image
+        src={blog.thumbnail}
+        alt={blog.title || "Blog thumbnail"}
+        width={304}
+        height={288}
+        className="rounded-t-[16px] object-cover w-full h-[288px]"
+      />
+
+      <span className="absolute top-4 left-4 text-white text-[16px] font-bold py-1 px-2">
+        {blog.state.charAt(0).toUpperCase() + blog.state.slice(1)}
+      </span>
+    </div>
+  )}
+>
+  <div className="flex items-center justify-between">
+    <h5 className="overflow-hidden text-xl font-bold text-white text-ellipsis whitespace-nowrap">
+      {truncateText(blog.title, 38)}
+    </h5>
+  </div>
+
+  <p className="text-sm text-neutral-500 line-clamp-2 h-[47px]">
+    {truncateText(blog.blogHeading, 75)}
+  </p>
+
+  <div className="flex justify-between gap-8 mt-2">{renderButtons(blog)}</div>
+</Card>
+```
+
+---
+
+## State-Based UI Behavior
+
+| Blog State   | Badge Displayed | Buttons Shown                |
+| ------------ | --------------- | ---------------------------- |
+| Draft        | Draft           | Delete, Edit                 |
+| Published    | Published       | Delete, View                 |
+| Denied       | Denied          | Delete, View                 |
+| Under Review | Under Review    | Edit Request, Cancel Request |
+
+---
+
+## Supporting Helpers (Used by the Card)
+
+- `truncateText(text, maxLength)` — trims long text safely
+- `renderButtons(blog)` — renders action buttons based on blog state
+- `slugify(title)` — used for blog view routing
+
+These helpers are **external to the card UI**.
+
+---
+
+## Styling & Customization
+
+- Uses `flowbite-react` `Card` as base container
+- Tailwind utility classes define spacing, typography, and layout
+- Image aspect ratio and height are fixed for visual consistency
+
+### Customization Guidelines
+
+- Modify classes directly in JSX if layout changes are global
+- Keep truncation logic consistent across usages
+- Do not embed business logic inside JSX
+
+---
+
+## Dependencies & Assumptions
+
+- `flowbite-react` Card component
+- `next/image` for optimized image rendering
+- Blog data is already filtered and prepared
+- State values are normalized strings (`draft`, `published`, etc.)
+
+---
+
+## When to Use / When NOT to Use
+
+### Use when
+
+- Displaying blog lists
+- Showing user-authored blogs
+- Rendering CMS-driven blog summaries
+
+### Do NOT use when
+
+- Editing blog content
+- Showing full blog details
+- Handling blog creation flows
+
+---
+
+## Summary
+
+This BlogCard is an **inline UI pattern**, not a reusable component.
+It exists as page-level JSX but is stable enough to be reused or extracted later if required.
+
+Documentation ensures consistency without forcing premature abstraction.

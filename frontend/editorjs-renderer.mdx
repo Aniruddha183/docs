@@ -1,0 +1,373 @@
+---
+title: EditorJsRenderer
+description: UI component for rendering EditorJS-style rich content
+---
+
+## Component Overview
+
+**Category:** UI Rendering / Content Display  
+**Primary Use:** Render rich-text content generated from EditorJS-style data in a readable, styled format.
+
+This component is designed to be **copied and reused across frontend surfaces** wherever read-only rich content needs to be displayed (blogs, descriptions, CMS content, etc.).
+
+---
+
+## Responsibility Contract
+
+### What this component does
+
+- Renders text, headers, lists, and images from EditorJS-like content
+- Normalizes multiple content formats into a single renderable structure
+- Applies consistent typography and spacing styles
+- Handles basic text formatting (bold, italic, underline, etc.)
+
+### What this component does NOT do
+
+- Does not fetch data
+- Does not validate business rules
+- Does not manage content state
+- Does not perform error handling beyond safe rendering
+- Does not mutate or persist content
+
+> This is a **pure UI renderer**.  
+> All business logic, validation, and data preparation must be handled by the parent.
+
+---
+
+## Component Contract (Props)
+
+| Prop      | Type  | Required | Description                                 |
+| --------- | ----- | -------- | ------------------------------------------- |
+| `content` | `any` | Yes      | EditorJS or EditorJS-like content to render |
+
+### Notes
+
+- The component assumes `content` is already safe and sanitized
+- If `content` is `null` or `undefined`, the component renders nothing
+
+---
+
+## Supported Content Types
+
+| Block Type  | Behavior                                     |
+| ----------- | -------------------------------------------- |
+| `paragraph` | Renders styled paragraph text                |
+| `header`    | Renders `h1`–`h5` based on level             |
+| `image`     | Renders centered image with optional caption |
+| `list`      | Renders ordered or unordered list            |
+
+Unknown or unsupported blocks are ignored safely.
+
+---
+
+## Internal Behavior (UI-Only)
+
+- Normalizes different input shapes into a common block structure
+- Decodes basic HTML entities (`&nbsp;`, `&amp;`, etc.)
+- Applies inline text formatting:
+  - Bold
+  - Italic
+  - Underline
+  - Strike
+  - Code
+  - Subscript / Superscript
+- Treats empty or whitespace-only paragraphs as visual spacers
+
+No state is stored outside render execution.
+
+---
+
+## Copy-Paste Usage Example
+
+```tsx
+import EditorJsRenderer from "@/components/EditorJsRenderer";
+
+<EditorJsRenderer content={data.description} />;
+```
+
+---
+
+## Full Component Implementation (Reference)
+
+```tsx
+import React from "react";
+
+interface Block {
+  id: string;
+  type: string;
+  data: any;
+}
+
+const EditorJsRenderer = ({ content }: any) => {
+  if (!content) return null;
+  console.log("EditorJsRenderer content: ", content);
+
+  // ✅ Decode HTML entities properly
+  const cleanText = (text?: string) => {
+    if (typeof text !== "string") return "";
+    return text
+      .replace(/&nbsp;/g, "\u00A0") // non-breaking space
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+  };
+
+  const normalizeContent = (input: any): Block[] => {
+    if (Array.isArray(input) && input.length > 0 && input[0].type) {
+      return input;
+    }
+
+    return input.map((item: any, index: number) => {
+      if (typeof item.insert === "string") {
+        const isHeader = item.attributes?.header;
+        return {
+          id: `coach-text-${index}`,
+          type: isHeader ? "header" : "paragraph",
+          data: {
+            text: item.insert,
+            level: item.attributes?.header || 2,
+            attributes: item.attributes || {},
+          },
+        };
+      }
+
+      if (item.insert?.image) {
+        return {
+          id: `coach-image-${index}`,
+          type: "image",
+          data: { file: { url: item.insert.image }, caption: "" },
+        };
+      }
+
+      return {
+        id: `unknown-${index}`,
+        type: "paragraph",
+        data: { text: "" },
+      };
+    });
+  };
+
+  const applyTextFormatting = (
+    text: string,
+    attributes: any = {}
+  ): React.ReactNode => {
+    let formattedText: React.ReactNode = cleanText(text);
+
+    if (attributes.bold) {
+      formattedText = <strong key="bold">{formattedText}</strong>;
+    }
+    if (attributes.italic) {
+      formattedText = <em key="italic">{formattedText}</em>;
+    }
+    if (attributes.underline) {
+      formattedText = <u key="underline">{formattedText}</u>;
+    }
+    if (attributes.strike) {
+      formattedText = <s key="strike">{formattedText}</s>;
+    }
+    if (attributes.code) {
+      formattedText = <code key="code">{formattedText}</code>;
+    }
+    if (attributes.script === "sub") {
+      formattedText = <sub key="sub">{formattedText}</sub>;
+    }
+    if (attributes.script === "super") {
+      formattedText = <sup key="super">{formattedText}</sup>;
+    }
+
+    return formattedText;
+  };
+
+  const getListItemContent = (item: any): string => {
+    if (typeof item === "string") {
+      return item;
+    }
+    if (typeof item === "object" && item !== null) {
+      if ("content" in item) {
+        return item.content;
+      }
+      return String(item);
+    }
+    return "";
+  };
+
+  const normalizedBlocks = normalizeContent(content);
+
+  const renderBlock = (block: Block) => {
+    switch (block.type) {
+      case "paragraph": {
+        const rawText = block.data.text || "";
+        const cleaned = cleanText(rawText);
+
+        // if only spaces / &nbsp; → treat as spacer
+        if (!cleaned.replace(/\u00A0/g, "").trim()) {
+          return <div key={block.id} className="my-6" />;
+        }
+
+        return (
+          <p
+            key={block.id}
+            className="text-[16px] md:text-[20px] text-[#D4D4D4] font-medium leading-normal md:leading-[32px] whitespace-pre-wrap break-words mb-4"
+          >
+            {applyTextFormatting(cleaned, block.data.attributes)}
+          </p>
+        );
+      }
+
+      case "header":
+        return React.createElement(
+          `h${block.data.level}`,
+          {
+            key: block.id,
+            className: `${
+              block.data.level === 1
+                ? "text-[24px] md:text-[42px] font-extrabold leading-tight"
+                : ""
+            } ${
+              block.data.level === 2
+                ? "text-[22px] md:text-[36px] font-bold leading-snug"
+                : ""
+            } ${
+              block.data.level === 3
+                ? "text-[20px] md:text-[30px] font-semibold leading-snug"
+                : ""
+            } ${
+              block.data.level === 4
+                ? "text-[18px] md:text-[26px] font-medium leading-snug"
+                : ""
+            } ${
+              block.data.level === 5
+                ? "text-[16px] md:text-[22px] font-medium leading-normal"
+                : ""
+            } ${
+              block.data.level === 5
+                ? "text-[14px] md:text-[20px] font-normal leading-normal"
+                : ""
+            } text-[#D4D4D4] my-3`,
+          },
+          applyTextFormatting(block.data.text, block.data.attributes)
+        );
+
+      case "image":
+        return (
+          <div key={block.id} className="my-6 flex justify-center">
+            <img
+              src={block.data.file.url}
+              alt={block.data.caption || "Image"}
+              className="rounded-[10px] w-full max-w-3xl shadow-md"
+            />
+            {block.data.caption && (
+              <p className="text-sm text-gray-400 mt-2">{block.data.caption}</p>
+            )}
+          </div>
+        );
+
+      case "list":
+        return block.data.style === "ordered" ? (
+          <ol
+            key={block.id}
+            className="list-decimal pl-6 my-4 text-[#D4D4D4] space-y-2"
+          >
+            {block.data.items.map((item: any, index: number) => {
+              const content = getListItemContent(item);
+              return (
+                <li
+                  key={index}
+                  className="text-[16px] md:text-[20px] font-medium leading-normal md:leading-[32px] whitespace-pre-wrap"
+                >
+                  {cleanText(content)}
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <ul
+            key={block.id}
+            className="list-disc pl-6 my-4 text-[#D4D4D4] space-y-2"
+          >
+            {block.data.items.map((item: any, index: number) => {
+              const content = getListItemContent(item);
+              return (
+                <li
+                  key={index}
+                  className="text-[16px] md:text-[20px] font-medium leading-normal md:leading-[32px] whitespace-pre-wrap"
+                >
+                  {cleanText(content)}
+                </li>
+              );
+            })}
+          </ul>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return <div>{normalizedBlocks.map(renderBlock)}</div>;
+};
+
+export default EditorJsRenderer;
+```
+
+---
+
+## Styling & Customization
+
+- Typography and spacing are defined internally using utility classes
+- Header styles vary automatically based on header level
+- Image width is constrained for readability
+
+### Customization Guidelines
+
+- Modify styles **inside the component only if global design changes**
+- Avoid passing custom classes from the parent
+- For theming, prefer a wrapper component
+
+---
+
+## Modification Guidelines
+
+### Safe to modify
+
+- Typography classes
+- Spacing values
+- Image container styling
+- Support for additional EditorJS block types
+
+### Do NOT modify
+
+- Content normalization logic unless input formats change globally
+- Formatting application logic unless EditorJS spec changes
+- Block type detection without updating documentation
+
+---
+
+## Dependencies & Assumptions
+
+- Content originates from EditorJS or compatible editors
+- Content is already sanitized
+- No external providers or context required
+
+---
+
+## When to Use / When NOT to Use
+
+### Use when
+
+- Displaying CMS-driven content
+- Rendering read-only rich text
+- Showing blog or informational content
+
+### Do NOT use when
+
+- Editing content
+- Handling user input
+- Applying business-specific rendering rules
+
+---
+
+## Summary
+
+`EditorJsRenderer` is a **pure UI rendering component** whose sole responsibility is to display structured rich content consistently.
+It is intentionally simple, safe to copy, and independent of business logic.

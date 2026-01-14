@@ -1,0 +1,976 @@
+---
+title: User Navbar
+description: Vertical user navigation bar for authenticated user flows with navigation links, settings, logout, and account deletion.
+---
+
+## Component Overview
+
+**Category:** Navigation / Layout  
+**Primary Use:** Render the authenticated user’s sidebar navigation with links to profile, sessions, blogs, subscriptions, bookings, orders, meal plans, help center, and settings actions.
+
+This component is designed to be **used as-is** across user-facing authenticated pages and is **not intended to be a generic navbar**.
+
+---
+
+## Responsibility Contract
+
+### What this component does
+
+- Renders a vertical (and responsive) navigation bar for logged-in users
+- Highlights active sections based on props
+- Provides navigation links to all major user areas
+- Exposes Settings actions via popover:
+  - Log out (confirmation dialog)
+  - Delete account (confirmation dialog)
+- Handles logout and account deletion side effects
+
+### What this component does NOT do
+
+- Does not manage authentication state globally
+- Does not fetch user profile data
+- Does not control routing logic outside navigation
+- Does not render children or page content
+
+> This is a **layout-level UI component with side effects** limited to logout and account deletion.
+
+---
+
+## Component Contract (Props)
+
+This component relies on **boolean flags and color tokens** to indicate active sections.
+
+### Props (Reference)
+
+| Prop                  | Type      | Description                |
+| --------------------- | --------- | -------------------------- |
+| `activeuser`          | `boolean` | Highlights “My Profile”    |
+| `activelive`          | `boolean` | Highlights “Sessions”      |
+| `activeblogs`         | `boolean` | Highlights “My Blogs”      |
+| `activeplans`         | `boolean` | Highlights “Subscriptions” |
+| `activebookings`      | `boolean` | Highlights “Bookings”      |
+| `activeorders`        | `boolean` | Highlights “Orders”        |
+| `isMealPlan`          | `boolean` | Highlights “My Plans”      |
+| `activehelp`          | `boolean` | Highlights “Help Center”   |
+| `useractivecolor`     | `string`  | Background color class     |
+| `liveactivecolor`     | `string`  | Background color class     |
+| `blogsactivecolor`    | `string`  | Background color class     |
+| `plansactivecolor`    | `string`  | Background color class     |
+| `bookingsactivecolor` | `string`  | Background color class     |
+| `ordersactivecolor`   | `string`  | Background color class     |
+| `mealPlancolor`       | `string`  | Background color class     |
+| `settingsactivecolor` | `string`  | Background color class     |
+
+> The component assumes **only one section is active at a time**.
+
+---
+
+## Navigation Structure
+
+### Primary Links
+
+- My Profile
+- Sessions
+- My Blogs
+- Subscriptions
+- Bookings
+- Orders
+- My Plans
+- Help Center
+
+Each item:
+
+- Uses `next/link`
+- Displays an icon + label
+- Applies visual state based on props
+
+---
+
+## Settings Actions (Popover)
+
+### Actions Provided
+
+- **Log Out**
+
+  - Opens confirmation dialog
+  - Calls `useLogout()` hook
+  - Clears auth cookies
+  - Redirects user
+
+- **Delete Account**
+  - Opens destructive confirmation dialog
+  - Calls delete user API
+  - Clears all auth-related cookies
+  - Redirects to signup page
+
+---
+
+## Side Effects & Internal Logic
+
+- Reads `user_id` from cookies
+- Uses `useRouter` for navigation
+- Uses `useLogout` hook for logout handling
+- Performs API call for account deletion
+- Clears:
+  - `access_token`
+  - `refresh_token`
+  - `id_token`
+  - `user_id`
+  - `genToken`
+  - user metadata cookies
+
+---
+
+## Copy-Paste Usage Example
+
+```tsx
+<UserNavbar activeblogs blogsactivecolor="neutral-700" />
+```
+
+Only pass the flags required for the current page.
+
+---
+
+## Full Component Implementation (Reference)
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import React, { useState, useEffect } from "react";
+import Cookies from "js-cookie";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import axios from "axios";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useRouter } from "next/navigation";
+import { useLogout } from "@/app/auth/logout-handler";
+
+const UserNavbar = (props: any) => {
+  const apiEndpoint = process.env.NEXT_PUBLIC_BASE_API_ENDPOINT;
+  const [onDetailsClick, setOnDetailsClick] = useState(false);
+  const userId = Cookies.get("user_id");
+  const router = useRouter();
+  const logout = useLogout();
+
+  console.log("user navbar props", props);
+
+  const handleDelete = async (e: any) => {
+    e.preventDefault();
+    try {
+      const userid = Cookies.get("user_id");
+      //console.log(userid);
+      const response = await fetch(
+        `${apiEndpoint}/api/fitnearn/web/users/delete`,
+        {
+          method: "DELETE", // Method should be a string
+          headers: {
+            "Content-Type": "application/json", // Specify JSON format
+          },
+          body: JSON.stringify({
+            userId: Cookies.get("user_id"),
+          }),
+        }
+      );
+
+      // Fetch does not automatically parse JSON, so you need to do it manually
+      const responseData = await response.json();
+      console.log("handleDelete :", responseData);
+      if (responseData.success) {
+        Cookies.remove("refresh_token");
+        Cookies.remove("access_token");
+        Cookies.remove("id_token");
+        Cookies.remove("email");
+        Cookies.remove("username");
+        if (Cookies.get("user_id")) {
+          Cookies.remove("user_id");
+        }
+        if (Cookies.get("genToken")) {
+          Cookies.remove("genToken");
+        }
+
+        router.push("/signup");
+        //  window.location.href = `${process.env.NEXT_PUBLIC_COGNITO_DOMAIN}/logout?client_id=${process.env.NEXT_PUBLIC_APP_CLIENT_ID}&logout_uri=${process.env.NEXT_PUBLIC_SITE_URL}/signup`;
+        //  window.location.href = `${process.env.NEXT_PUBLIC_COGNITO_DOMAIN}/logout?client_id=${process.env.NEXT_PUBLIC_APP_CLIENT_ID}&logout_uri=${window.location.origin}/signup`;
+
+        //console.log("Account deleted successfully");
+        //console.log(responseData);
+      } else {
+        //console.log(responseData);
+      }
+    } catch (error) {
+      //console.error("Error submitting form:", error);
+    }
+  };
+
+  return (
+    <div className="z-50">
+      <div
+        style={{
+          backgroundColor: "var(--Neutral-900, #171717)",
+          boxShadow: "1px 15px 20px 4px rgba(255, 255, 255, 0.10)",
+        }}
+        className="text-white z-40 mq450:w-screen mq450:overflow-y-hidden mq450:overflow-scroll mq450:scrollbar-thin  h-[750px] mq450:h-[72px] fixed mq450:top-[53px] top-[71px] -2 w-[120px] mq450:flex mq450:text-[14px] border-neutral-800 border-b-2 "
+      >
+        <Link href={`/profile/${userId}`}>
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.useractivecolor ? props.useractivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <g
+                className={`${props.activeuser ? "" : "mix-blend-luminosity"}`}
+              >
+                <path
+                  d="M11.9997 0.332031C9.69223 0.332031 7.4366 1.01627 5.51803 2.29822C3.59945 3.58017 2.10411 5.40225 1.22109 7.53406C0.338063 9.66586 0.107024 12.0116 0.557185 14.2748C1.00735 16.5379 2.11849 18.6167 3.7501 20.2483C5.38171 21.8799 7.46051 22.991 9.72363 23.4412C11.9867 23.8914 14.3325 23.6603 16.4643 22.7773C18.5961 21.8943 20.4182 20.3989 21.7002 18.4803C22.9821 16.5618 23.6663 14.3061 23.6663 11.9987C23.6629 8.90555 22.4327 5.94006 20.2455 3.75287C18.0583 1.56568 15.0928 0.335428 11.9997 0.332031V0.332031ZM11.9997 6.16536C12.6919 6.16536 13.3686 6.37064 13.9442 6.75522C14.5197 7.13981 14.9684 7.68643 15.2333 8.32597C15.4982 8.96551 15.5675 9.66925 15.4324 10.3482C15.2974 11.0271 14.964 11.6508 14.4746 12.1402C13.9851 12.6297 13.3614 12.9631 12.6825 13.0981C12.0036 13.2332 11.2998 13.1638 10.6603 12.8989C10.0207 12.634 9.47412 12.1854 9.08954 11.6099C8.70495 11.0343 8.49968 10.3576 8.49968 9.66536C8.49968 8.73711 8.86843 7.84687 9.5248 7.19049C10.1812 6.53411 11.0714 6.16536 11.9997 6.16536V6.16536ZM11.9997 21.332C9.94542 21.3343 7.93616 20.7304 6.22351 19.596C6.35887 18.468 6.90242 17.4284 7.7516 16.6736C8.60077 15.9188 9.69685 15.5009 10.833 15.4987H13.1663C14.3025 15.5009 15.3986 15.9188 16.2478 16.6736C17.0969 17.4284 17.6405 18.468 17.7758 19.596C16.0632 20.7304 14.0539 21.3343 11.9997 21.332V21.332Z"
+                  fill="url(#paint0_linear_9207_42840)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_9207_42840"
+                  x1="-0.564428"
+                  y1="15.2257"
+                  x2="24.4517"
+                  y2="15.2297"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            <p className="text-center text-nowrap">My Profile</p>
+          </div>
+        </Link>
+        <Link href="/live_session/upcoming_session">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.liveactivecolor ? props.liveactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${props.activelive ? "" : "mix-blend-luminosity"}`}
+                clipPath="url(#clip0_1421_19964)"
+              >
+                <path
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                  d="M16.18 0.166487C15.9854 0.13602 15.7867 0.144185 15.5952 0.190515C15.4037 0.236845 15.2233 0.320433 15.0641 0.436506C14.905 0.552579 14.7702 0.698865 14.6676 0.86701C14.565 1.03516 14.4965 1.22187 14.466 1.41649C14.4355 1.61111 14.4437 1.80982 14.49 2.00128C14.5364 2.19275 14.6199 2.37321 14.736 2.53237C14.8521 2.69153 14.9984 2.82627 15.1665 2.92889C15.3347 3.03152 15.5214 3.10002 15.716 3.13049C18.4445 3.56985 20.9078 5.01982 22.6162 7.19217C24.3246 9.36453 25.1531 12.1002 24.9369 14.8554C24.7207 17.6106 23.4757 20.1835 21.4493 22.0628C19.4229 23.9421 16.7636 24.9901 14 24.9985C11.7944 24.9989 9.63958 24.3365 7.81507 23.0972C5.99056 21.8579 4.58057 20.0989 3.768 18.0485C3.69975 17.8596 3.59428 17.6864 3.45784 17.5391C3.3214 17.3918 3.15677 17.2733 2.97371 17.1908C2.79064 17.1083 2.59288 17.0634 2.39213 17.0587C2.19138 17.054 1.99174 17.0897 1.80504 17.1637C1.61834 17.2376 1.44838 17.3482 1.30525 17.4891C1.16212 17.6299 1.04872 17.7981 0.971775 17.9835C0.894832 18.169 0.855914 18.368 0.857327 18.5688C0.85874 18.7696 0.900455 18.9681 0.98 19.1525C2.18153 22.1793 4.40042 24.6928 7.2549 26.2605C10.1094 27.8281 13.421 28.3519 16.6199 27.7417C19.8189 27.1315 22.7051 25.4255 24.7821 22.9172C26.8592 20.4089 27.997 17.2551 28 13.9985C27.9998 10.663 26.8092 7.43716 24.6423 4.90144C22.4754 2.36571 19.4746 0.686669 16.18 0.166487ZM12.328 1.32049C12.3773 1.51143 12.3885 1.71023 12.3608 1.90549C12.3332 2.10075 12.2674 2.28865 12.1671 2.45844C12.0668 2.62823 11.9339 2.77657 11.7762 2.89498C11.6185 3.01338 11.439 3.09953 11.248 3.14849C10.747 3.27741 10.2557 3.44183 9.778 3.64049C9.59612 3.71613 9.40112 3.7552 9.20414 3.75549C9.00716 3.75577 8.81205 3.71725 8.62995 3.64212C8.44785 3.567 8.28234 3.45675 8.14285 3.31766C8.00337 3.17857 7.89264 3.01337 7.817 2.83149C7.74136 2.64961 7.70228 2.45461 7.702 2.25762C7.70172 2.06064 7.74024 1.86553 7.81536 1.68344C7.89049 1.50134 8.00074 1.33583 8.13983 1.19634C8.27892 1.05685 8.44412 0.946128 8.626 0.870487C9.23 0.618487 9.856 0.408487 10.502 0.242487C10.6928 0.193488 10.8914 0.182557 11.0864 0.210315C11.2815 0.238074 11.4691 0.30398 11.6387 0.40427C11.8083 0.504559 11.9564 0.637267 12.0747 0.794816C12.193 0.952365 12.279 1.12967 12.328 1.32049ZM6.37 3.78649C6.6467 4.07196 6.79875 4.45559 6.79275 4.85311C6.78675 5.25063 6.62319 5.6295 6.338 5.90649C5.59434 6.63129 4.9549 7.45583 4.438 8.35649C4.34292 8.53241 4.21363 8.68754 4.05773 8.81277C3.90182 8.938 3.72245 9.03079 3.53016 9.08568C3.33787 9.14057 3.13655 9.15647 2.93803 9.13242C2.73951 9.10838 2.5478 9.04488 2.37418 8.94567C2.20056 8.84646 2.04853 8.71353 1.92702 8.5547C1.80552 8.39588 1.717 8.21436 1.66667 8.02083C1.61635 7.8273 1.60522 7.62566 1.63396 7.42776C1.66269 7.22987 1.73071 7.03971 1.834 6.86849C2.48902 5.72213 3.30235 4.67381 4.25 3.75449C4.53547 3.47779 4.91911 3.32574 5.31662 3.33174C5.71414 3.33774 6.09301 3.5013 6.37 3.78649ZM1.832 10.5585C2.2258 10.614 2.58144 10.8236 2.82072 11.1413C3.06 11.459 3.16333 11.8587 3.108 12.2525C3.03586 12.766 2.99978 13.2839 3 13.8025C3 14.2003 2.84196 14.5818 2.56066 14.8631C2.27936 15.1445 1.89782 15.3025 1.5 15.3025C1.10218 15.3025 0.720644 15.1445 0.43934 14.8631C0.158035 14.5818 0 14.2003 0 13.8025C0 13.1365 0.046 12.4785 0.138 11.8345C0.193522 11.4407 0.40316 11.085 0.720823 10.8458C1.03849 10.6065 1.43817 10.5032 1.832 10.5585ZM9 17.7625V10.2345C9.00018 9.8937 9.08744 9.55862 9.25349 9.26103C9.41954 8.96344 9.65888 8.71321 9.94879 8.5341C10.2387 8.35498 10.5696 8.25291 10.91 8.23758C11.2504 8.22225 11.5892 8.29416 11.894 8.44649L19.422 12.2105C19.7538 12.3768 20.0327 12.6321 20.2277 12.9478C20.4226 13.2636 20.5259 13.6274 20.5259 13.9985C20.5259 14.3696 20.4226 14.7334 20.2277 15.0491C20.0327 15.3649 19.7538 15.6202 19.422 15.7865L11.894 19.5505C11.5892 19.7028 11.2504 19.7747 10.91 19.7594C10.5696 19.7441 10.2387 19.642 9.94879 19.4629C9.65888 19.2838 9.41954 19.0335 9.25349 18.7359C9.08744 18.4384 9.00018 18.1033 9 17.7625Z"
+                  fill="url(#paint0_linear_9207_42818)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_9207_42818"
+                  x1="-1.07692"
+                  y1="17.9195"
+                  x2="28.9424"
+                  y2="17.9244"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <clipPath id="clip0_9207_42818">
+                  <rect width="28" height="28" fill="white" />
+                </clipPath>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">Sessions</p>
+          </div>
+        </Link>
+        <Link href="/user_blogs/all_blogs">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.blogsactivecolor ? props.blogsactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${props.activeblogs ? "" : "mix-blend-luminosity"}`}
+              >
+                <path
+                  d="M12.833 6.05129C10.5697 5.28342 4.25334 3.79674 2.67484 5.34503C2.45802 5.55699 2.33523 5.8439 2.33301 6.1437V20.634C2.33301 20.8342 2.38692 21.031 2.48932 21.2044C2.59172 21.3779 2.739 21.5219 2.91635 21.6221C3.09371 21.7222 3.29489 21.7749 3.49968 21.7749C3.70447 21.7749 3.90565 21.7222 4.08301 21.622C5.31851 21.2912 11.3922 22.5051 12.833 23.3335V6.05129Z"
+                  fill="url(#paint0_linear_9207_42819)"
+                />
+                <path
+                  d="M25.3245 5.34503C23.7448 3.79788 17.4297 5.28342 15.1663 6.05129V23.3346C16.606 22.5063 22.675 21.2934 23.9163 21.6232C24.0938 21.7234 24.2951 21.7761 24.5 21.776C24.7048 21.776 24.9061 21.7232 25.0835 21.6229C25.2609 21.5226 25.4081 21.3784 25.5105 21.2048C25.6128 21.0312 25.6665 20.8343 25.6663 20.634V6.1437C25.6641 5.8439 25.5413 5.55699 25.3245 5.34503Z"
+                  fill="url(#paint1_linear_9207_42819)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_9207_42819"
+                  x1="1.43557"
+                  y1="16.5829"
+                  x2="26.4517"
+                  y2="16.5879"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint1_linear_9207_42819"
+                  x1="1.43557"
+                  y1="16.5829"
+                  x2="26.4517"
+                  y2="16.5879"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            <p className="text-center text-nowrap">My Blogs</p>
+          </div>
+        </Link>
+        <Link href="/sub_plans/active_plans">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.plansactivecolor ? props.plansactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${props.activeplans ? "" : "mix-blend-luminosity"}`}
+              >
+                <path
+                  d="M3.49967 8.45703C2.37209 8.45703 1.45801 9.37111 1.45801 10.4987V23.332C1.45801 24.4596 2.37209 25.3737 3.49967 25.3737H24.4997C25.6273 25.3737 26.5413 24.4596 26.5413 23.332V10.4987C26.5413 9.37111 25.6273 8.45703 24.4997 8.45703H3.49967Z"
+                  fill="url(#paint0_linear_9207_42811)"
+                />
+                <path
+                  d="M12.1688 12.1152C11.9015 11.9281 11.5523 11.9052 11.2629 12.056C10.9735 12.2066 10.792 12.5057 10.792 12.832V20.9987C10.792 21.325 10.9735 21.6242 11.2629 21.7748C11.5523 21.9255 11.9015 21.9026 12.1688 21.7155L18.0021 17.6322C18.236 17.4685 18.3753 17.2009 18.3753 16.9154C18.3753 16.6299 18.236 16.3623 18.0021 16.1986L12.1688 12.1152Z"
+                  fill="white"
+                />
+                <path
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                  d="M3.79199 6.41667C3.79199 5.93342 4.18375 5.54167 4.66699 5.54167H23.3337C23.8169 5.54167 24.2087 5.93342 24.2087 6.41667C24.2087 6.89991 23.8169 7.29167 23.3337 7.29167H4.66699C4.18375 7.29167 3.79199 6.89991 3.79199 6.41667ZM6.12533 3.5C6.12533 3.01675 6.51708 2.625 7.00033 2.625H21.0003C21.4836 2.625 21.8753 3.01675 21.8753 3.5C21.8753 3.98324 21.4836 4.375 21.0003 4.375H7.00033C6.51708 4.375 6.12533 3.98324 6.12533 3.5Z"
+                  fill="url(#paint1_linear_9207_42811)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_9207_42811"
+                  x1="0.493264"
+                  y1="19.2549"
+                  x2="27.3856"
+                  y2="19.2614"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint1_linear_9207_42811"
+                  x1="3.00674"
+                  y1="5.60372"
+                  x2="24.8958"
+                  y2="5.61925"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">Subscriptions</p>
+          </div>
+        </Link>
+        <Link href="/my_bookings/upcoming_bookings">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.bookingsactivecolor ? props.bookingsactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${
+                  props.activebookings ? "" : "mix-blend-luminosity"
+                }`}
+              >
+                <path
+                  d="M26 14C26 15.625 25.6823 17.1771 25.0469 18.6562C24.4115 20.1354 23.5573 21.4115 22.4844 22.4844C21.4115 23.5573 20.1354 24.4115 18.6562 25.0469C17.1771 25.6823 15.625 26 14 26C12.2083 26 10.5052 25.6224 8.89062 24.8672C7.27604 24.112 5.90104 23.0469 4.76562 21.6719C4.69271 21.5677 4.65885 21.4505 4.66406 21.3203C4.66927 21.1901 4.71354 21.0833 4.79688 21L6.9375 18.8438C7.04167 18.75 7.17188 18.7031 7.32812 18.7031C7.49479 18.724 7.61458 18.7865 7.6875 18.8906C8.44792 19.8802 9.38021 20.6458 10.4844 21.1875C11.5885 21.7292 12.7604 22 14 22C15.0833 22 16.1172 21.7891 17.1016 21.3672C18.0859 20.9453 18.9375 20.375 19.6562 19.6562C20.375 18.9375 20.9453 18.0859 21.3672 17.1016C21.7891 16.1172 22 15.0833 22 14C22 12.9167 21.7891 11.8828 21.3672 10.8984C20.9453 9.91406 20.375 9.0625 19.6562 8.34375C18.9375 7.625 18.0859 7.05469 17.1016 6.63281C16.1172 6.21094 15.0833 6 14 6C12.9792 6 12 6.1849 11.0625 6.55469C10.125 6.92448 9.29167 7.45312 8.5625 8.14062L10.7031 10.2969C11.026 10.6094 11.099 10.9688 10.9219 11.375C10.7448 11.7917 10.4375 12 10 12H3C2.72917 12 2.49479 11.901 2.29688 11.7031C2.09896 11.5052 2 11.2708 2 11V4C2 3.5625 2.20833 3.25521 2.625 3.07812C3.03125 2.90104 3.39062 2.97396 3.70312 3.29688L5.73438 5.3125C6.84896 4.26042 8.1224 3.44531 9.55469 2.86719C10.987 2.28906 12.4688 2 14 2C15.625 2 17.1771 2.31771 18.6562 2.95312C20.1354 3.58854 21.4115 4.44271 22.4844 5.51562C23.5573 6.58854 24.4115 7.86458 25.0469 9.34375C25.6823 10.8229 26 12.375 26 14ZM16 9.5V16.5C16 16.6458 15.9531 16.7656 15.8594 16.8594C15.7656 16.9531 15.6458 17 15.5 17H10.5C10.3542 17 10.2344 16.9531 10.1406 16.8594C10.0469 16.7656 10 16.6458 10 16.5V15.5C10 15.3542 10.0469 15.2344 10.1406 15.1406C10.2344 15.0469 10.3542 15 10.5 15H14V9.5C14 9.35417 14.0469 9.23438 14.1406 9.14062C14.2344 9.04688 14.3542 9 14.5 9H15.5C15.6458 9 15.7656 9.04688 15.8594 9.14062C15.9531 9.23438 16 9.35417 16 9.5Z"
+                  fill="url(#paint0_linear_9207_42817)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_9207_42817"
+                  x1="1.07692"
+                  y1="17.3192"
+                  x2="26.8078"
+                  y2="17.3233"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">Bookings</p>
+          </div>
+        </Link>
+
+        <Link href="/my_orders/all_orders">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.ordersactivecolor ? props.ordersactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${
+                  props.activeorders ? "" : "mix-blend-luminosity"
+                }`}
+              >
+                <path
+                  d="M21.9828 16.3322C22.2499 16.3323 22.5097 16.2497 22.7229 16.0968C22.9361 15.944 23.091 15.7293 23.1642 15.4853L25.6203 7.31969C25.6724 7.14609 25.6813 6.96338 25.6465 6.78594C25.6116 6.6085 25.5338 6.44117 25.4193 6.29712C25.3048 6.15307 25.1566 6.03622 24.9865 5.95578C24.8164 5.87534 24.629 5.8335 24.4389 5.83355H8.1918L7.4611 3.20304C7.39195 2.95397 7.23796 2.73364 7.02314 2.57643C6.80832 2.41922 6.54476 2.33397 6.27358 2.33398H3.56204C3.23634 2.33398 2.92398 2.45689 2.69367 2.67565C2.46337 2.89442 2.33398 3.19112 2.33398 3.5005C2.33398 3.80989 2.46337 4.10659 2.69367 4.32536C2.92398 4.54412 3.23634 4.66703 3.56204 4.66703H5.32798L6.06481 7.29753V7.30919V7.31969L8.52091 15.4853L9.43704 18.9686C8.83055 19.224 8.30792 19.6303 7.92435 20.1445C7.54078 20.6587 7.3105 21.2617 7.25783 21.8899C7.20515 22.5181 7.33204 23.1482 7.62508 23.7135C7.91813 24.2789 8.36646 24.7587 8.92274 25.1021C9.47901 25.4455 10.1226 25.6398 10.7855 25.6646C11.4484 25.6894 12.1061 25.5437 12.6891 25.2428C13.272 24.942 13.7587 24.4972 14.0976 23.9554C14.4365 23.4137 14.6151 22.795 14.6145 22.1648C14.6104 21.7665 14.534 21.3719 14.3885 20.9983H17.2966C17.1511 21.3719 17.0747 21.7665 17.0706 22.1648C17.0706 22.857 17.2867 23.5336 17.6915 24.1091C18.0963 24.6846 18.6717 25.1331 19.3449 25.398C20.0181 25.6629 20.7589 25.7322 21.4735 25.5972C22.1882 25.4621 22.8446 25.1288 23.3599 24.6394C23.8751 24.15 24.226 23.5264 24.3681 22.8476C24.5103 22.1687 24.4373 21.4651 24.1585 20.8256C23.8796 20.1861 23.4074 19.6396 22.8016 19.2551C22.1957 18.8705 21.4834 18.6653 20.7548 18.6653H11.8882L11.2742 16.3322H21.9828ZM12.1584 22.1648C12.1584 22.3955 12.0864 22.6211 11.9514 22.8129C11.8165 23.0048 11.6247 23.1543 11.4003 23.2426C11.1759 23.3308 10.929 23.3539 10.6908 23.3089C10.4526 23.2639 10.2337 23.1528 10.062 22.9897C9.89024 22.8265 9.77328 22.6187 9.7259 22.3924C9.67851 22.1661 9.70283 21.9316 9.79578 21.7184C9.88873 21.5053 10.0461 21.3231 10.2481 21.1949C10.45 21.0667 10.6875 20.9983 10.9304 20.9983C11.2561 20.9983 11.5684 21.1212 11.7987 21.34C12.029 21.5587 12.1584 21.8555 12.1584 22.1648ZM20.7548 23.3314C20.5119 23.3314 20.2745 23.2629 20.0725 23.1348C19.8706 23.0066 19.7132 22.8244 19.6202 22.6112C19.5273 22.3981 19.5029 22.1635 19.5503 21.9373C19.5977 21.711 19.7147 21.5031 19.8864 21.34C20.0582 21.1768 20.277 21.0657 20.5152 21.0207C20.7534 20.9757 21.0003 20.9988 21.2247 21.0871C21.4491 21.1754 21.6409 21.3249 21.7759 21.5167C21.9108 21.7086 21.9828 21.9341 21.9828 22.1648C21.9828 22.4742 21.8534 22.7709 21.6231 22.9897C21.3928 23.2085 21.0805 23.3314 20.7548 23.3314Z"
+                  fill="url(#paint0_linear_15661_2155)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_15661_2155"
+                  x1="1.43655"
+                  y1="17.2276"
+                  x2="26.4527"
+                  y2="17.2317"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stop-color="#F43F5E" />
+                  <stop offset="1" stop-color="#FB923C" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">Orders</p>
+          </div>
+        </Link>
+
+        <Link href="/meal_plan/all_plans">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.mealPlancolor ? props.mealPlancolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${props.isMealPlan ? "" : "mix-blend-luminosity"}`}
+                clipPath="url(#clip0_17244_4950)"
+              >
+                <path
+                  d="M4 13H5.50046V14.5H4V13Z"
+                  fill="url(#paint0_linear_17244_4950)"
+                />
+                <path
+                  d="M4 17.5H5.50046V18.9998H4V17.5Z"
+                  fill="url(#paint1_linear_17244_4950)"
+                />
+                <path
+                  d="M4 8.5H5.50046V10H4V8.5Z"
+                  fill="url(#paint2_linear_17244_4950)"
+                />
+                <path
+                  d="M14.9997 5.00039C15.276 5.00039 15.4998 4.77652 15.4998 4.50052V2.50041C15.4998 2.22441 15.276 2.00054 14.9997 2.00054H11.9499C11.8275 1.99264 11.7111 1.94607 11.6169 1.86746C11.6 1.85101 11.5842 1.83328 11.5699 1.81448C11.5464 1.78671 11.5259 1.75637 11.509 1.72412C11.4979 1.70083 11.4885 1.67691 11.4808 1.65256C11.4729 1.63525 11.4658 1.61752 11.4599 1.59958C11.2697 0.668627 10.4507 0 9.50034 0C8.55016 0 7.73115 0.668627 7.54103 1.59958C7.53526 1.61539 7.52864 1.63098 7.52095 1.64593C7.51155 1.67776 7.49873 1.70852 7.4825 1.73758C7.43721 1.82025 7.36906 1.88818 7.28639 1.93346C7.25734 1.94927 7.22679 1.96209 7.19497 1.97149C7.16506 1.98046 7.13408 1.98666 7.1029 1.99007C7.08559 1.99456 7.06786 1.99798 7.04992 2.00054H4.00008C3.72387 2.00054 3.5 2.22441 3.5 2.50041V4.50052C3.5 4.77652 3.72387 5.00039 4.00008 5.00039H14.9997ZM7.50001 3.00049H13.9998C14.276 3.00049 14.4999 3.22436 14.4999 3.50057C14.4999 3.77657 14.276 4.00044 13.9998 4.00044H7.50001C7.2238 4.00044 6.99993 3.77657 6.99993 3.50057C6.99993 3.22436 7.2238 3.00049 7.50001 3.00049ZM5.00003 3.00049H5.50011C5.77611 3.00049 5.99998 3.22436 5.99998 3.50057C5.99998 3.77657 5.77611 4.00044 5.50011 4.00044H5.00003C4.72382 4.00044 4.49995 3.77657 4.49995 3.50057C4.49995 3.22436 4.72382 3.00049 5.00003 3.00049Z"
+                  fill="url(#paint3_linear_17244_4950)"
+                />
+                <path
+                  d="M18.1005 15.0096C18.1135 15.0096 18.1225 15.02 18.1349 15.0235C18.269 15.0111 18.4041 15.0015 18.541 15.0015H19.624H19.6349C19.8966 15.0021 20.1559 15.0478 20.402 15.1369C20.452 15.1555 20.4984 15.182 20.5469 15.2035C20.4911 14.794 20.3975 14.3907 20.2675 13.9985C19.862 12.8138 18.7527 12.0142 17.5004 12.004H17.4919C17.1708 12.0029 16.85 12.0206 16.531 12.0576C16.4665 12.7495 16.4435 14.678 18.1005 15.0096Z"
+                  fill="url(#paint4_linear_17244_4950)"
+                />
+                <path
+                  d="M19 11.3243V3.50008C19 3.22387 18.7761 3 18.4999 3H16.5V3.99995H17.0001C17.5523 3.99995 18 4.44769 18 4.9999V11.0498C18.3437 11.0974 18.68 11.1897 19 11.3243Z"
+                  fill="url(#paint5_linear_17244_4950)"
+                />
+                <path
+                  d="M2.00011 26.9994C1.44769 26.9994 0.99995 26.5519 0.99995 25.9995V4.9999C0.99995 4.4477 1.44769 3.99995 2.00011 3.99995H2.49998V3H0.500082C0.223873 3 0 3.22387 0 3.50008V27.4995C0 27.7757 0.223873 27.9996 0.500082 27.9996H17.1997C16.7543 27.7157 16.3442 27.3799 15.9778 26.9994H2.00011Z"
+                  fill="url(#paint6_linear_17244_4950)"
+                />
+                <path
+                  d="M16.6805 15.4299C15.4902 14.4693 15.4007 12.6469 15.5765 11.6183C15.6227 11.4128 15.7081 11.0535 16.9997 11.0074V5H16.4075C16.1965 5.59728 15.6329 5.99739 14.9996 5.99995H3.9999C3.36652 5.99739 2.80299 5.59728 2.59194 5H2V25.9996H15.1846C14.4076 24.8106 13.9958 23.4201 13.9996 21.9998V19.8348C13.9761 17.9744 15.0173 16.2637 16.6805 15.4299ZM7.9997 9.00001H14.9996C15.2758 9.00001 15.4996 9.22389 15.4996 9.49988C15.4996 9.77609 15.2758 9.99996 14.9996 9.99996H7.9997C7.7237 9.99996 7.49983 9.77609 7.49983 9.49988C7.49983 9.22389 7.7237 9.00001 7.9997 9.00001ZM6.49988 23.4996C6.49988 24.052 6.05214 24.4998 5.49993 24.4998H3.9999C3.44769 24.4998 2.99995 24.052 2.99995 23.4996V21.9998C2.99995 21.4474 3.44769 20.9998 3.9999 20.9998H5.49993C6.05214 20.9998 6.49988 21.4474 6.49988 21.9998V23.4996ZM6.49988 18.9997C6.49988 19.5521 6.05214 19.9997 5.49993 19.9997H3.9999C3.44769 19.9997 2.99995 19.5521 2.99995 18.9997V17.4999C2.99995 16.9475 3.44769 16.4997 3.9999 16.4997H5.49993C6.05214 16.4997 6.49988 16.9475 6.49988 17.4999V18.9997ZM6.49988 14.4998C6.49988 15.052 6.05214 15.4998 5.49993 15.4998H3.9999C3.44769 15.4998 2.99995 15.052 2.99995 14.4998V12.9998C2.99995 12.4476 3.44769 11.9999 3.9999 11.9999H5.49993C6.05214 11.9999 6.49988 12.4476 6.49988 12.9998V14.4998ZM6.49988 9.99996C6.49988 10.5522 6.05214 10.9999 5.49993 10.9999H3.9999C3.44769 10.9999 2.99995 10.5522 2.99995 9.99996V8.49993C2.99995 7.94773 3.44769 7.49998 3.9999 7.49998H5.49993C6.05214 7.49998 6.49988 7.94773 6.49988 8.49993V9.99996ZM12.4998 23.4996H7.9997C7.7237 23.4996 7.49983 23.2759 7.49983 22.9997C7.49983 22.7235 7.7237 22.4997 7.9997 22.4997H12.4998C12.7758 22.4997 12.9997 22.7235 12.9997 22.9997C12.9997 23.2759 12.7758 23.4996 12.4998 23.4996ZM12.4998 18.9997H7.9997C7.7237 18.9997 7.49983 18.7759 7.49983 18.4999C7.49983 18.2236 7.7237 17.9998 7.9997 17.9998H12.4998C12.7758 17.9998 12.9997 18.2236 12.9997 18.4999C12.9997 18.7759 12.7758 18.9997 12.4998 18.9997ZM13.4997 14.4998H7.9997C7.7237 14.4998 7.49983 14.276 7.49983 14C7.49983 13.7238 7.7237 13.4999 7.9997 13.4999H13.4997C13.7757 13.4999 13.9996 13.7238 13.9996 14C13.9996 14.276 13.7757 14.4998 13.4997 14.4998Z"
+                  fill="url(#paint7_linear_17244_4950)"
+                />
+                <path
+                  d="M24.4614 15.9996H23.3574C23.2215 16.0013 23.0868 16.0235 22.9575 16.0649L22.9334 16.072C22.3534 16.3072 21.9811 16.8784 21.9999 17.5041L21.9715 17.5615C21.8715 16.0936 22.03 13.0375 24.753 11.43C24.983 11.2865 25.0567 10.9855 24.9187 10.7518C24.781 10.5181 24.4819 10.4371 24.245 10.5692C21.3449 12.2807 20.9275 15.3546 20.96 17.1614C20.867 16.6686 20.527 16.2583 20.06 16.0756C19.9254 16.0273 19.7836 16.0019 19.6404 16.0006H18.5386C16.5876 15.9996 15 17.7209 15 19.8344V21.9995C15 25.3074 17.497 27.9994 20.5654 27.9994H22.4344C25.5028 27.9994 27.9998 25.3084 27.9998 21.9995V19.8344C27.9998 17.7209 26.4124 15.9996 24.4614 15.9996ZM18.1616 17.9704C18.106 17.9924 17.0001 18.4124 17.0001 19.9994C17.0001 20.2756 16.7762 20.4994 16.5 20.4994C16.2238 20.4994 16.0002 20.2756 16.0002 19.9994C16.0002 17.666 17.7666 17.0495 17.842 17.0249C18.0114 16.9677 18.1983 17.0051 18.3325 17.1232C18.4666 17.2411 18.5277 17.4216 18.4927 17.5968C18.4576 17.772 18.3318 17.9153 18.1626 17.9725L18.1616 17.9704ZM20.9999 17.9059C21.0065 17.9749 21.0129 18.039 21.0196 18.099C21.0095 18.0665 21.0029 18.0332 20.9999 17.9995V17.9059Z"
+                  fill="url(#paint8_linear_17244_4950)"
+                />
+                <path
+                  d="M4 22H5.50046V23.4998H4V22Z"
+                  fill="url(#paint9_linear_17244_4950)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_17244_4950"
+                  x1="3.94229"
+                  y1="13.9575"
+                  x2="5.55096"
+                  y2="13.9577"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint1_linear_17244_4950"
+                  x1="3.94229"
+                  y1="18.4573"
+                  x2="5.55096"
+                  y2="18.4576"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint2_linear_17244_4950"
+                  x1="3.94229"
+                  y1="9.45747"
+                  x2="5.55096"
+                  y2="9.45773"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint3_linear_17244_4950"
+                  x1="3.03847"
+                  y1="3.19174"
+                  x2="15.9037"
+                  y2="3.19674"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint4_linear_17244_4950"
+                  x1="16.3545"
+                  y1="14.0462"
+                  x2="20.6827"
+                  y2="14.0471"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint5_linear_17244_4950"
+                  x1="16.4038"
+                  y1="8.31338"
+                  x2="19.0841"
+                  y2="8.31351"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint6_linear_17244_4950"
+                  x1="-0.661528"
+                  y1="18.9572"
+                  x2="17.7786"
+                  y2="18.9593"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint7_linear_17244_4950"
+                  x1="1.42309"
+                  y1="18.404"
+                  x2="17.5045"
+                  y2="18.4059"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint8_linear_17244_4950"
+                  x1="14.5"
+                  y1="21.6719"
+                  x2="28.4373"
+                  y2="21.6736"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient
+                  id="paint9_linear_17244_4950"
+                  x1="3.94229"
+                  y1="22.9573"
+                  x2="5.55096"
+                  y2="22.9576"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#F43F5E" />
+                  <stop offset="1" stopColor="#FB923C" />
+                </linearGradient>
+                <clipPath id="clip0_17244_4950">
+                  <rect width="28" height="28" fill="white" />
+                </clipPath>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">My Plans</p>
+          </div>
+        </Link>
+
+        <Link href="/contactUs">
+          <div
+            className={`flex flex-col items-center py-3 mq450:px-3 bg-${
+              props.helpactivColor ? props.helpactivecolor : ""
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+            >
+              <g
+                className={`${props.activehelp ? "" : "mix-blend-luminosity"}`}
+              >
+                <path
+                  d="M13.9413 20.9987C14.3497 20.9987 14.695 20.8575 14.9773 20.5752C15.2597 20.2929 15.4005 19.9479 15.3997 19.5404C15.3989 19.1328 15.2581 18.7875 14.9773 18.5044C14.6966 18.2213 14.3512 18.0805 13.9413 18.082C13.5315 18.0836 13.1865 18.2248 12.9065 18.5055C12.6265 18.7863 12.4853 19.1313 12.483 19.5404C12.4807 19.9495 12.6218 20.2948 12.9065 20.5764C13.1912 20.8579 13.5361 20.9987 13.9413 20.9987ZM12.8913 16.507H15.0497C15.0497 15.8654 15.1228 15.3598 15.269 14.9904C15.4152 14.6209 15.8282 14.1154 16.508 13.4737C17.0136 12.9681 17.4122 12.4867 17.7038 12.0294C17.9955 11.572 18.1413 11.0229 18.1413 10.382C18.1413 9.29315 17.7427 8.45704 16.9455 7.8737C16.1483 7.29037 15.2052 6.9987 14.1163 6.9987C13.008 6.9987 12.1089 7.29037 11.419 7.8737C10.7291 8.45704 10.2477 9.15704 9.97468 9.9737L11.8997 10.732C11.9969 10.382 12.2158 10.0029 12.5565 9.59454C12.8972 9.1862 13.4171 8.98204 14.1163 8.98204C14.7386 8.98204 15.2052 9.15237 15.5163 9.49304C15.8275 9.8337 15.983 10.2078 15.983 10.6154C15.983 11.0043 15.8663 11.369 15.633 11.7097C15.3997 12.0504 15.108 12.3661 14.758 12.657C13.9025 13.4154 13.3775 13.989 13.183 14.3779C12.9886 14.7668 12.8913 15.4765 12.8913 16.507ZM13.9997 25.6654C12.3858 25.6654 10.8691 25.3593 9.44968 24.7472C8.03023 24.1351 6.79551 23.3036 5.74551 22.2529C4.69551 21.2021 3.86445 19.9674 3.25234 18.5487C2.64023 17.13 2.33379 15.6134 2.33301 13.9987C2.33223 12.384 2.63868 10.8674 3.25234 9.4487C3.86601 8.03004 4.69706 6.79531 5.74551 5.74454C6.79395 4.69376 8.02868 3.8627 9.44968 3.25137C10.8707 2.64004 12.3873 2.33359 13.9997 2.33204C15.612 2.33048 17.1287 2.63693 18.5497 3.25137C19.9707 3.86581 21.2054 4.69687 22.2538 5.74454C23.3023 6.7922 24.1337 8.02693 24.7482 9.4487C25.3626 10.8705 25.6687 12.3871 25.6663 13.9987C25.664 15.6103 25.3576 17.1269 24.747 18.5487C24.1365 19.9705 23.3054 21.2052 22.2538 22.2529C21.2023 23.3005 19.9676 24.132 18.5497 24.7472C17.1318 25.3624 15.6151 25.6685 13.9997 25.6654Z"
+                  fill="url(#paint0_linear_3999_27551)"
+                />
+              </g>
+              <defs>
+                <linearGradient
+                  id="paint0_linear_3999_27551"
+                  x1="25.1551"
+                  y1="25.6654"
+                  x2="1.13079"
+                  y2="24.3539"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#E3206D" />
+                  <stop offset="1" stopColor="#F16A33" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <p className="text-center text-nowrap">Help Center</p>
+          </div>
+        </Link>
+
+        <div
+          className={`flex cursor-pointer flex-col py-2 mq450:mt-2 items-center  mq450:px-3 bg-${
+            props.settingsactivecolor ? props.settingsactivecolor : ""
+          }`}
+        >
+          <Popover>
+            <PopoverTrigger className="flex flex-col items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M8.5 11.4737C8.77532 11.4714 9.04983 11.4422 9.32 11.3863C9.42298 10.9 9.65537 10.4545 9.99 10.1021L10.7 9.3579C10.9317 9.1128 11.2072 8.9185 11.5107 8.78624C11.8142 8.65398 12.1395 8.58638 12.468 8.58737C12.525 8.58737 12.581 8.5979 12.637 8.60105C13.0178 7.66465 13.1018 6.62397 12.8763 5.6334C12.6509 4.64282 12.1282 3.75511 11.3856 3.10197C10.6431 2.44883 9.72027 2.06505 8.75414 2.00755C7.78801 1.95006 6.83001 2.22192 6.02225 2.78281C5.2145 3.34369 4.60002 4.16372 4.26998 5.12125C3.93993 6.07877 3.9119 7.12278 4.19005 8.09839C4.46819 9.07401 5.0377 9.92926 5.81407 10.5373C6.59044 11.1453 7.53233 11.4737 8.5 11.4737ZM8.5 4.10527C8.99445 4.10527 9.4778 4.25961 9.88893 4.54877C10.3 4.83793 10.6205 5.24892 10.8097 5.72978C10.9989 6.21064 11.0484 6.73976 10.952 7.25024C10.8555 7.76072 10.6174 8.22962 10.2678 8.59765C9.91814 8.96568 9.47268 9.21632 8.98773 9.31786C8.50277 9.4194 8.00011 9.36728 7.54329 9.16811C7.08648 8.96893 6.69603 8.63163 6.42133 8.19887C6.14662 7.76611 6 7.25732 6 6.73684C6 6.03891 6.26339 5.36955 6.73223 4.87604C7.20107 4.38252 7.83696 4.10527 8.5 4.10527Z"
+                  fill="#A3A3A3"
+                />
+                <path
+                  d="M9.313 19.8947H4V17.7895C4 16.952 4.31607 16.1487 4.87868 15.5565C5.44129 14.9643 6.20435 14.6316 7 14.6316H8.072C8.14574 14.2416 8.30246 13.8743 8.53038 13.5573C8.75831 13.2403 9.05153 12.9817 9.388 12.8011C9.36715 12.7104 9.35079 12.6187 9.339 12.5263H7C5.67441 12.528 4.40356 13.083 3.46622 14.0697C2.52888 15.0564 2.00159 16.3941 2 17.7895V20.9474C2 21.2265 2.10536 21.4943 2.29289 21.6917C2.48043 21.8891 2.73478 22 3 22H10.687L9.987 21.2632C9.63656 20.8889 9.40164 20.4119 9.313 19.8947Z"
+                  fill="#A3A3A3"
+                />
+                <path
+                  d="M21.5 14.6316H20.38C20.2672 14.1138 20.0714 13.6201 19.801 13.1716L20.601 12.3347C20.6947 12.236 20.7474 12.1022 20.7474 11.9626C20.7474 11.8231 20.6947 11.6892 20.601 11.5905L19.894 10.8463C19.8002 10.7476 19.6731 10.6922 19.5405 10.6922C19.4079 10.6922 19.2808 10.7476 19.187 10.8463L18.392 11.6884C17.9647 11.4014 17.4939 11.1935 17 11.0737V9.89474C17 9.75515 16.9473 9.62128 16.8536 9.52258C16.7598 9.42387 16.6326 9.36842 16.5 9.36842H15.5C15.3674 9.36842 15.2402 9.42387 15.1464 9.52258C15.0527 9.62128 15 9.75515 15 9.89474V11.0737C14.5081 11.1925 14.0391 11.3986 13.613 11.6832L12.818 10.8463C12.7242 10.7476 12.5971 10.6922 12.4645 10.6922C12.3319 10.6922 12.2048 10.7476 12.111 10.8463L11.404 11.5905C11.3103 11.6892 11.2576 11.8231 11.2576 11.9626C11.2576 12.1022 11.3103 12.236 11.404 12.3347L12.204 13.1768C11.9324 13.6234 11.7349 14.1153 11.62 14.6316H10.5C10.3674 14.6316 10.2402 14.687 10.1464 14.7857C10.0527 14.8844 10 15.0183 10 15.1579V16.2105C10 16.3501 10.0527 16.484 10.1464 16.5827C10.2402 16.6814 10.3674 16.7368 10.5 16.7368H11.62C11.7328 17.2546 11.9286 17.7483 12.199 18.1968L11.404 19.0337C11.3103 19.1324 11.2576 19.2662 11.2576 19.4058C11.2576 19.5453 11.3103 19.6792 11.404 19.7779L12.111 20.5221C12.2048 20.6208 12.3319 20.6762 12.4645 20.6762C12.5971 20.6762 12.7242 20.6208 12.818 20.5221L13.618 19.68C14.0422 19.9659 14.5096 20.1738 15 20.2947V21.4737C15 21.6133 15.0527 21.7471 15.1464 21.8458C15.2402 21.9445 15.3674 22 15.5 22H16.5C16.6326 22 16.7598 21.9445 16.8536 21.8458C16.9473 21.7471 17 21.6133 17 21.4737V20.2947C17.4919 20.176 17.9609 19.9699 18.387 19.6853L19.182 20.5274C19.2758 20.626 19.4029 20.6815 19.5355 20.6815C19.6681 20.6815 19.7952 20.626 19.889 20.5274L20.596 19.7832C20.6897 19.6845 20.7424 19.5506 20.7424 19.4111C20.7424 19.2715 20.6897 19.1376 20.596 19.0389L19.796 18.2021C20.0686 17.7523 20.2662 17.2568 20.38 16.7368H21.5C21.6326 16.7368 21.7598 16.6814 21.8536 16.5827C21.9473 16.484 22 16.3501 22 16.2105V15.1579C22 15.0183 21.9473 14.8844 21.8536 14.7857C21.7598 14.687 21.6326 14.6316 21.5 14.6316ZM16 18.3158C15.5055 18.3158 15.0222 18.1615 14.6111 17.8723C14.2 17.5831 13.8795 17.1721 13.6903 16.6913C13.5011 16.2104 13.4516 15.6813 13.548 15.1708C13.6445 14.6603 13.8826 14.1914 14.2322 13.8234C14.5819 13.4554 15.0273 13.2047 15.5123 13.1032C15.9972 13.0017 16.4999 13.0538 16.9567 13.253C17.4135 13.4521 17.804 13.7894 18.0787 14.2222C18.3534 14.6549 18.5 15.1637 18.5 15.6842C18.5 16.3822 18.2366 17.0515 17.7678 17.545C17.2989 18.0385 16.663 18.3158 16 18.3158Z"
+                  fill="#A3A3A3"
+                />
+                <path
+                  d="M16 16.7368C16.5523 16.7368 17 16.2656 17 15.6842C17 15.1029 16.5523 14.6316 16 14.6316C15.4477 14.6316 15 15.1029 15 15.6842C15 16.2656 15.4477 16.7368 16 16.7368Z"
+                  fill="#A3A3A3"
+                />
+              </svg>
+              <p className="text-center text-nowrap">Settings</p>
+            </PopoverTrigger>
+            <PopoverContent className=" px-5 py-3 bg-neutral-800 rounded-lg border border-neutral-700 flex-col justify-start items-center gap-2.5 inline-flex">
+              <Dialog>
+                <DialogTrigger>
+                  <button
+                    type="submit"
+                    className="w-[193px] justify-between items-center inline-flex"
+                  >
+                    <div className="text-sm font-semibold text-neutral-100 font-Lato">
+                      Log Out
+                    </div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <path
+                        d="M15.923 12.382C16.0241 12.1374 16.0241 11.8626 15.923 11.618C15.8731 11.496 15.7993 11.3851 15.706 11.292L11.706 7.292C11.6138 7.19649 11.5034 7.12031 11.3814 7.0679C11.2594 7.01549 11.1282 6.9879 10.9954 6.98675C10.8626 6.9856 10.7309 7.0109 10.608 7.06118C10.4851 7.11146 10.3735 7.18571 10.2796 7.2796C10.1857 7.3735 10.1115 7.48515 10.0612 7.60805C10.0109 7.73094 9.9856 7.86262 9.98675 7.9954C9.9879 8.12818 10.0155 8.2594 10.0679 8.3814C10.1203 8.50341 10.1965 8.61375 10.292 8.706L12.586 11H4C3.73478 11 3.48043 11.1054 3.29289 11.2929C3.10536 11.4804 3 11.7348 3 12C3 12.2652 3.10536 12.5196 3.29289 12.7071C3.48043 12.8946 3.73478 13 4 13H12.586L10.293 15.293C10.1975 15.3852 10.1213 15.4956 10.0689 15.6176C10.0165 15.7396 9.9889 15.8708 9.98775 16.0036C9.9866 16.1364 10.0119 16.2681 10.0622 16.391C10.1125 16.5138 10.1867 16.6255 10.2806 16.7194C10.3745 16.8133 10.4861 16.8875 10.609 16.9378C10.7319 16.9881 10.8636 17.0134 10.9964 17.0123C11.1292 17.0111 11.2604 16.9835 11.3824 16.9311C11.5044 16.8787 11.6148 16.8025 11.707 16.707L15.707 12.707C15.7998 12.6141 15.8733 12.5036 15.923 12.382Z"
+                        fill="#D4D4D4"
+                      />
+                      <path
+                        d="M18 20H15C14.7348 20 14.4804 19.8946 14.2929 19.7071C14.1054 19.5196 14 19.2652 14 19C14 18.7348 14.1054 18.4804 14.2929 18.2929C14.4804 18.1054 14.7348 18 15 18H18C18.2652 18 18.5196 17.8946 18.7071 17.7071C18.8946 17.5196 19 17.2652 19 17V7C19 6.73478 18.8946 6.48043 18.7071 6.29289C18.5196 6.10536 18.2652 6 18 6H15C14.7348 6 14.4804 5.89464 14.2929 5.70711C14.1054 5.51957 14 5.26522 14 5C14 4.73478 14.1054 4.48043 14.2929 4.29289C14.4804 4.10536 14.7348 4 15 4H18C18.7956 4 19.5587 4.31607 20.1213 4.87868C20.6839 5.44129 21 6.20435 21 7V17C21 17.7956 20.6839 18.5587 20.1213 19.1213C19.5587 19.6839 18.7956 20 18 20Z"
+                        fill="#D4D4D4"
+                      />
+                    </svg>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="logout-dialog  bg-neutral-800 border border-neutral-700 rounded-xl  w-[580px]  max-w-[calc(100vw-24px)]   mq450:w-[280px]  mq375:w-[260px]  p-6 ">
+                  <DialogHeader>
+                    <DialogTitle></DialogTitle>
+
+                    <DialogDescription>
+                      <form
+                        // action="/api/auth/signout"
+                        // method="GET"
+                        className="flex flex-col items-center justify-center mt-6"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="80"
+                          height="80"
+                          viewBox="0 0 80 80"
+                          fill="none"
+                        >
+                          <path
+                            d="M43.3359 46.668H36.6693V30.0013H43.3359M43.3359 60.0013H36.6693V53.3346H43.3359M3.33594 70.0013H76.6693L40.0026 6.66797L3.33594 70.0013Z"
+                            fill="#991B1B"
+                          />
+                        </svg>
+                        <h1 className="text-[32px] text-[#FFFFFF] font-bold leading-normal">
+                          Log Out
+                        </h1>
+                        <h5 className="text-[18px] text-[#F5F5F5] font-normal leading-normal">
+                          Are you sure you want to log out ?
+                        </h5>
+                        <div className="flex items-center justify-center gap-6 mt-4">
+                          <DialogClose className="text-[16px] text-[#FFFFFF] font-normal leading-[24px] px-4 py-[6px] rounded-[11px] border-[1px] border-[#F5F5F5]">
+                            Cancel
+                          </DialogClose>
+                          <button
+                            // type="submit"
+                            onClick={logout}
+                            className="text-[16px] text-[#FFFFFF] font-normal leading-[24px] px-4 py-[6px] rounded-[8px] border-[1px] primaryButton border-[#C72D65]"
+                          >
+                            Log Out
+                          </button>
+                        </div>
+                      </form>
+                    </DialogDescription>
+                  </DialogHeader>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog>
+                <DialogTrigger>
+                  <div className="w-[193px] justify-between  items-center inline-flex">
+                    <div className="text-sm font-semibold text-neutral-100 font-Lato">
+                      Delete Account
+                    </div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <path
+                        d="M20 6.21053H16V4.10526C16 3.54691 15.7893 3.01143 15.4142 2.61662C15.0391 2.2218 14.5304 2 14 2H10C9.46957 2 8.96086 2.2218 8.58579 2.61662C8.21071 3.01143 8 3.54691 8 4.10526V6.21053H4C3.73478 6.21053 3.48043 6.32143 3.29289 6.51884C3.10536 6.71624 3 6.98398 3 7.26316C3 7.54233 3.10536 7.81007 3.29289 8.00748C3.48043 8.20489 3.73478 8.31579 4 8.31579H5V19.8947C5 20.4531 5.21071 20.9886 5.58579 21.3834C5.96086 21.7782 6.46957 22 7 22H17C17.5304 22 18.0391 21.7782 18.4142 21.3834C18.7893 20.9886 19 20.4531 19 19.8947V8.31579H20C20.2652 8.31579 20.5196 8.20489 20.7071 8.00748C20.8946 7.81007 21 7.54233 21 7.26316C21 6.98398 20.8946 6.71624 20.7071 6.51884C20.5196 6.32143 20.2652 6.21053 20 6.21053ZM10 4.10526H14V6.21053H10V4.10526ZM17 19.8947H7V8.31579H17V19.8947Z"
+                        fill="#E5E5E5"
+                      />
+                      <path
+                        d="M10 9.36842C9.73478 9.36842 9.48043 9.47932 9.29289 9.67673C9.10536 9.87414 9 10.1419 9 10.4211V17.7895C9 18.0686 9.10536 18.3364 9.29289 18.5338C9.48043 18.7312 9.73478 18.8421 10 18.8421C10.2652 18.8421 10.5196 18.7312 10.7071 18.5338C10.8946 18.3364 11 18.0686 11 17.7895V10.4211C11 10.1419 10.8946 9.87414 10.7071 9.67673C10.5196 9.47932 10.2652 9.36842 10 9.36842Z"
+                        fill="#E5E5E5"
+                      />
+                      <path
+                        d="M14 9.36842C13.7348 9.36842 13.4804 9.47932 13.2929 9.67673C13.1054 9.87414 13 10.1419 13 10.4211V17.7895C13 18.0686 13.1054 18.3364 13.2929 18.5338C13.4804 18.7312 13.7348 18.8421 14 18.8421C14.2652 18.8421 14.5196 18.7312 14.7071 18.5338C14.8946 18.3364 15 18.0686 15 17.7895V10.4211C15 10.1419 14.8946 9.87414 14.7071 9.67673C14.5196 9.47932 14.2652 9.36842 14 9.36842Z"
+                        fill="#E5E5E5"
+                      />
+                    </svg>
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="logout-dialog delete-dialog bg-neutral-600  border border-neutral-700  rounded-xl   w-[580px]  max-w-[calc(100vw-24px)]  mq450:w-[280px] mq375:w-[260px] p-6">
+                  <DialogHeader>
+                    <DialogTitle></DialogTitle>
+                    <DialogClose className="absolute z-40 text-white opacity-10 top-2 md:top-1 right-2 md:right-2"></DialogClose>
+                    <DialogDescription>
+                      <form
+                        // action="/api/auth/signout"
+                        // method="GET"
+                        className="flex flex-col items-center justify-center mt-6"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="80"
+                          height="80"
+                          viewBox="0 0 80 80"
+                          fill="none"
+                        >
+                          <path
+                            d="M43.3359 46.668H36.6693V30.0013H43.3359M43.3359 60.0013H36.6693V53.3346H43.3359M3.33594 70.0013H76.6693L40.0026 6.66797L3.33594 70.0013Z"
+                            fill="#991B1B"
+                          />
+                        </svg>
+                        <h1 className="text-[32px] text-[#FFFFFF] font-bold leading-normal whitespace-nowrap mq450:mb-3">
+                          Delete Account
+                        </h1>
+                        <h5 className="text-[18px] text-[#F5F5F5] font-normal leading-normal mq450:mb-1">
+                          Are you sure you want to Delete account ?
+                        </h5>
+                        <h4 className="text-neutral-400 mq450:mt-1">
+                          Once you delete your account, you will lose all your
+                          data insights!
+                        </h4>
+                        <div className="flex items-center justify-center gap-6 mt-4">
+                          <DialogClose className="text-[16px] text-[#FFFFFF] font-normal leading-[24px] px-4 py-[6px] rounded-[11px] border-[1px] border-[#F5F5F5]">
+                            Cancel
+                          </DialogClose>
+                          <button
+                            // type="submit"
+                            onClick={handleDelete}
+                            className="text-[16px] primaryButton text-[#FFFFFF] font-normal leading-[24px] px-4 py-[6px] rounded-[8px] border-[1px] border-[#C72D65]"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </form>
+                    </DialogDescription>
+                  </DialogHeader>
+                </DialogContent>
+              </Dialog>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UserNavbar;
+```
+
+---
+
+## Styling & Responsiveness
+
+- Fixed vertical layout on desktop
+- Collapses to horizontal/top layout on mobile
+- Uses Tailwind utility classes
+- Icons are inline SVGs for full control
+
+---
+
+## Modification Guidelines
+
+### Safe to modify
+
+- Icons
+- Text labels
+- Tailwind spacing and typography
+- Breakpoints and layout classes
+
+### Do NOT modify
+
+- Cookie cleanup logic
+- Logout flow
+- Delete account API call
+- Confirmation dialogs without updating behavior documentation
+
+---
+
+## Dependencies & Assumptions
+
+- Requires authenticated user (`user_id` cookie present)
+- Depends on:
+
+  - `@/components/ui/dialog`
+  - `@/components/ui/popover`
+  - `useLogout` hook
+
+- Assumes API endpoint is available via env
+
+---
+
+## When to Use / When NOT to Use
+
+### Use when
+
+- Rendering authenticated user pages
+- Consistent navigation is required
+- User actions like logout/delete are needed
+
+### Do NOT use when
+
+- Public pages
+- Admin dashboards
+- Stateless or unauthenticated views
+
+---
+
+## Summary
+
+`UserNavbar` is a **state-aware navigation component** for authenticated users, combining routing, visual state, and critical account actions.
+It should be reused without structural modification and controlled via props for active states.
