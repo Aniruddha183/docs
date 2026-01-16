@@ -236,7 +236,7 @@
         {
           "group": "Coach Booking Module",
           "pages": [
-            "backend/modules/coach/overview",
+            "backend/Coach/coach-booking-overview",
             "backend/coachBooking-db-schema",
 
             {
@@ -290,16 +290,12 @@
         {
           "group": "Workout Plan Module",
           "pages": [
-            "backend/modules/coach/overview",
+            "backend/workoutPlan-overview",
             "backend/workoutPlan-db-schema",
 
             {
               "group": "Admin Panel",
               "pages": ["backend/admin-workoutPlan-management"]
-            },
-            {
-              "group": "Website",
-              "pages": ["backend/User/user-workout-plan-api-doc(Not Prepared)1"]
             },
             {
               "group": "Coach App",
@@ -310,7 +306,6 @@
         {
           "group": "Post Module",
           "pages": [
-            "backend/modules/coach/overview",
             "backend/DB-Schema/Post-module-db-schema",
 
             {

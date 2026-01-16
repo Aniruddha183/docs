@@ -19,10 +19,12 @@ Full model field lists for the Coach Booking module. These match the fields used
 * `_id`: `ObjectId`
 * `sessionId`: `string` — unique id (e.g., `PRV0001`)
 * `coachId`: `string`
-* `userId`: `string` — the user who created/booked the private session (could be same as invited user)
+* `userId`: `string` — the user who created/booked the private session
 * `title`: `string`
 * `description`: `string`
-* `date`: `string | Date`
+* `date`: `string`
+* `dateTime`: `Date` — scheduled start time in UTC
+* `endDateTime`: `Date` — scheduled end time in UTC
 * `startTime`: `string`
 * `endTime`: `string`
 * `duration`: `number`
@@ -32,18 +34,14 @@ Full model field lists for the Coach Booking module. These match the fields used
 * `currency`: `string`
 * `status`: `string` — `scheduled` | `cancelled` | `completed` | `pending`
 * `invitedEmails`: `string[]` — list of invited user emails
-* `invitedUsers`: `Array<{ userId: string; email?: string; status: 'invited' | 'accepted' | 'declined' }>`
-* `createdBy`: `{ userId?: string; coachId?: string }`
+* `participantsEmails`: `string[]` — list of registered user emails
 * `createdAt`: `Date`
 * `updatedAt`: `Date`
 * `meetingLink`: `string` — optional
-* `meta`: `Record<string, any>`
 
 **Indexes**
 
 * `sessionId` unique
-* `coachId` for lookups
-* `{ coachId, date, startTime }` for conflict checks
 
 ---
 
@@ -63,7 +61,7 @@ Represents payments/bookings for private sessions and may be shared with other b
 * `amount`: `number`
 * `currency`: `string`
 * `transactionId`: `string`
-* `gateway`: `string` — `razorpay`, `stripe`, etc.
+* `isRefunded`: `boolean`
 * `createdAt`, `updatedAt`
 
 ---
@@ -75,36 +73,14 @@ Used to describe a coach's available time-slot metadata.
 **Full fields**
 
 * `_id`: `ObjectId`
-* `slotId`: `string`
 * `coachId`: `string`
 * `date`: `string | Date`
 * `startTime`: `string`
 * `endTime`: `string`
-* `capacity`: `number`
-* `booked`: `number`
-* `status`: `string` — `available` | `booked` | `blocked`
 * `createdAt`, `updatedAt`
 
 ---
 
-### `IInvitation`
-
-Invitation records for sessions (used by inviteUser endpoint).
-
-**Full fields**
-
-* `_id`: `ObjectId`
-* `inviteId`: `string`
-* `sessionId`: `string`
-* `fromUserId`: `string` (sender)
-* `toEmail`: `string`
-* `toUserId`?: `string`
-* `message`?: `string`
-* `status`: `string` — `sent` | `accepted` | `declined` | `expired`
-* `sentAt`: `Date`
-* `respondedAt`?: `Date`
-
----
 
 ### `UserInviteToken`
 
@@ -115,9 +91,8 @@ Small token record used for one-click invite accept flows (added per your reques
 * `_id`: `ObjectId`
 * `token`: `string` — randomized token
 * `sessionId`: `string`
-* `inviteeEmail`: `string`
-* `expiresAt`: `Date`
-* `usedAt`?: `Date`
+* `email`: `string`
+* `status`: `string` — `active` | `inactive`
 * `createdAt`: `Date`
 
 ---
@@ -151,15 +126,12 @@ export interface IPrivateSession {
   timeZone?: string;
   seats?: number;
   price?: number;
-  currency?: string;
-  status?: 'scheduled' | 'cancelled' | 'completed' | 'pending';
+  status?: 'active' | 'inactive';
   invitedEmails?: string[];
-  invitedUsers?: Array<{ userId: string; email?: string; status: 'invited' | 'accepted' | 'declined' }>;
-  createdBy?: { userId?: string; coachId?: string };
+  participantEmails?: string[];
   createdAt?: Date;
   updatedAt?: Date;
   meetingLink?: string;
-  meta?: Record<string, any>;
 }
 
 export interface IBooking {
@@ -169,49 +141,33 @@ export interface IBooking {
   userId: string;
   orderId?: string;
   paymentId?: string;
-  status?: 'success' | 'failed' | 'pending' | 'refunded';
+  status?: 'active' | 'inactive';
   amount?: number;
   currency?: string;
   transactionId?: string;
-  gateway?: string;
+  isRefunded?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface ISlot {
   _id?: string;
-  slotId: string;
   coachId: string;
   date: string | Date;
   startTime: string;
   endTime?: string;
   capacity?: number;
-  booked?: number;
-  status?: 'available' | 'booked' | 'blocked';
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface IInvitation {
-  _id?: string;
-  inviteId: string;
-  sessionId: string;
-  fromUserId: string;
-  toEmail: string;
-  toUserId?: string;
-  message?: string;
-  status?: 'sent' | 'accepted' | 'declined' | 'expired';
-  sentAt?: Date;
-  respondedAt?: Date;
-}
 
 export interface IUserInviteToken {
   _id?: string;
   token: string;
   sessionId: string;
-  inviteeEmail: string;
-  expiresAt: Date;
-  usedAt?: Date;
+  email: string;
+  status: string;
   createdAt?: Date;
 }
 
@@ -229,7 +185,7 @@ export interface IProfileModelSnapshot {
 ## Implementation notes
 
 * Conflict checking endpoints should compare `{ coachId, date, startTime, duration }` to detect overlaps. Use queries that convert times to a canonical timezone when comparing.
-* `UserInviteToken` must be indexed on `token` with TTL (`expiresAt`) for auto-expiry.
+* `UserInviteToken` must be indexed on `token` with TTL (`expiresAt`) for auto-expiry(Optional).
 * Keep sensitive payment fields encrypted at rest (if storing any gateway response payloads).
 
 ---

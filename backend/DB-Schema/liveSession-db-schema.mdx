@@ -28,7 +28,9 @@ Represents a public / live session record.
 * `thumbnailURL`: `string`
 * `thumbnailKey`: `string` — S3 key for image
 * `thumbnailMediaId`: `string` — media id reference
-* `date`: `string` | `Date` — scheduled date (YYYY-MM-DD)
+* `date`: `string` | `Date` — scheduled date (DD-MM-YYYY)
+* `dateTime`: `Date` — scheduled start time in UTC
+* `endDateTime`: `Date` — scheduled end time in UTC
 * `startTime`: `string` — scheduled start time (HH:mm:ss or ISO time)
 * `endTime`: `string` — computed or stored end time
 * `duration`: `number` — minutes
@@ -37,34 +39,22 @@ Represents a public / live session record.
 * `seats`: `number` — total seats available
 * `availableSeats`: `number` — computed / updated
 * `price`: `number` — coach-facing price
-* `bookingPrice`: `number` — price user pays (incl fees)
-* `liveSessionPrice`: `number` — for live-only pricing
-* `currency`: `string` — e.g. `INR` / `USD`
 * `sessionType`: `string` — `public` | `recorded` | `hybrid`
-* `status`: `string` — `draft` | `published` | `cancelled` | `completed` | `archived`
+* `status`: `string` — `Active` | `Inactive`
 * `state`: `string` — higher-level lifecycle state (used by controllers)
-* `stage`: `string` — review stage (e.g., `reviewer_pending`, `approver_pending`)
-* `isRefunded`: `boolean`
+* `stage`: `string` — review stage 
 * `cancelReason`: `string` | null
 * `cancelledBy`: `{ adminId?: string, coachId?: string, userId?: string }` — who cancelled
 * `meetingLink`: `string` — URL for live meeting
-* `meetingProvider`: `string` — e.g., `Zoom`, `Jitsi`
-* `bookingId`: `string` — latest booking ref
-* `orderId`: `string` — payment order id
-* `paymentId`: `string` — payment gateway id
-* `bookings`: `number` — total bookings count
-* `attendees`: `Array<{ userId: string, bookingId: string, attended: boolean, attendedAt?: Date }>`
 * `likes`: `number`
-* `likedBy`: `string[]` — optional array of userIds (may be trimmed)
+* `likedUsers`: `string[]` — optional array of userIds (may be trimmed)
 * `shares`: `number`
 * `reports`: `number` — aggregated count
-* `reportsDetails`: `[{ reporterId: string, reason: string, createdAt: Date }]`
+* `reportedUsers`: `string[]` — optional array of userIds (may be trimmed)
 * `createdBy`: `{ adminId?: string, coachId?: string }`
 * `createdAt`: `Date`
 * `updatedAt`: `Date`
 * `publishedAt`: `Date | null`
-* `cancellationRefundedAt`: `Date | null`
-* `metadata`: `Record<string, any>` — extensible object for tags
 
 **Indexes**
 
@@ -95,14 +85,13 @@ Represents a booking record for a user who booked a public session.
 * `seatCount`: `number`
 * `createdAt`: `Date`
 * `updatedAt`: `Date`
-* `refund`: `{ refundedAt?: Date, refundAmount?: number, refundId?: string, refundStatus?: string }`
+* `isRefunded`: `Boolean`
 * `userMeta`: `{ name?: string, email?: string, profileImage?: string }` — denormalized snapshot
 
 **Indexes**
 
 * `bookingId` (unique)
 * `sessionId` for lookups
-* `userId` for user booking queries
 
 ---
 
@@ -143,7 +132,9 @@ export interface IPublicSession {
   thumbnailURL?: string;
   thumbnailKey?: string;
   thumbnailMediaId?: string;
-  date: string | Date;
+  date: string;
+  dateTime: Date;
+  endDateTime: Date;
   startTime: string;
   endTime?: string;
   duration?: number;
@@ -152,34 +143,19 @@ export interface IPublicSession {
   seats?: number;
   availableSeats?: number;
   price?: number;
-  bookingPrice?: number;
-  liveSessionPrice?: number;
-  currency?: string;
-  sessionType?: string;
   status?: string;
   state?: string;
   stage?: string;
-  isRefunded?: boolean;
   cancelReason?: string | null;
   cancelledBy?: { adminId?: string; coachId?: string; userId?: string };
-  meetingLink?: string;
-  meetingProvider?: string;
-  bookingId?: string;
-  orderId?: string;
-  paymentId?: string;
-  bookings?: number;
-  attendees?: Array<{ userId: string; bookingId: string; attended: boolean; attendedAt?: Date }>;
   likes?: number;
   likedBy?: string[];
+  participants: string[];
   shares?: number;
   reports?: number;
-  reportsDetails?: Array<{ reporterId: string; reason: string; createdAt: Date }>;
-  createdBy?: { adminId?: string; coachId?: string };
+  reportsedUsers?: string[];
   createdAt?: Date;
   updatedAt?: Date;
-  publishedAt?: Date | null;
-  cancellationRefundedAt?: Date | null;
-  metadata?: Record<string, any>;
 }
 
 export interface IBookedSlot {
@@ -198,7 +174,7 @@ export interface IBookedSlot {
   seatCount?: number;
   createdAt?: Date;
   updatedAt?: Date;
-  refund?: { refundedAt?: Date; refundAmount?: number; refundId?: string; refundStatus?: string };
+  isRefund?: boolean;
   userMeta?: { name?: string; email?: string; profileImage?: string };
 }
 
