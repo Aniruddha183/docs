@@ -261,23 +261,18 @@ export interface IPostModel extends Document {
 ```mermaid
 flowchart TD
   A[Author: Compose Post] --> B[Request presigned URL]
-  B --> C[Upload to S3 (client -> S3)]
-  C --> D[Register PostMedia in DB (temp)]
-  D --> E[Save Draft: create IPostModel(status=draft)]
+  B --> C[Upload to S3 client to S3]
+  C --> D[Register PostMedia in DB temp]
+  D --> E[Save Draft: create IPostModel status=draft]
   E --> F[Submit For Review]
   F --> G[Backend: diff referenced media vs PostMedia]
-  G -->|unused keys| H[Delete unused S3 objects & cleanup DB]
-  G --> I[Create/Update AdminReview(stage=reviewer)]
+  G --> I[Create/Update AdminReview stage=reviewer]
   I --> J[Reviewer reviews]
-  J -->|save draft comment| I
-  J -->|request_changes| K[Return to Author with comments]
-  J -->|send_to_approver| L[Approver stage; reviewer lock=true]
-  L --> M[Approver reviews; may edit minor fields]
-  M -->|approve| N[Publish Post -> set status=published; version++]
-  N --> O[Notify subscribers; index for search; enable public view]
-  M -->|deny| P[Set status=denied; notify author with reason]
-  N --> Q[Users view, like, comment, report]
-  Q --> R[Analytics & moderation flows]
+  J --> K[Save draft comment - Return to reviewer]
+  J --> M[Send to approver - Approver stage reviewer lock=true]
+  M --> N[Approver reviews may edit minor fields]
+  N --> O[Approve - Publish Post set status=published]
+  N --> Q[Deny - Set status=denied notify author with reason]
 ```
 
 ---
