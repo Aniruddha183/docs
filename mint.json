@@ -306,6 +306,7 @@
         {
           "group": "Post Module",
           "pages": [
+            "backend/post-overview",
             "backend/DB-Schema/Post-module-db-schema",
 
             {
